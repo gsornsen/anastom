@@ -1,0 +1,22 @@
+{
+  "project": "Anastom",
+  "generated": "2026-09-10",
+  "documents": [
+    "README.md",
+    "docs/ADDITIONAL_RECOMMENDATIONS.md",
+    "docs/ARCHITECTURE.md",
+    "docs/BOOTSTRAP_BUILD_BRIEF.md",
+    "docs/MILESTONES.md",
+    "docs/MYCELIUM_MIGRATION.md",
+    "docs/PRD_MLP.md",
+    "docs/PROJECT_STRUCTURE.md",
+    "docs/RUNTIMES_AND_INSPIRATION.md",
+    "docs/STRATEGY.md",
+    "docs/VISION.md",
+    "docs/WORKFLOW_IR.md"
+  ],
+  "mlp_milestones": "M0-M7 (M8 desirable)",
+  "recommended_first_runtime": "Pi",
+  "recommended_second_runtime": "Codex",
+  "primary_language": "TypeScript"
+}

@@ -1,0 +1,67 @@
+name: Feature proposal
+description: Propose a user-visible capability with a concrete outcome and acceptance evidence.
+title: "feature: "
+labels:
+  - enhancement
+  - needs-design
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and outcome
+      description: Describe the user problem and the observable outcome the proposal should enable.
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Concrete use case
+      description: Give a representative workflow or before/after example.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Proposed scope
+      description: Identify what belongs in the first increment and what should remain outside it.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance evidence
+      description: List deterministic tests, fixtures, artifacts, or observations that would prove completion.
+    validations:
+      required: true
+  - type: dropdown
+    id: contracts
+    attributes:
+      label: Does this change a foundational contract?
+      options:
+        - No
+        - Workflow IR
+        - Runtime adapter
+        - Event or transition semantics
+        - Persistence or recovery
+        - Security or workspace isolation
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Include a smaller solution or an existing primitive if one could satisfy the use case.
+    validations:
+      required: true
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Principle checks
+      options:
+        - label: The proposal keeps orchestration policy outside hidden prompts.
+          required: true
+        - label: The proposal does not require core or engine code to depend on one model or harness.
+          required: true
+        - label: I searched existing issues, discussions, and roadmap documents.
+          required: true

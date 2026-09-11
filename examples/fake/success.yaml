@@ -1,0 +1,19 @@
+nodes:
+  analyze:
+    - output:
+        summary: The requested feature has one bounded implementation path.
+  implement:
+    - events:
+        - Applied the bounded fake change.
+      output:
+        changedFiles:
+          - src/feature.ts
+  verify:
+    - output:
+        passed: true
+        checks:
+          - id: acceptance
+            passed: true
+            evidence:
+              - fake:test-output
+            summary: All deterministic acceptance checks passed.

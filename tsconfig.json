@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": false,
+    "baseUrl": ".",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@anastom/cli": ["packages/cli/src/index.ts"],
+      "@anastom/core": ["packages/core/src/index.ts"],
+      "@anastom/engine": ["packages/engine/src/index.ts"],
+      "@anastom/runtime-contract": ["packages/runtime-contract/src/index.ts"],
+      "@anastom/runtime-fake": ["packages/runtime-fake/src/index.ts"]
+    },
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2023",
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["eslint.config.js", "packages/**/*.ts", "vitest.config.ts"]
+}

@@ -1,0 +1,58 @@
+# OS and editor metadata
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+.direnv/
+
+# JavaScript and TypeScript
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+*.tsbuildinfo
+*.log
+pnpm-debug.log*
+.eslintcache
+.turbo/
+.nx/
+
+# Python adapters and tooling
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Rust and Go adapters
+target/
+*.test
+coverage.out
+
+# Anastom local run state
+.anastom/
+anastom.db
+anastom.db-shm
+anastom.db-wal
+
+# Temporary files
+.cache/
+.tmp/
+tmp/

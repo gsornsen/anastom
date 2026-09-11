@@ -1,0 +1,14 @@
+{
+  "name": "@anastom/runtime-fake",
+  "version": "0.0.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@anastom/core": "workspace:*",
+    "@anastom/runtime-contract": "workspace:*",
+    "ajv": "^8.17.1",
+    "yaml": "^2.8.1"
+  }
+}

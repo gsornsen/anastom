@@ -1,0 +1,36 @@
+{
+  "name": "anastom",
+  "version": "0.0.0",
+  "description": "Adaptive orchestration for autonomous software-engineering agents.",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gsornsen/anastom.git"
+  },
+  "homepage": "https://github.com/gsornsen/anastom#readme",
+  "bugs": {
+    "url": "https://github.com/gsornsen/anastom/issues"
+  },
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=24",
+    "pnpm": "11.9.0"
+  },
+  "scripts": {
+    "anastom": "tsx packages/cli/src/bin.ts",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@types/node": "^24.3.1",
+    "eslint": "^9.35.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.42.0",
+    "vitest": "^3.2.4"
+  }
+}

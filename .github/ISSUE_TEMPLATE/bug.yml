@@ -1,0 +1,79 @@
+name: Bug report
+description: Report reproducible behavior that conflicts with a documented contract.
+title: "bug: "
+labels:
+  - bug
+  - needs-triage
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping make Anastom more reliable. Remove secrets, private source code, and proprietary transcripts from all evidence.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Workflow IR and validation
+        - Engine and transitions
+        - Runtime contract or adapter
+        - Persistence and recovery
+        - CLI
+        - Documentation
+        - Build and tooling
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: State what happened and include the complete safe error output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: Cite the contract, documentation, or invariant that led to this expectation.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide the smallest workflow, fake scenario, and commands that reproduce the issue.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Anastom revision
+      description: Commit SHA, tag, or branch and date.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, Node.js version, pnpm version, and any relevant runtime details.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Additional evidence
+      description: Event sequence, fixture, minimized logs, or other evidence that helps isolate the failure.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues and discussions.
+          required: true
+        - label: I removed secrets, private data, and unrelated proprietary material.
+          required: true
+        - label: This is not a security vulnerability requiring private disclosure.
+          required: true

@@ -1,0 +1,33 @@
+apiVersion: anastom.dev/v1alpha1
+kind: Workflow
+
+metadata:
+  id: demo/feature
+  version: 0.1.0
+
+inputs: {}
+
+policies:
+  defaultAttemptBudget:
+    maxAttempts: 2
+    maxDuration: 1m
+
+nodes:
+  analyze:
+    kind: agent
+    role: analyst
+    output:
+      schema: ../schemas/analysis.json
+
+  implement:
+    kind: agent
+    role: bounded-implementer
+    needs: [analyze]
+    output:
+      schema: ../schemas/implementation.json
+
+  verify:
+    kind: verifier
+    needs: [implement]
+    output:
+      schema: ../schemas/verification.json

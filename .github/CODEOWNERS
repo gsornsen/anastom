@@ -1,0 +1,8 @@
+# Default review ownership. Add package-level owners as the maintainer group grows.
+* @gsornsen
+
+/.github/ @gsornsen
+/docs/ @gsornsen
+/packages/core/ @gsornsen
+/packages/engine/ @gsornsen
+/packages/runtime-contract/ @gsornsen

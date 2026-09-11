@@ -1,0 +1,60 @@
+name: Design proposal
+description: Propose a change to a foundational API, IR, or architectural invariant.
+title: "design: "
+labels:
+  - design
+  - needs-design
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form before implementing changes to the Workflow IR, runtime contract, event model, persistence boundary, security model, licensing, trademarks, contributor terms, or governance.
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision to make
+      description: Frame the specific ambiguity or choice that must be resolved.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and evidence
+      description: Explain the current limitation and provide fixtures, failures, measurements, or prior decisions.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed contract
+      description: Show the smallest concrete API, schema, state transition, or policy change.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: invariants
+    attributes:
+      label: Preserved invariants
+      description: Explain how control-plane ownership, determinism, evidence, isolation, and vendor neutrality are preserved.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and tradeoffs
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and migration
+      description: Identify affected workflows, event histories, adapters, APIs, and migration or versioning needs.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation plan
+      description: State how fake-runtime tests and deterministic evidence will validate the decision before real integrations depend on it.
+    validations:
+      required: true

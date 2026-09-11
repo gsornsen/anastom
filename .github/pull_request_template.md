@@ -1,0 +1,33 @@
+## Problem and result
+
+<!-- Describe the concrete problem and resulting behavior. Include a before/after example when useful. -->
+
+## Scope
+
+<!-- State what changed and identify intentionally deferred follow-up work. -->
+
+## Evidence
+
+<!-- List the exact tests, fixtures, commands, or measurements used to validate the change. -->
+
+## Contract and architecture review
+
+- [ ] State changes pass through typed transitions and events.
+- [ ] Core and engine remain independent of specific models and harnesses.
+- [ ] Structured outputs are validated before affecting workflow state.
+- [ ] Public contract changes include focused tests and documentation.
+- [ ] Compatibility and migration impact is documented, or this change has none.
+- [ ] The change fits the currently approved milestone or linked design decision.
+
+## Risk and recovery
+
+<!-- Describe meaningful failure modes and how the change can be disabled, reverted, or recovered. Write "Low risk" with a reason when appropriate. -->
+
+## Assistance and provenance
+
+- [ ] I reviewed every submitted change and have the right to contribute it.
+- [ ] New dependencies, copied material, and generated assets have compatible terms and documented provenance.
+- [ ] Commits include a DCO `Signed-off-by` line.
+- [ ] I disclosed substantial AI assistance below, or no such assistance was used.
+
+<!-- AI assistance disclosure, if applicable. Include the tool and the parts of the change it materially helped produce. -->
