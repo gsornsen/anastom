@@ -35,25 +35,21 @@ Anastom is organized around five layers:
 
 See the documents in `docs/` for the product vision, strategy, MLP PRD, milestones, architecture, workflow IR, runtime evaluation, and migration plan.
 
-## Recommended first build
+## Build sequence
 
-Do **not** start by porting all of Mycelium.
-
-Start with one thin vertical slice:
+M0 proves the language and transition engine with a deterministic fake runtime. M1 is the first real vertical slice:
 
 ```text
-Goal
-  -> methodology selection
-  -> Workflow IR instance
-  -> two isolated worker branches
-  -> runtime adapter (Pi first)
-  -> durable event log
-  -> deterministic verifier
-  -> synthesis
-  -> resumable run
+Markdown task
+  -> one Workflow IR instance
+  -> one isolated worktree
+  -> one Pi worker with fresh context
+  -> one deterministic command verifier
+  -> SQLite event history and filesystem artifacts
+  -> durable status and inspection
 ```
 
-Then add Codex as the second adapter. The same workflow executing successfully on Pi and Codex is the first proof that Anastom is truly a control plane rather than a harness-specific framework.
+M2 adds Codex as the second adapter and proves that the same contract survives a different execution substrate. Multiple workers, integration branches, and crash recovery follow in their own milestones.
 
 ## Reference CLI
 
@@ -88,6 +84,8 @@ pnpm anastom validate examples/workflows/demo-feature.yaml
 pnpm anastom graph examples/workflows/demo-feature.yaml
 pnpm anastom run examples/workflows/demo-feature.yaml --fake-scenario examples/fake/success.yaml
 ```
+
+M0 decisions and evidence are recorded in [docs/M0_RETROSPECTIVE.md](docs/M0_RETROSPECTIVE.md). The accepted M1 scope is in [docs/M1_BUILD_BRIEF.md](docs/M1_BUILD_BRIEF.md).
 
 ## License and community
 

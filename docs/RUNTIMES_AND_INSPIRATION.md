@@ -24,7 +24,9 @@ First adapter. Keep Anastom orchestration above it.
 Do not make Pi extensions the Anastom plugin system. Preserve a neutral core.
 
 Reference:
-https://github.com/badlogic/pi-mono
+https://github.com/earendil-works/pi
+
+The maintained SDK package is `@earendil-works/pi-coding-agent`. Earlier releases used the `@mariozechner` scope and the `badlogic/pi-mono` repository; adapters should follow the maintained package and pin an exact reviewed version.
 
 ---
 

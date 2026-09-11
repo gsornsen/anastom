@@ -48,14 +48,16 @@ Generic status-change events were rejected in favor of events such as `AttemptSt
 
 Artifact repositories, routing layers, command executors, gate providers, workspace abstractions, and model configuration were rejected for M0. None are needed to prove parsing, scheduling, adapter isolation, output validation, retry behavior, replay, or reload.
 
-## Architecture questions before M1
+## M1 review resolution
 
-`ARCHITECTURE.md` should update `ExecutionRequest` to include the node kind and clarify that role is optional for deterministic nodes. It should also decide whether command, gate, and verifier execution belongs behind the same runtime adapter, behind dedicated control-plane executors, or behind a smaller common execution interface.
+The M1 contract review resolved these questions in `ARCHITECTURE.md`, `WORKFLOW_IR.md`, `docs/adr/`, and `M1_BUILD_BRIEF.md`.
 
-`WORKFLOW_IR.md` should record the single-output-schema syntax or replace it with an explicit named-artifact mapping before multiple outputs and workflow state are added. Optional inputs, defaults, and input-to-child mapping also need syntax before nested workflows.
+`ExecutionRequest` includes the node kind and keeps role optional. A real runtime adapter executes agent nodes only. Deterministic command verification belongs to the control plane; general verifier and gate providers remain deferred.
 
-Gate semantics remain intentionally undefined beyond a typed node kind and blocked result. M1 design should state how machine conditions and human approvals are represented, resumed, and audited without hiding a condition in a prompt.
+The single schema-validated node output remains authoritative in M1. Diffs, worker reports, context envelopes, and command output are named artifacts rather than additional workflow outputs. Optional inputs, defaults, workflow state slots, and child mappings remain deferred with nested workflows.
 
-Duration enforcement needs one owner and one race policy: whether the control plane cancels an adapter, how a late result is recorded, and whether timeout consumes an attempt. That should be settled before any long-running harness adapter.
+M1 does not implement executable human gates. The fake runtime retains gate coverage only for M0 transition tests.
 
-The architecture should distinguish event history from immutable run configuration. M0 stores the normalized workflow beside its events; if events alone must recreate a run on another machine, a workflow definition digest and a versioned definition repository will be required.
+The control plane owns attempt deadlines. Timeout requests cancellation, consumes an attempt, and wins over a late result for authoritative state.
+
+SQLite stores immutable normalized workflow JSON with a digest beside append-only events. Event sequence remains the transition ordering authority. M1 durability supports later-process inspection, while live-attempt recovery remains M3.

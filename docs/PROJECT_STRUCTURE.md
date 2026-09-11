@@ -223,15 +223,6 @@ Fault injection:
 - timeout;
 - repeated verifier failure.
 
-## ADRs to create immediately
+## Initial ADRs
 
-1. `0001-control-plane-not-harness.md`
-2. `0002-workflow-ir.md`
-3. `0003-event-sourced-runs.md`
-4. `0004-fresh-context-by-default.md`
-5. `0005-role-model-decoupling.md`
-6. `0006-runtime-adapter-boundary.md`
-7. `0007-sqlite-first-temporal-later.md`
-8. `0008-worktree-isolation.md`
-
-These decisions are important enough to remain explicit as agents begin modifying the project.
+The initial control-plane, Workflow IR, event sourcing, context, role, adapter, persistence, and worktree decisions are recorded in `docs/adr/`. Later decisions should supersede them with new records instead of removing their history.

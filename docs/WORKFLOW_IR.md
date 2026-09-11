@@ -1,44 +1,30 @@
 # Workflow IR
 
+## Status
+
+`anastom.dev/v1alpha1` is an experimental, strictly validated format. This document separates the implemented M0 profile from later design directions so examples cannot silently become APIs.
+
+The parser rejects unknown fields, unknown node kinds, invalid schema references, missing dependencies, self-dependencies, duplicate dependencies, and dependency cycles. A field described under a future direction is not accepted until its milestone adds validation, normalized types, execution semantics, and tests.
+
 ## Purpose
 
-The Workflow IR is the most important design surface in Anastom.
+The Workflow IR describes engineering policy without embedding model- or harness-specific behavior. It must remain versioned, deterministic, typed, inspectable, serializable, and executable with a fake runtime.
 
-It must be expressive enough to encode engineering methodologies without embedding model- or harness-specific behavior.
+## Implemented M0 profile
 
-## Design goals
-
-- declarative where possible;
-- deterministic transition semantics;
-- typed inputs and outputs;
-- composable;
-- versioned;
-- inspectable;
-- testable without an LLM;
-- serializable;
-- safe to evolve.
-
-## Proposed v0 shape
+The complete authored shape supported today is:
 
 ```yaml
 apiVersion: anastom.dev/v1alpha1
 kind: Workflow
 
 metadata:
-  id: debug/hypothesis
+  id: feature/demo
   version: 0.1.0
 
 inputs:
-  issue:
-    schema: ./schemas/issue.json
-
-state:
-  reproduction:
-    schema: ./schemas/reproduction.json
-  hypotheses:
-    schema: ./schemas/hypothesis-list.json
-  evidence:
-    schema: ./schemas/evidence-list.json
+  request:
+    schema: ../schemas/request.json
 
 policies:
   defaultAttemptBudget:
@@ -46,232 +32,145 @@ policies:
     maxDuration: 20m
 
 nodes:
-  reproduce:
+  analyze:
     kind: agent
-    role: debugger
-    mutation: readonly
-    produces:
-      - reproduction
-    verify:
-      - type: schema
-        artifact: reproduction
-      - type: expression
-        condition: "outputs.reproduction.observed == true"
+    role: analyst
+    output:
+      schema: ../schemas/analysis.json
 
-  hypothesize:
+  implement:
     kind: agent
-    role: diagnostician
-    needs: [reproduce]
-    mutation: readonly
-    produces:
-      - hypotheses
-
-  experiment:
-    kind: agent
-    role: experimenter
-    needs: [hypothesize]
-    mutation: controlled
-    loop:
-      until: "state.hypotheses.top.confidence >= 0.85"
-      maxIterations: 6
-
-  fix:
-    kind: workflow
-    workflow: sdlc/patch
-    when: "state.hypotheses.top.confidence >= 0.85"
+    role: implementer
+    needs: [analyze]
+    output:
+      schema: ../schemas/implementation.json
 
   verify:
     kind: verifier
-    needs: [fix]
+    needs: [implement]
+    output:
+      schema: ../schemas/verification.json
 ```
 
-The exact syntax should remain provisional until M0/M1.
+All declared inputs are required. Unknown input names are rejected. JSON Schema validates each input value.
 
-## Node kinds to start with
+Every node has exactly one authoritative structured output. `output.schema` is resolved relative to the workflow file and embedded in the normalized definition. Artifact files, logs, diffs, and command evidence are separate records; they do not become additional authoritative node outputs.
 
-Do not create twenty node kinds.
+`needs` contains node IDs. Declaration order is the stable scheduling tie-breaker. M0 executes one ready node at a time.
 
-Start with:
+`role` is required for `agent` nodes and rejected for deterministic node kinds. A role expresses requested capability; it does not select a model or harness.
+
+`maxAttempts` defaults to one. `maxDuration` accepts a positive integer followed by `ms`, `s`, `m`, or `h`. M0 normalizes the duration and passes it to the fake runtime without enforcing a wall-clock timeout.
+
+## Implemented node semantics
 
 ### `agent`
-Execute one bounded model/harness task.
+
+Requests one bounded harness attempt. The adapter result must satisfy the node output schema.
 
 ### `command`
-Execute a deterministic process.
+
+Crosses the fake runtime boundary in M0. M1 gives it deterministic process semantics through the control plane. It does not acquire a role or model assignment.
 
 ### `gate`
-Require a condition or human approval.
 
-### `fanout`
-Instantiate children over a list.
-
-### `fanin`
-Aggregate children.
-
-### `workflow`
-Call another workflow.
+Crosses the fake runtime boundary in M0 so blocked transitions can be tested. Human approval, resume, and condition syntax remain outside M1.
 
 ### `verifier`
-Evaluate evidence/acceptance criteria.
 
-Later, add specialized constructs only if these are insufficient.
+Crosses the fake runtime boundary in M0. Its schema-valid output must also contain a boolean `passed`. `passed: false` is a verification failure and consumes an attempt.
 
-## Roles
+M1 command verification uses a deterministic `command` node. General verifier plugins and model-assisted review remain later work.
 
-Roles should define capabilities, not vendor assignments:
+## M1 additions
 
-```yaml
-roles:
-  planner:
-    requires:
-      reasoning: high
-      context: high
-      instructionFollowing: high
-    prefers:
-      cost: medium
+M1 adds only the authored information needed for one real worker:
 
-  bounded-implementer:
-    requires:
-      toolUse: high
-      instructionFollowing: high
-    prefers:
-      cost: low
+- an `agent` node declares `mutation: readonly | isolated`;
+- a `command` node declares a non-shell `argv` vector, a workspace-relative working directory, a duration limit, and an output-size limit;
+- normalized runs retain a digest of the exact workflow definition used to create them;
+- execution records may reference named artifacts such as a diff, command stdout, command stderr, and a worker report.
+
+The implementation must reject `shared-integration`, `external`, shell strings, undeclared environment injection, absolute command working directories, and other unimplemented modes. These additions remain part of `v1alpha1`; compatibility is documented in the M1 build brief and exercised by parser tests before a real adapter can consume them.
+
+## Markdown task descriptor
+
+The M1 demo accepts a Markdown task because bounded engineering work is more readable as prose than as a workflow graph. A task descriptor is a CLI input format, not a second workflow language. The CLI strictly validates its YAML front matter and compiles it into one `agent` node followed by one deterministic `command` node.
+
+```markdown
+---
+apiVersion: anastom.dev/v1alpha1
+kind: Task
+metadata:
+  id: demo/add-endpoint
+  version: 0.1.0
+role: bounded-implementer
+workspace:
+  mutation: isolated
+acceptanceCriteria:
+  - GET /health returns HTTP 200 with a JSON status body.
+verification:
+  argv: [pnpm, test]
+  maxDuration: 5m
+---
+
+# Add a health endpoint
+
+Implement the endpoint using the repository's existing conventions.
 ```
 
-A routing policy resolves role -> runtime/model.
+The Markdown body is the objective. Front matter is policy. Prose cannot override the workspace, verification, budget, or output contract. M1 supports exactly one command verifier in a task descriptor; multiple verifiers and user-authored task-to-workflow templates require a later decision.
 
 ## Artifacts and evidence
 
-Every workflow-relevant output should have:
+M1 introduces artifact references without turning every artifact into workflow state:
 
 ```ts
 type ArtifactRef = {
   id: string;
   type: string;
-  schemaVersion: string;
+  mediaType: string;
   uri: string;
-  producer: AttemptRef;
+  producer: {
+    runId: string;
+    nodeId: string;
+    attempt: number;
+  };
   digest: string;
 };
 ```
 
-Evidence wraps artifacts or observations with meaning:
+The digest covers the stored bytes. Artifact metadata belongs in the durable run history; artifact bodies belong in the run artifact directory. M1 does not add an evidence graph, confidence score, named workflow state slots, or multi-output node transitions.
 
-```ts
-type Evidence = {
-  claim?: string;
-  direction: "supports" | "contradicts" | "neutral";
-  strength?: number;
-  source: ArtifactRef | ObservationRef;
-};
-```
+## Deferred directions
 
-## Hypothesis entity
+The following concepts remain design intent rather than accepted syntax:
 
-A useful canonical representation:
+- optional inputs and defaults;
+- `fanout` and `fanin`;
+- loops and expressions;
+- nested `workflow` calls and explicit parent/child mappings;
+- shared integration workspaces;
+- human approval gates and resume;
+- named authoritative outputs and workflow state slots;
+- role-to-model routing and runtime capability requirements;
+- evidence graphs and hypothesis entities.
 
-```ts
-type Hypothesis = {
-  id: string;
-  statement: string;
-  confidence: number;
-
-  supports: EvidenceRef[];
-  contradicts: EvidenceRef[];
-
-  assumptions: string[];
-
-  nextExperiment?: {
-    objective: string;
-    discriminatesAgainst: string[];
-    expectedIfTrue: string;
-    expectedIfFalse: string;
-    costEstimate?: string;
-  };
-};
-```
-
-The confidence field does not have to be mathematically Bayesian in the MLP; the key is that changes must cite evidence.
-
-## Verification as a first-class node
-
-A verifier should return structured data:
-
-```ts
-type VerificationResult = {
-  passed: boolean;
-  checks: Array<{
-    id: string;
-    passed: boolean;
-    evidence: ArtifactRef[];
-    summary: string;
-  }>;
-};
-```
-
-A model may help interpret a result, but the pass/fail owner should be deterministic wherever possible.
-
-## Nested workflows
-
-Nested workflows need scoped state:
-
-```text
-parent run
-  sdlc/default
-    implementation node
-      call debug/hypothesis
-        local hypotheses
-        local evidence
-      return:
-        fixArtifact
-        verificationArtifact
-```
-
-The child should receive explicitly mapped inputs and return explicitly mapped outputs.
-
-Do not implicitly share all parent state.
+When added, nested workflows must receive explicitly mapped inputs and return explicitly mapped outputs. They must not inherit all parent state or transcript history.
 
 ## Methodology packages
 
-Suggested layout:
+Methodologies are versioned data, prompts, schemas, and deterministic evaluators composed from accepted IR primitives:
 
 ```text
 methodologies/
-  sdlc/
-    default/
-      workflow.yaml
-      roles.yaml
-      prompts/
-      schemas/
-      evaluators/
-      README.md
-
-  debug/
-    hypothesis/
-      workflow.yaml
-      ...
-
-  tdd/
-    delegated/
-      workflow.yaml
-      ...
+  sdlc/default/
+    workflow.yaml
+    roles.yaml
+    prompts/
+    schemas/
+    evaluators/
+    README.md
 ```
 
-## Workflow testing
-
-Every methodology should support deterministic tests with the fake runtime:
-
-```text
-given fake planner returns Plan A
-and worker 1 passes
-and worker 2 fails verifier twice
-expect circuit breaker
-expect diagnostics transition
-expect no third mutation attempt
-```
-
-This should become one of Anastom's strongest quality practices.
-
-## Design constraint
-
-If a methodology requires hidden prompt behavior to remain correct, the Workflow IR is missing a primitive.
+Every methodology must support deterministic fake-runtime tests. If correctness depends on an unrecorded prompt convention, the Workflow IR or control-plane contract is missing a primitive.
