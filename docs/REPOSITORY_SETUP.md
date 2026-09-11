@@ -20,7 +20,7 @@ This checklist captures the repository controls that cannot be expressed entirel
 Create the ruleset after the initial branch exists:
 
 - require a pull request before merge;
-- require the `Test, types, lint, and demo` status check;
+- require the `Test, types, lint, and demo`, `DCO sign-off`, and `Dependency review` status checks;
 - require all conversations to be resolved;
 - require branches to be up to date before merge;
 - block force pushes and branch deletion;
@@ -44,7 +44,7 @@ Do not require an approving review while there is only one maintainer because au
 ## Community and maintenance
 
 - Create the labels referenced by the issue forms and release configuration.
-- Install or configure a DCO check before accepting third-party commits.
+- Keep the committed DCO workflow required before accepting third-party commits.
 - Pin a welcome discussion describing current scope and how design decisions are made.
 - Create milestones only for approved scopes; do not use issue labels as a substitute for acceptance criteria.
 - Record foundational API decisions in design proposals or architecture decision records.
