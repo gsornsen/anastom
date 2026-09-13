@@ -35,6 +35,14 @@ Contributions should preserve the boundaries in [VISION.md](docs/VISION.md), [AR
 
 Keep pull requests narrow enough to review. Update design documents when behavior, contracts, or architectural assumptions change. Add a retrospective or decision record when implementation reveals that the design intent should change.
 
+## Keep the project overview current
+
+Update `README.md` in every pull request by default. It should give an external reader an accurate view of the project's purpose, supported behavior, setup, limitations, milestone status, and links to deeper documentation. Keep implemented capabilities distinct from planned work.
+
+A README edit may be omitted when the change has no meaningful effect on that overview, such as a test-only correction or a mechanical change that leaves supported behavior and setup unchanged. Explain the specific reason in the pull request. Avoid artificial README edits made only to satisfy the policy.
+
+Record notable user-facing or project changes in `CHANGELOG.md`. Keep the README's changelog link working; the overview and detailed change history serve different purposes.
+
 ## Tests and evidence
 
 Tests should prove observable behavior and failure handling. Avoid tests that merely repeat an implementation. A pull request should state which checks ran and include relevant output or fixtures for behavior that cannot be covered by the standard commands.
