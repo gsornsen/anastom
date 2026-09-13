@@ -18,6 +18,9 @@
 - [ ] Public contract changes include focused tests and documentation.
 - [ ] Compatibility and migration impact is documented, or this change has none.
 - [ ] The change fits the currently approved milestone or linked design decision.
+- [ ] README.md is updated, or the reason no overview update is needed is documented below.
+
+<!-- Update README.md in every PR by default. If unchanged, explain the specific reason this change does not affect the project overview, supported behavior, setup, limitations, milestone status, or documentation links. -->
 
 ## Risk and recovery
 
