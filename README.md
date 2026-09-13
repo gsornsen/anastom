@@ -6,7 +6,7 @@ Anastom is building a local-first, vendor-neutral control plane for software-eng
 
 The goal is to make work that spans hours or days understandable, bounded, and recoverable, even as models and coding tools change.
 
-**Current stage: M1 single-worker validation.** Pi delegation, isolated Git worktrees, independent command verification, and durable history are implemented and demonstrated. The controlled live run with Anthropic `claude-opus-4-8` passed; final review and code analysis are tracked in the [M1 evidence record](docs/M1_EVIDENCE.md).
+**Current stage: M1 is complete.** Anastom can delegate a bounded task to Pi in an isolated Git worktree, verify it independently, and preserve history for later inspection. The controlled live run with Anthropic `claude-opus-4-8` passed; see the [M1 completion evidence](docs/M1_EVIDENCE.md).
 
 [Changelog](CHANGELOG.md) · [Roadmap](docs/MILESTONES.md) · [Design documents](#learn-more) · [Contributing](CONTRIBUTING.md)
 
@@ -103,7 +103,7 @@ Each milestone must produce a useful, testable demonstration. These are planned 
 | Milestone | Status | Outcome |
 | --- | --- | --- |
 | **M0 — Skeleton** | Complete | Validate workflows and execute deterministic fake runs. |
-| **M1 — Single worker** | Implementation in validation | One Pi worker, fresh context, isolated Git worktree, command verification, SQLite history, and durable `status` / `inspect`. |
+| **M1 — Single worker** | Complete | One Pi worker, fresh context, isolated Git worktree, command verification, SQLite history, and durable `status` / `inspect`. |
 | **M2 — Portable worker** | Planned | Run the same contract through Codex; compare normalized events and capabilities. |
 | **M3 — Durable execution** | Planned | Recover safely after interruption, with ownership, orphan detection, pause, and resume semantics. |
 | **M4 — Defined SDLC** | Planned | Plan, delegate parallel work, integrate, review, and verify a feature. |

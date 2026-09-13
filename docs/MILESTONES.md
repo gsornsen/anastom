@@ -31,6 +31,8 @@ This proves the core language before coupling to an LLM harness.
 
 ## M1 — Single worker: "Anastom can delegate one bounded task"
 
+Status: complete. See [M1_EVIDENCE.md](M1_EVIDENCE.md) for deterministic checks, the controlled Pi/Anthropic demonstration, durable inspection, digests, and retained diff.
+
 ### Demo
 On a small repository:
 

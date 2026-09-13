@@ -1,6 +1,6 @@
 # M1 completion evidence
 
-Status: deterministic and required live Pi evidence recorded. Final code-analysis checks are being revalidated after task-parser hardening.
+Status: complete. All required M0/M1 functional evidence is recorded, including the authenticated live Pi run, durable inspection, and passing Linux/macOS CI. Code analysis passed after parser hardening and one documented individual false-positive dismissal.
 
 ## Environment
 
@@ -107,6 +107,10 @@ The live retained diff is byte-identical to the complete fake-run diff printed a
 
 ## CI and analysis
 
-Node.js 24 Linux CI, Node.js 24 macOS portability, dependency review, and DCO passed on the initial implementation commit. CodeQL flagged the front-matter regular expression and direct task-file path use. The regex was replaced with a single line scan, including BOM/CRLF and repeated-delimiter regression coverage. The loader now resolves the explicitly selected task filename before reading, matching the compatible workflow loader. Final checks are being re-run on this change; no scan rules were disabled.
+Node.js 24 Linux CI (full tests/types/lint/M0 and M1 demos), Node.js 24 macOS portability, dependency review, and DCO passed on implementation and parser-hardening commits. CodeQL's regex finding was fixed with a single line scan and BOM/CRLF/repeated-delimiter regression coverage.
+
+CodeQL alert 6 (`js/path-injection`, task-file read) was individually assessed as a false positive: a local operator explicitly chooses the task filename, and the loader intentionally supports that filesystem operation. M1 has no HTTP/API input boundary and does not elevate permissions beyond its caller. Resolving the path is normalization, not filesystem authorization. A future network-facing caller must authorize filenames before invoking this API. The same local-file selection is supported by the compatible workflow loader. The narrow dismissal and rationale are recorded in GitHub and ADR 0009; the path-injection query remains enabled. This assessment follows the [CodeQL rule's access-boundary concern](https://codeql.github.com/codeql-query-help/javascript/js-path-injection/) and GitHub's [documented alert dismissal process](https://docs.github.com/en/code-security/how-tos/manage-security-alerts/manage-code-scanning-alerts/resolve-alerts).
+
+All six PR checks passed: full Linux tests/types/lint/demos, macOS portability, dependency review, DCO, CodeQL analysis, and CodeQL results. Human implementation review is the next step; M2 work has not begun.
 
 Reproduction commands and limits are in [M1_DEMO.md](M1_DEMO.md); the required completion checklist is in [M1_BUILD_BRIEF.md](M1_BUILD_BRIEF.md).

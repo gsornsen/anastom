@@ -76,7 +76,8 @@ export async function compileTask(task: TaskDocument, sourcePath: string): Promi
   return { ...definition, task: { objective: task.objective, acceptanceCriteria: [...task.acceptanceCriteria] } };
 }
 export async function loadTask(file: string): Promise<WorkflowDefinition> {
-  // The caller intentionally selects a local task file, as with loadWorkflow.
+  // Operator-selected local file, as with loadWorkflow. This is not a network
+  // request boundary: callers exposing it remotely must authorize filenames.
   const absolutePath = resolve(file);
   let source: string;
   try { source = await readFile(absolutePath, "utf8"); }

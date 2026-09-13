@@ -17,6 +17,7 @@ The M1 contract leaves fake task mutation, partially supplied attempt policies, 
 - Deadline, cancellation, and late-result events have ordered reducer transitions. Timeout cannot transition to success. An unconfirmed or failed cancellation prevents retry; runtime stream/collection errors also stop retries because safe termination cannot be established.
 - Cleanup retains dirty work and worker commits rather than deleting evidence. It operates only on recorded owned worktrees and is safe to repeat after clean removal.
 - Capture the workspace after worker execution and after verification so final evidence includes verifier-side changes as well.
+- Task loading intentionally reads an operator-selected local filename, consistent with workflow loading. It is not a network authorization boundary. A future server must authorize filesystem access at its call site before invoking the loader; M1 introduces no server. CodeQL alert 6 (`js/path-injection`) is a false positive for this profile and is dismissed individually with this rationale, without disabling the query.
 
 ## Consequences
 
