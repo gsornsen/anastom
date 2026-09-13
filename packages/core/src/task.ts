@@ -38,12 +38,21 @@ const validate = new Ajv({ allErrors: true }).compile({
   },
 });
 export function parseTaskMarkdown(source: string): TaskDocument {
-  const match = /^(?:\uFEFF)?---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]+)$/.exec(source);
-  if (!match) throw new WorkflowValidationError(["Task requires YAML front matter and a Markdown objective"]);
+  const text = source.startsWith("\uFEFF") ? source.slice(1) : source;
+  const openingEnd = text.indexOf("\n");
+  if (openingEnd < 0 || text.slice(0, openingEnd).replace(/\r$/, "") !== "---") throw new WorkflowValidationError(["Task requires YAML front matter and a Markdown objective"]);
+  let closingStart = -1, closingEnd = -1;
+  for (let cursor = openingEnd + 1; cursor < text.length;) {
+    const end = text.indexOf("\n", cursor);
+    if (end < 0) break;
+    if (text.slice(cursor, end).replace(/\r$/, "") === "---") { closingStart = cursor; closingEnd = end; break; }
+    cursor = end + 1;
+  }
+  if (closingStart < 0) throw new WorkflowValidationError(["Task requires YAML front matter and a Markdown objective"]);
   let candidate: unknown;
-  try { candidate = parse(match[1] as string); } catch { throw new WorkflowValidationError(["Invalid task YAML front matter"]); }
+  try { candidate = parse(text.slice(openingEnd + 1, closingStart)); } catch { throw new WorkflowValidationError(["Invalid task YAML front matter"]); }
   if (!validate(candidate)) throw new WorkflowValidationError((validate.errors ?? []).map((e) => `${e.instancePath || "/"} ${e.message}${e.keyword === "additionalProperties" ? " (" + String(e.params.additionalProperty) + ")" : ""}`));
-  const objective = (match[2] as string).trim();
+  const objective = text.slice(closingEnd + 1).trim();
   if (!objective) throw new WorkflowValidationError(["Task objective must not be empty"]);
   return { ...candidate as Omit<TaskDocument, "objective">, objective };
 }
@@ -67,5 +76,10 @@ export async function compileTask(task: TaskDocument, sourcePath: string): Promi
   return { ...definition, task: { objective: task.objective, acceptanceCriteria: [...task.acceptanceCriteria] } };
 }
 export async function loadTask(file: string): Promise<WorkflowDefinition> {
-  return compileTask(parseTaskMarkdown(await readFile(file, "utf8")), file);
+  // The caller intentionally selects a local task file, as with loadWorkflow.
+  const absolutePath = resolve(file);
+  let source: string;
+  try { source = await readFile(absolutePath, "utf8"); }
+  catch (error) { throw new WorkflowValidationError(["Cannot load task " + absolutePath + ": " + (error instanceof Error ? error.message : String(error))]); }
+  return compileTask(parseTaskMarkdown(source), absolutePath);
 }

@@ -42,6 +42,13 @@ describe("M1 task descriptor", () => {
     first.nodes.implement!.output.schema.type = "string";
     expect(second.nodes.implement?.output.schema.type).toBe("object");
   });
+  it("scans front matter once and preserves BOM/CRLF and Markdown delimiters", async () => {
+    const source = await readFile(taskPath, "utf8");
+    expect(parseTaskMarkdown("\uFEFF" + source.replace(/\n/g, "\r\n")).objective).toContain("Change only server.mjs");
+    const body = source + "\n---\na".repeat(10000);
+    expect(parseTaskMarkdown(body).objective.endsWith("\n---\na")).toBe(true);
+    expect(() => parseTaskMarkdown("---\n" + "invalid-frontmatter\n".repeat(10000))).toThrow("front matter");
+  });
   it("preserves M0 syntax while enforcing M1 field ownership", async () => {
     const base = "apiVersion: anastom.dev/v1alpha1\nkind: Workflow\nmetadata: {id: test/m1, version: 0.1.0}\ninputs: {}\nnodes:\n  work: {kind: command, output: {schema: out.json}}";
     expect(parseWorkflowYaml(base).nodes.work?.command).toBeUndefined();

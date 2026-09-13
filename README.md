@@ -6,7 +6,7 @@ Anastom is building a local-first, vendor-neutral control plane for software-eng
 
 The goal is to make work that spans hours or days understandable, bounded, and recoverable, even as models and coding tools change.
 
-**Current stage: M1 validation.** The single-worker implementation adds Pi delegation, isolated Git worktrees, independent command verification, and durable history. Deterministic tests use a fake worker; completion also requires the controlled live Pi demonstration described in the [M1 evidence record](docs/M1_EVIDENCE.md).
+**Current stage: M1 single-worker validation.** Pi delegation, isolated Git worktrees, independent command verification, and durable history are implemented and demonstrated. The controlled live run with Anthropic `claude-opus-4-8` passed; final review and code analysis are tracked in the [M1 evidence record](docs/M1_EVIDENCE.md).
 
 [Changelog](CHANGELOG.md) · [Roadmap](docs/MILESTONES.md) · [Design documents](#learn-more) · [Contributing](CONTRIBUTING.md)
 

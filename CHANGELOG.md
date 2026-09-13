@@ -20,9 +20,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 - Canonical context and filesystem artifacts with SHA-256 identities, plus durable CLI `status` and `inspect --json`.
 - Independent verification commands with duration limits, bounded stdout/stderr, and evidence on failure.
 - Controlled HTTP fixture, explicit fake file-change scenarios, M1 boundary tests, and a demo guide.
+- Successful live Pi/Anthropic `claude-opus-4-8` fixture demonstration with independent acceptance and recorded sanitized evidence.
 
 ### Changed
 
 - Reframed the README for external readers with Mycelium origins, project goals, current support, roadmap, and documentation links.
 - Made README updates the default for every pull request, with documented reasons for exceptions.
 - Enforced attempt deadlines in the control plane; late results cannot override timeout, and unconfirmed termination prevents retry.
+- Hardened task front-matter parsing with a line scanner and resolved explicit task filenames consistently with workflow loading.
