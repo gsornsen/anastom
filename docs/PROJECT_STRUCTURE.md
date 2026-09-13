@@ -4,6 +4,10 @@
 
 Use a TypeScript monorepo.
 
+The implemented M1 workspace contains eight packages: `core`, `engine`, `runtime-contract`, `runtime-fake`, `runtime-pi`, `persistence`, `workspaces`, and `cli`. `core/schemas/` holds versioned task result schemas. The context builder and deterministic command executor remain in `engine`; SQLite and filesystem artifact storage live in `persistence`. The controlled HTTP repository is in `examples/demo-repos/m1-endpoint/`, with a copy/setup helper in `scripts/create-m1-fixture.ts`.
+
+The broader tree below is design intent. Routing, telemetry, other adapters, generalized methodologies, and recovery packages have not been scaffolded for M1.
+
 A good initial structure:
 
 ```text

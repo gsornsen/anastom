@@ -1,0 +1,13 @@
+{
+  "name": "@anastom/runtime-pi",
+  "version": "0.0.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@anastom/core": "workspace:*",
+    "@anastom/runtime-contract": "workspace:*",
+    "@earendil-works/pi-coding-agent": "0.85.1"
+  }
+}

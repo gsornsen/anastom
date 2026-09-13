@@ -21,6 +21,8 @@ pnpm anastom validate examples/workflows/demo-feature.yaml
 pnpm anastom run examples/workflows/demo-feature.yaml --fake-scenario examples/fake/success.yaml
 ```
 
+Automated M1 tests use temporary Git repositories and a deterministic Pi session test double. They must not call real models or require provider credentials. The [M1 demo guide](docs/M1_DEMO.md) documents the separate, explicitly invoked live integration check and durable inspection commands.
+
 ## Engineering expectations
 
 Contributions should preserve the boundaries in [VISION.md](docs/VISION.md), [ARCHITECTURE.md](docs/ARCHITECTURE.md), and [WORKFLOW_IR.md](docs/WORKFLOW_IR.md):

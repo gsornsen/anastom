@@ -1,12 +1,19 @@
 import { randomUUID } from "node:crypto";
 
-import { validateJsonValue, type JsonValue, type WorkflowDefinition } from "@anastom/core";
+import { canonicalJson, validateJsonValue, type JsonValue, type WorkflowDefinition } from "@anastom/core";
 import type {
   ExecutionFailure,
+  ExecutionHandle,
   ExecutionRequest,
   ExecutionResult,
   RuntimeAdapter,
+  RuntimeEvent,
+  WorkspaceRef,
+  WorkspaceCapture,
 } from "@anastom/runtime-contract";
+import type { ArtifactStore } from "./artifacts.js";
+import { LocalCommandExecutor, type CommandExecutor } from "./command.js";
+import { buildContext } from "./context.js";
 
 import {
   materializeEvents,
@@ -21,12 +28,18 @@ import { findExecutableNodes, findReadyNodes } from "./scheduler.js";
 export interface CreateRunOptions {
   runId?: string;
   inputs?: Record<string, JsonValue>;
+  workspace?: WorkspaceRef;
 }
 
 export interface WorkflowEngineOptions {
   runtime: RuntimeAdapter;
   persistence: RunPersistence;
   createRunId?: () => string;
+  executionMode?: "fake" | "worker";
+  artifacts?: ArtifactStore;
+  commandExecutor?: CommandExecutor;
+  captureWorkspace?: (workspace: WorkspaceRef) => Promise<WorkspaceCapture>;
+  cancellationGraceMs?: number;
 }
 
 export class RunNotFoundError extends Error {
@@ -39,13 +52,13 @@ export class RunNotFoundError extends Error {
 function validateInputs(workflow: WorkflowDefinition, inputs: Record<string, JsonValue>): void {
   const declared = Object.keys(workflow.inputs);
   const received = Object.keys(inputs);
-  const missing = declared.filter((id) => !(id in inputs));
-  const unknown = received.filter((id) => !(id in workflow.inputs));
+  const missing = declared.filter((id) => !Object.hasOwn(inputs, id));
+  const unknown = received.filter((id) => !Object.hasOwn(workflow.inputs, id));
   const errors: string[] = [];
   if (missing.length > 0) errors.push(`missing workflow inputs: ${missing.join(", ")}`);
   if (unknown.length > 0) errors.push(`unknown workflow inputs: ${unknown.join(", ")}`);
   for (const id of declared) {
-    if (!(id in inputs)) continue;
+    if (!Object.hasOwn(inputs, id)) continue;
     const definition = workflow.inputs[id];
     if (definition === undefined) continue;
     const result = validateJsonValue(definition.schema, inputs[id] as JsonValue);
@@ -77,14 +90,24 @@ export class WorkflowEngine {
   private readonly runtime: RuntimeAdapter;
   private readonly persistence: RunPersistence;
   private readonly createRunId: () => string;
+  private readonly options: WorkflowEngineOptions;
 
   constructor(options: WorkflowEngineOptions) {
+    this.options = options;
     this.runtime = options.runtime;
     this.persistence = options.persistence;
     this.createRunId = options.createRunId ?? randomUUID;
   }
 
   async createRun(workflow: WorkflowDefinition, options: CreateRunOptions = {}): Promise<RunState> {
+    if (this.options.executionMode === "worker") {
+      if (!this.options.artifacts || !options.workspace || options.workspace.mode === "memory") throw new Error("Worker runs require durable artifacts and a filesystem workspace");
+      for (const node of Object.values(workflow.nodes)) {
+        if (node.kind !== "agent" && (node.kind !== "command" || !node.command)) throw new Error("Unsupported worker node: " + node.id);
+        if (node.kind === "agent" && node.mutation === undefined) throw new Error("Agent mutation intent is required");
+        if (node.mutation !== undefined && node.mutation !== options.workspace.mode) throw new Error("Workspace mode does not match mutation intent");
+      }
+    }
     const inputs = structuredClone(options.inputs ?? {});
     validateInputs(workflow, inputs);
     const runId = options.runId ?? this.createRunId();
@@ -103,7 +126,10 @@ export class WorkflowEngine {
     const initialized = materializeEvents(
       created.state,
       runId,
-      readyIds.map((nodeId) => ({ type: "NodeReady" as const, nodeId, reason: "dependencies-satisfied" })),
+      [
+        ...(options.workspace ? [{ type: "WorkspaceAssigned" as const, workspace: options.workspace }] : []),
+        ...readyIds.map((nodeId) => ({ type: "NodeReady" as const, nodeId, reason: "dependencies-satisfied" as const })),
+      ],
     );
     await this.persistence.create(runId, {
       workflow,
@@ -128,44 +154,72 @@ export class WorkflowEngine {
     const attempt = nodeState.attempts.length + 1;
 
     let state = await this.commit(runId, initialState, [
-      { type: "AttemptScheduled", nodeId, attempt, runtimeId: this.runtime.id },
+      { type: "AttemptScheduled", nodeId, attempt, runtimeId: this.options.executionMode === "worker" && node.kind === "command" ? "command" : this.runtime.id },
       { type: "AttemptStarted", nodeId, attempt },
     ]);
 
-    const dependencyOutputs = Object.fromEntries(
-      node.needs.map((dependency) => {
-        const output = state.nodes[dependency]?.output;
-        if (output === undefined) throw new Error(`Dependency ${dependency} has no output`);
-        return [dependency, output];
-      }),
-    );
-    const request: ExecutionRequest = {
+    const workspace = state.workspace ?? { id: `${runId}:memory`, mode: "memory" as const };
+    const context = buildContext(workflow, state, nodeId, attempt, workspace);
+    const request: ExecutionRequest = Object.freeze({
       runId,
       workflowInstanceId: state.workflowInstanceId,
       nodeId,
       nodeKind: node.kind,
       attempt,
       ...(node.role === undefined ? {} : { role: { id: node.role } }),
-      workspace: { id: `${runId}:memory`, mode: "memory" },
-      context: { inputs: state.inputs, dependencyOutputs },
-      budget: node.attemptBudget,
-      requiredOutputSchema: node.output.schema,
-      toolPolicy: { allowMutations: false },
-    };
+      workspace: context.envelope.workspace!,
+      context: context.envelope,
+      budget: context.envelope.budget!,
+      requiredOutputSchema: context.envelope.requiredOutputSchema!,
+      toolPolicy: Object.freeze({ allowMutations: node.mutation === "isolated" }),
+    });
 
-    let result: ExecutionResult;
-    const observed: RunEventPayload[] = [];
+    let result: ExecutionResult = { status: "failed", failure: { category: "unknown-internal", message: "Attempt did not complete" } };
+    let unsafeToRetry = false;
+    const recordArtifact = async (type: string, mediaType: string, bytes: string | Uint8Array) => {
+      if (!this.options.artifacts) return undefined;
+      const artifact = await this.options.artifacts.write({ runId, nodeId, attempt, type, mediaType, bytes });
+      state = await this.commit(runId, state, [{ type: "ArtifactProduced", nodeId, attempt, artifact }]);
+      return artifact;
+    };
     try {
-      const handle = await this.runtime.start(request);
-      for await (const event of this.runtime.events(handle)) {
-        observed.push({ type: "RuntimeEventObserved", nodeId, attempt, event });
+      await recordArtifact("context", "application/json", context.bytes);
+      if (this.options.executionMode === "worker" && node.kind === "command") {
+        if (!node.command) throw new Error("Missing command definition");
+        const command = await (this.options.commandExecutor ?? new LocalCommandExecutor()).execute(node.command, workspace);
+        await recordArtifact("stdout", "text/plain", command.stdout);
+        await recordArtifact("stderr", "text/plain", command.stderr);
+        await recordArtifact("command-result", "application/json", canonicalJson(command.output));
+        state = await this.commit(runId, state, [{ type: "CommandCompleted", nodeId, attempt, output: command.output }]);
+        result = command.failure ? { status: "failed", failure: command.failure } : { status: "succeeded", output: { ...command.output } };
+      } else {
+        const logs: Buffer[] = [];
+        let logBytes = 0;
+        const execution = await this.executeRuntime(request,
+          async (event) => {
+            state = await this.commit(runId, state, [{ type: "RuntimeEventObserved", nodeId, attempt, event }]);
+            if (event.type === "log" && logBytes < 1_048_576) {
+              const bytes = Buffer.from(event.message + "\n").subarray(0, 1_048_576 - logBytes);
+              logs.push(bytes); logBytes += bytes.length;
+            }
+          },
+          async (payload) => { state = await this.commit(runId, state, [payload]); },
+        );
+        result = execution.result;
+        unsafeToRetry = execution.unsafeToRetry;
+        await recordArtifact("logs", "text/plain", Buffer.concat(logs));
+        if (result.status === "succeeded") await recordArtifact("worker-report", "application/json", canonicalJson(result.output));
       }
-      result = await this.runtime.collect(handle);
+      if (this.options.captureWorkspace && !unsafeToRetry && (node.kind === "agent" || this.options.executionMode === "worker" && node.kind === "command")) {
+        const capture = await this.options.captureWorkspace(workspace);
+        if (workspace.mode === "readonly" && capture.changedFiles.length) result = { status: "failed", failure: { category: "policy-violation", message: "Readonly workspace was mutated" } };
+        const diff = await recordArtifact("diff", "text/x-diff", capture.diff);
+        if (diff) state = await this.commit(runId, state, [{ type: "WorkspaceObserved", nodeId, attempt, headCommit: capture.headCommit, changedFiles: capture.changedFiles, diffArtifactId: diff.id }]);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      result = { status: "failed", failure: { category: "runtime-unavailable", message } };
+      if (!(result.status === "failed" && result.failure.category === "budget-exhausted")) result = { status: "failed", failure: { category: "unknown-internal", message } };
     }
-    if (observed.length > 0) state = await this.commit(runId, state, observed);
 
     if (result.status === "blocked") {
       const reason = result.reason;
@@ -205,11 +259,11 @@ export class WorkflowEngine {
 
     if (failure !== null) {
       state = await this.commit(runId, state, [{ type: "AttemptFailed", nodeId, attempt, failure }]);
-      if (attempt < node.attemptBudget.maxAttempts) {
+      if (!unsafeToRetry && attempt < node.attemptBudget.maxAttempts) {
         return this.commit(runId, state, [{ type: "NodeReady", nodeId, reason: "retry" }]);
       }
       state = await this.commit(runId, state, [{ type: "NodeFailed", nodeId, failure }]);
-      const reason = `Node ${nodeId} exhausted ${node.attemptBudget.maxAttempts} attempt(s)`;
+      const reason = unsafeToRetry ? "Runtime termination was not confirmed; retry is unsafe" : `Node ${nodeId} exhausted ${node.attemptBudget.maxAttempts} attempt(s)`;
       return this.commit(runId, state, [
         ...blockedNodePayloads(state, nodeId, reason),
         { type: "RunCompleted", outcome: "failed" },
@@ -261,6 +315,61 @@ export class WorkflowEngine {
 
   async events(runId: string): Promise<readonly RunEvent[]> {
     return (await this.requireRun(runId)).events;
+  }
+
+  private async executeRuntime(
+    request: ExecutionRequest,
+    observe: (event: RuntimeEvent) => Promise<void>,
+    record: (payload: RunEventPayload) => Promise<void>,
+  ): Promise<{ result: ExecutionResult; unsafeToRetry: boolean }> {
+    let handle: ExecutionHandle | undefined;
+    let expired = false;
+    let runtimeErrored = false;
+    let pendingObservation = Promise.resolve();
+    let cancellation: Promise<"succeeded" | "failed"> | undefined;
+    const cancel = () => {
+      if (!handle) return undefined;
+      return cancellation ??= Promise.resolve().then(() => this.runtime.cancel(handle as ExecutionHandle)).then(() => "succeeded" as const, () => "failed" as const);
+    };
+    const operation = (async (): Promise<ExecutionResult> => {
+      try {
+        handle = await this.runtime.start(request);
+        if (expired) { await cancel(); return this.runtime.collect(handle); }
+        for await (const event of this.runtime.events(handle)) {
+          if (!expired) { pendingObservation = observe(event); await pendingObservation; }
+        }
+        return await this.runtime.collect(handle);
+      } catch {
+        runtimeErrored = true;
+        if (!expired) void cancel();
+        return { status: "failed", failure: { category: "runtime-unavailable", message: "Runtime start, stream, or collection failed; check runtime configuration" } };
+      }
+    })();
+    if (request.budget.maxDurationMs === undefined) return { result: await operation, unsafeToRetry: runtimeErrored };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<null>((done) => {
+      timer = setTimeout(() => { expired = true; done(null); }, request.budget.maxDurationMs);
+    });
+    const first = await Promise.race([operation, deadline]);
+    if (timer) clearTimeout(timer);
+    if (first !== null) return { result: first, unsafeToRetry: runtimeErrored };
+    await pendingObservation;
+    const identity = { nodeId: request.nodeId, attempt: request.attempt };
+    await record({ type: "AttemptTimeoutRequested", ...identity });
+    const graceMs = this.options.cancellationGraceMs ?? 500;
+    const bounded = async <T>(promise: Promise<T>): Promise<T | null> => {
+      let grace: ReturnType<typeof setTimeout> | undefined;
+      try { return await Promise.race([promise, new Promise<null>((done) => { grace = setTimeout(() => done(null), graceMs); })]); }
+      finally { if (grace) clearTimeout(grace); }
+    };
+    const cancelled = handle ? await bounded(cancel() as Promise<"succeeded" | "failed">) : null;
+    await record({ type: "AttemptCancellationCompleted", ...identity, outcome: cancelled ?? (handle ? "failed" : "unavailable") });
+    const late = await bounded(operation);
+    if (late) await record({ type: "LateResultObserved", ...identity, status: late.status });
+    return {
+      result: { status: "failed", failure: { category: "budget-exhausted", message: "Attempt exceeded its duration limit" } },
+      unsafeToRetry: cancelled !== "succeeded" || late === null,
+    };
   }
 
   private async commit(runId: string, state: RunState, payloads: readonly RunEventPayload[]): Promise<RunState> {

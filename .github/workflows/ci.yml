@@ -51,3 +51,30 @@ jobs:
 
       - name: Execute fake demo
         run: pnpm anastom run examples/workflows/demo-feature.yaml --fake-scenario examples/fake/success.yaml
+
+      - name: Execute durable M1 fake demo
+        shell: bash
+        run: |
+          fixture="$(pnpm exec tsx scripts/create-m1-fixture.ts)"
+          pnpm anastom run examples/demo-repos/m1-endpoint/tasks/add-endpoint.md --runtime fake --fake-scenario examples/fake/m1-endpoint.yaml --repo "$fixture"
+
+  macos:
+    name: M1 macOS portability
+    runs-on: macos-15
+    timeout-minutes: 10
+    env:
+      CI: true
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install pnpm and Node.js
+        uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+        with:
+          runtime: node@24
+          install: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Verify M1 filesystem and process portability
+        run: pnpm test packages/workspaces packages/persistence packages/engine/src/command.test.ts packages/cli/src/durable.test.ts

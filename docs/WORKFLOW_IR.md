@@ -2,7 +2,7 @@
 
 ## Status
 
-`anastom.dev/v1alpha1` is an experimental, strictly validated format. This document separates the implemented M0 profile from later design directions so examples cannot silently become APIs.
+`anastom.dev/v1alpha1` is an experimental, strictly validated format. This document separates the compatible M0 profile, implemented M1 additions, and later design directions so examples cannot silently become APIs.
 
 The parser rejects unknown fields, unknown node kinds, invalid schema references, missing dependencies, self-dependencies, duplicate dependencies, and dependency cycles. A field described under a future direction is not accepted until its milestone adds validation, normalized types, execution semantics, and tests.
 
@@ -12,7 +12,7 @@ The Workflow IR describes engineering policy without embedding model- or harness
 
 ## Implemented M0 profile
 
-The complete authored shape supported today is:
+The compatible M0 authored shape is:
 
 ```yaml
 apiVersion: anastom.dev/v1alpha1
@@ -60,7 +60,7 @@ Every node has exactly one authoritative structured output. `output.schema` is r
 
 `role` is required for `agent` nodes and rejected for deterministic node kinds. A role expresses requested capability; it does not select a model or harness.
 
-`maxAttempts` defaults to one. `maxDuration` accepts a positive integer followed by `ms`, `s`, `m`, or `h`. M0 normalizes the duration and passes it to the fake runtime without enforcing a wall-clock timeout.
+`maxAttempts` defaults to one. `maxDuration` accepts a positive integer followed by `ms`, `s`, `m`, or `h`, within the process timer range. M1 enforces declared adapter attempt durations in the control plane, including fake attempts. Commands enforce their own required duration limit.
 
 ## Implemented node semantics
 
@@ -93,6 +93,23 @@ M1 adds only the authored information needed for one real worker:
 
 The implementation must reject `shared-integration`, `external`, shell strings, undeclared environment injection, absolute command working directories, and other unimplemented modes. These additions remain part of `v1alpha1`; compatibility is documented in the M1 build brief and exercised by parser tests before a real adapter can consume them.
 
+The authored command fields are nested under `command`:
+
+```yaml
+verify:
+  kind: command
+  needs: [implement]
+  command:
+    argv: [node, --test, server.test.mjs]
+    cwd: .
+    maxDuration: 30s
+    maxOutputBytes: 1048576
+  output:
+    schema: command-result.json
+```
+
+`cwd` defaults to `.`; `maxOutputBytes` defaults to 1 MiB per stream and is capped at 16 MiB. `argv` and `maxDuration` are required when `command` is supplied. Only agent nodes accept `mutation`; only command nodes accept `command`. Legacy fake command nodes may omit the process configuration, while worker execution rejects them before an attempt.
+
 ## Markdown task descriptor
 
 The M1 demo accepts a Markdown task because bounded engineering work is more readable as prose than as a workflow graph. A task descriptor is a CLI input format, not a second workflow language. The CLI strictly validates its YAML front matter and compiles it into one `agent` node followed by one deterministic `command` node.
@@ -121,6 +138,8 @@ Implement the endpoint using the repository's existing conventions.
 
 The Markdown body is the objective. Front matter is policy. Prose cannot override the workspace, verification, budget, or output contract. M1 supports exactly one command verifier in a task descriptor; multiple verifiers and user-authored task-to-workflow templates require a later decision.
 
+Optional `attemptPolicy.maxAttempts` and `attemptPolicy.maxDuration` default independently to one attempt and ten minutes. The compiler assigns stable node IDs `implement` and `verify` and embeds the [worker-report](../packages/core/schemas/worker-report.v1alpha1.json) and [command-result](../packages/core/schemas/command-result.v1alpha1.json) schemas. See the [demo guide](M1_DEMO.md) for execution, environment, and isolation limits.
+
 ## Artifacts and evidence
 
 M1 introduces artifact references without turning every artifact into workflow state:
@@ -131,6 +150,7 @@ type ArtifactRef = {
   type: string;
   mediaType: string;
   uri: string;
+  digest: string; // sha256:<64 lowercase hex digits>
   producer: {
     runId: string;
     nodeId: string;

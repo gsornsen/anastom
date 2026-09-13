@@ -38,7 +38,7 @@ On a small repository:
 anastom run tasks/add-endpoint.md --runtime pi
 ```
 
-Pi receives a fresh context envelope, modifies an isolated worktree, runs a verifier, and returns structured results.
+Pi receives a fresh context envelope, modifies an isolated worktree, and returns a structured report. The control plane runs the independent command verifier and records acceptance.
 
 ### Deliverables
 - Pi runtime adapter;

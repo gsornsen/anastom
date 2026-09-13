@@ -21,4 +21,9 @@ export default tseslint.config(
       "@typescript-eslint/require-await": "off"
     },
   },
+  {
+    files: ["examples/**/*.mjs"],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { parserOptions: { projectService: false }, globals: { fetch: "readonly" } },
+  },
 );

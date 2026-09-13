@@ -1,5 +1,7 @@
 import type { JsonValue, NodeStatus } from "@anastom/core";
-import type { ExecutionFailure, RuntimeEvent } from "@anastom/runtime-contract";
+import type { ArtifactRef, ExecutionFailure, RuntimeEvent, WorkspaceRef } from "@anastom/runtime-contract";
+import type { CommandReport } from "./command.js";
+import { assertRunEvent } from "./event-validation.js";
 
 export type RunStatus = "running" | "blocked" | "succeeded" | "failed" | "paused" | "cancelled";
 export type AttemptStatus = "scheduled" | "running" | "blocked" | "succeeded" | "failed" | "cancelled";
@@ -9,6 +11,7 @@ export interface AttemptState {
   runtimeId: string;
   status: AttemptStatus;
   failure?: ExecutionFailure;
+  timeout?: { cancellation?: "succeeded" | "failed" | "unavailable"; lateStatus?: "succeeded" | "failed" | "blocked" | "cancelled" };
 }
 
 export interface NodeRunState {
@@ -18,6 +21,7 @@ export interface NodeRunState {
   output?: JsonValue;
   failure?: ExecutionFailure;
   blockedReason?: string;
+  command?: CommandReport;
 }
 
 export interface RunState {
@@ -29,9 +33,19 @@ export interface RunState {
   sequence: number;
   inputs: Record<string, JsonValue>;
   nodes: Record<string, NodeRunState>;
+  workspace?: WorkspaceRef;
+  artifacts?: ArtifactRef[];
+  workspaceObservation?: { headCommit: string; changedFiles: string[]; diffArtifactId: string };
 }
 
 export type RunEventPayload =
+  | { type: "WorkspaceAssigned"; workspace: WorkspaceRef }
+  | { type: "ArtifactProduced"; nodeId: string; attempt: number; artifact: ArtifactRef }
+  | { type: "WorkspaceObserved"; nodeId: string; attempt: number; headCommit: string; changedFiles: string[]; diffArtifactId: string }
+  | { type: "CommandCompleted"; nodeId: string; attempt: number; output: CommandReport }
+  | { type: "AttemptTimeoutRequested"; nodeId: string; attempt: number }
+  | { type: "AttemptCancellationCompleted"; nodeId: string; attempt: number; outcome: "succeeded" | "failed" | "unavailable" }
+  | { type: "LateResultObserved"; nodeId: string; attempt: number; status: "succeeded" | "failed" | "blocked" | "cancelled" }
   | {
       type: "RunCreated";
       workflowInstanceId: string;
@@ -91,6 +105,7 @@ function requireCurrentAttempt(node: NodeRunState, attempt: number, status: Atte
 }
 
 export function applyRunEvent(current: RunState | undefined, event: RunEvent): RunState {
+  assertRunEvent(event);
   if (current === undefined) {
     if (event.type !== "RunCreated" || event.sequence !== 1) {
       throw new InvalidTransitionError("The first event must be RunCreated at sequence 1");
@@ -115,11 +130,57 @@ export function applyRunEvent(current: RunState | undefined, event: RunEvent): R
     throw new InvalidTransitionError(`Expected event sequence ${current.sequence + 1}, received ${event.sequence}`);
   }
   if (event.type === "RunCreated") throw new InvalidTransitionError("RunCreated can only be the first event");
+  if (["succeeded", "failed", "cancelled"].includes(current.status)) throw new InvalidTransitionError("A terminal run cannot accept more events");
 
   const state = structuredClone(current);
   state.sequence = event.sequence;
 
   switch (event.type) {
+    case "WorkspaceAssigned":
+      if (state.status !== "running" || state.workspace !== undefined) throw new InvalidTransitionError("Workspace can only be assigned once to a running run");
+      state.workspace = structuredClone(event.workspace);
+      break;
+    case "ArtifactProduced": {
+      const node = requireNode(state, event.nodeId);
+      requireNodeStatus(node, event.type, ["running"]);
+      requireCurrentAttempt(node, event.attempt, "running");
+      if (event.artifact.producer.runId !== state.runId || event.artifact.producer.nodeId !== event.nodeId || event.artifact.producer.attempt !== event.attempt) throw new InvalidTransitionError("Artifact producer mismatch");
+      (state.artifacts ??= []).push(structuredClone(event.artifact));
+      break;
+    }
+    case "WorkspaceObserved": {
+      const node = requireNode(state, event.nodeId);
+      requireCurrentAttempt(node, event.attempt, "running");
+      if (!state.artifacts?.some((artifact) => artifact.id === event.diffArtifactId)) throw new InvalidTransitionError("Workspace diff artifact is missing");
+      state.workspaceObservation = { headCommit: event.headCommit, changedFiles: [...event.changedFiles], diffArtifactId: event.diffArtifactId };
+      break;
+    }
+    case "CommandCompleted": {
+      const node = requireNode(state, event.nodeId);
+      requireCurrentAttempt(node, event.attempt, "running");
+      node.command = structuredClone(event.output);
+      break;
+    }
+    case "AttemptTimeoutRequested": {
+      const node = requireNode(state, event.nodeId);
+      requireNodeStatus(node, event.type, ["running"]);
+      const attempt = requireCurrentAttempt(node, event.attempt, "running");
+      if (attempt.timeout) throw new InvalidTransitionError("Attempt timeout was already requested");
+      attempt.timeout = {};
+      break;
+    }
+    case "AttemptCancellationCompleted": {
+      const attempt = requireCurrentAttempt(requireNode(state, event.nodeId), event.attempt, "running");
+      if (!attempt.timeout || attempt.timeout.cancellation) throw new InvalidTransitionError("Cancellation requires one pending timeout");
+      attempt.timeout.cancellation = event.outcome;
+      break;
+    }
+    case "LateResultObserved": {
+      const attempt = requireCurrentAttempt(requireNode(state, event.nodeId), event.attempt, "running");
+      if (!attempt.timeout?.cancellation || attempt.timeout.lateStatus) throw new InvalidTransitionError("Late result requires completed timeout cancellation");
+      attempt.timeout.lateStatus = event.status;
+      break;
+    }
     case "NodeReady": {
       const node = requireNode(state, event.nodeId);
       requireNodeStatus(node, event.type, event.reason === "retry" ? ["running"] : event.reason === "resumed" ? ["paused"] : ["pending"]);
@@ -154,7 +215,9 @@ export function applyRunEvent(current: RunState | undefined, event: RunEvent): R
     case "AttemptSucceeded": {
       const node = requireNode(state, event.nodeId);
       requireNodeStatus(node, event.type, ["running"]);
-      requireCurrentAttempt(node, event.attempt, "running").status = "succeeded";
+      const attempt = requireCurrentAttempt(node, event.attempt, "running");
+      if (attempt.timeout) throw new InvalidTransitionError("A timed-out attempt cannot succeed");
+      attempt.status = "succeeded";
       node.output = structuredClone(event.output);
       delete node.failure;
       break;
@@ -163,6 +226,7 @@ export function applyRunEvent(current: RunState | undefined, event: RunEvent): R
       const node = requireNode(state, event.nodeId);
       requireNodeStatus(node, event.type, ["running"]);
       const attempt = requireCurrentAttempt(node, event.attempt, "running");
+      if (attempt.timeout && (event.failure.category !== "budget-exhausted" || !attempt.timeout.cancellation)) throw new InvalidTransitionError("A timed-out attempt requires completed cancellation and a budget failure");
       attempt.status = "failed";
       attempt.failure = { ...event.failure };
       node.failure = { ...event.failure };
@@ -171,13 +235,17 @@ export function applyRunEvent(current: RunState | undefined, event: RunEvent): R
     case "AttemptBlocked": {
       const node = requireNode(state, event.nodeId);
       requireNodeStatus(node, event.type, ["running"]);
-      requireCurrentAttempt(node, event.attempt, "running").status = "blocked";
+      const attempt = requireCurrentAttempt(node, event.attempt, "running");
+      if (attempt.timeout) throw new InvalidTransitionError("A timed-out attempt cannot become blocked");
+      attempt.status = "blocked";
       break;
     }
     case "AttemptCancelled": {
       const node = requireNode(state, event.nodeId);
       requireNodeStatus(node, event.type, ["running"]);
-      requireCurrentAttempt(node, event.attempt, "running").status = "cancelled";
+      const attempt = requireCurrentAttempt(node, event.attempt, "running");
+      if (attempt.timeout) throw new InvalidTransitionError("A timed-out attempt must record a budget failure");
+      attempt.status = "cancelled";
       break;
     }
     case "NodeSucceeded": {

@@ -32,6 +32,22 @@ export interface WorkflowNodeDocument {
   role?: string;
   output: SchemaReferenceDocument;
   attemptPolicy?: AttemptPolicyDocument;
+  mutation?: "readonly" | "isolated";
+  command?: CommandDocument;
+}
+
+export interface CommandDocument {
+  argv: string[];
+  cwd?: string;
+  maxDuration: string;
+  maxOutputBytes?: number;
+}
+
+export interface CommandDefinition {
+  argv: readonly string[];
+  cwd: string;
+  maxDurationMs: number;
+  maxOutputBytes: number;
 }
 
 export interface WorkflowDocument {
@@ -69,6 +85,8 @@ export interface WorkflowNode {
   role?: string;
   output: ResolvedSchemaReference;
   attemptBudget: AttemptBudget;
+  mutation?: "readonly" | "isolated";
+  command?: CommandDefinition;
 }
 
 export interface WorkflowDefinition {
@@ -85,6 +103,7 @@ export interface WorkflowDefinition {
   };
   nodeOrder: readonly string[];
   nodes: Readonly<Record<string, WorkflowNode>>;
+  task?: { objective: string; acceptanceCriteria: readonly string[] };
 }
 
 export interface ValidationResult {

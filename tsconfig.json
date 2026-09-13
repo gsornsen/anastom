@@ -14,6 +14,9 @@
       "@anastom/cli": ["packages/cli/src/index.ts"],
       "@anastom/core": ["packages/core/src/index.ts"],
       "@anastom/engine": ["packages/engine/src/index.ts"],
+      "@anastom/persistence": ["packages/persistence/src/index.ts"],
+      "@anastom/workspaces": ["packages/workspaces/src/index.ts"],
+      "@anastom/runtime-pi": ["packages/runtime-pi/src/index.ts"],
       "@anastom/runtime-contract": ["packages/runtime-contract/src/index.ts"],
       "@anastom/runtime-fake": ["packages/runtime-fake/src/index.ts"]
     },
@@ -23,5 +26,5 @@
     "target": "ES2023",
     "types": ["node", "vitest/globals"]
   },
-  "include": ["eslint.config.js", "packages/**/*.ts", "vitest.config.ts"]
+  "include": ["eslint.config.js", "packages/**/*.ts", "scripts/**/*.ts", "vitest.config.ts"]
 }

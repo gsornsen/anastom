@@ -87,6 +87,8 @@ The Markdown body after front matter is a non-empty objective. Unknown fields ar
 
 The task compiler produces an immutable internal workflow with stable node IDs `implement` and `verify`. `implement` uses the built-in worker-report JSON Schema. `verify` uses the built-in command-result JSON Schema. These schemas are versioned repository assets and are recorded in the normalized run definition.
 
+Each optional worker attempt-policy field has its own default: one attempt and a ten-minute duration. Supplying only `maxAttempts` does not remove the deadline.
+
 ## Worker report
 
 The Pi adapter must normalize its final response into:
@@ -196,11 +198,14 @@ Preserve the M0 commands. Add:
 
 ```text
 anastom run <task.md> --runtime pi [--repo <path>]
+anastom run <task.md> --runtime fake --fake-scenario <file> [--repo <path>]
 anastom status <run-id> [--state-dir <path>]
 anastom inspect <run-id> [--state-dir <path>] [--json]
 ```
 
 Human output goes to stdout. Actionable errors go to stderr and return a nonzero exit status. `run` prints the run ID immediately after durable creation so a failure can still be inspected.
+
+Fake task execution requires an explicit scenario; the CLI never infers fixture-specific behavior. Successful scripted attempts may declare workspace-relative `files` to make deterministic changes in an isolated worktree. Pi may optionally select a configured model with paired `--provider` and `--model` flags; this is explicit selection, without routing or capability negotiation. Task runs also accept `--state-dir` for repository state placement.
 
 `status` shows the current run and node outcomes. `inspect` shows the immutable task/workflow identity, workspace, attempts, event sequence, context and artifact references, verifier result, and failures. Secret material and unrestricted environment dumps are never rendered.
 
@@ -255,7 +260,7 @@ pnpm anastom run examples/workflows/demo-feature.yaml --fake-scenario examples/f
 M1 additionally requires:
 
 ```bash
-pnpm anastom run examples/demo-repos/m1-endpoint/tasks/add-endpoint.md --runtime fake --repo <temporary-fixture-repo>
+pnpm anastom run examples/demo-repos/m1-endpoint/tasks/add-endpoint.md --runtime fake --fake-scenario examples/fake/m1-endpoint.yaml --repo <temporary-fixture-repo>
 pnpm anastom status <run-id> --state-dir <temporary-fixture-repo>/.anastom
 pnpm anastom inspect <run-id> --state-dir <temporary-fixture-repo>/.anastom
 pnpm anastom run examples/demo-repos/m1-endpoint/tasks/add-endpoint.md --runtime pi --repo <temporary-fixture-repo>

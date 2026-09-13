@@ -1,5 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { readFile, writeFile, realpath, mkdir, lstat } from "node:fs/promises";
+import { resolve, relative, isAbsolute, dirname } from "node:path";
 
 import type { JsonValue } from "@anastom/core";
 import { FAILURE_CATEGORIES, type ExecutionHandle, type ExecutionRequest, type ExecutionResult, type RuntimeAdapter, type RuntimeCapabilities, type RuntimeEvent } from "@anastom/runtime-contract";
@@ -7,7 +7,7 @@ import Ajv, { type ErrorObject } from "ajv";
 import { parse } from "yaml";
 
 export type FakeAttemptDefinition =
-  | { outcome?: "succeeded"; output: JsonValue; events?: string[] }
+  | { outcome?: "succeeded"; output: JsonValue; events?: string[]; files?: Record<string, string> }
   | { outcome: "failed"; failure?: { category?: (typeof FAILURE_CATEGORIES)[number]; message?: string }; events?: string[] }
   | { outcome: "blocked"; reason?: string; events?: string[] }
   | { outcome: "cancelled"; reason?: string; events?: string[] };
@@ -35,6 +35,7 @@ const scenarioSchema = {
               properties: {
                 outcome: { const: "succeeded" },
                 output: true,
+                files: { type: "object", additionalProperties: { type: "string" } },
                 events: { type: "array", items: { type: "string" } },
               },
             },
@@ -176,9 +177,32 @@ export class FakeRuntimeAdapter implements RuntimeAdapter {
 
   async start(request: ExecutionRequest): Promise<ExecutionHandle> {
     const id = `fake:${request.runId}:${request.nodeId}:${request.attempt}`;
+    const definition = this.scenario.nodes[request.nodeId]?.[request.attempt - 1];
+    if (definition && "files" in definition && definition.files) {
+      if (request.workspace.mode !== "isolated" || !request.toolPolicy.allowMutations) throw new Error("Fake file changes require an isolated mutable workspace");
+      const root = await realpath(request.workspace.path);
+      for (const [path, content] of Object.entries(definition.files)) {
+        if (isAbsolute(path) || path.split(/[\\/]/).includes("..") || path.includes("\0")) throw new Error("Fake file path escapes workspace");
+        const target = resolve(root, path);
+        const rel = relative(root, target);
+        if (!rel || rel.startsWith("..") || isAbsolute(rel)) throw new Error("Invalid fake file path");
+        let parent = root;
+        for (const segment of relative(root, dirname(target)).split(/[\\/]/).filter(Boolean)) {
+          parent = resolve(parent, segment);
+          try { if ((await lstat(parent)).isSymbolicLink()) throw new Error("Fake file parent is a symlink"); }
+          catch (error) {
+            if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+            await mkdir(parent);
+          }
+        }
+        try { if ((await lstat(target)).isSymbolicLink()) throw new Error("Fake file target is a symlink"); }
+        catch (error) { if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error; }
+        await writeFile(target, content);
+      }
+    }
     this.executions.set(
       id,
-      normalizeAttempt(request.nodeId, request.attempt, this.scenario.nodes[request.nodeId]?.[request.attempt - 1]),
+      normalizeAttempt(request.nodeId, request.attempt, definition),
     );
     return { id };
   }

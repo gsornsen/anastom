@@ -16,7 +16,7 @@ import {
   type WorkflowNode,
 } from "./types.js";
 
-const ajv = new Ajv({ allErrors: true, strict: false });
+const ajv = new Ajv({ allErrors: true, strict: false, addUsedSchema: false });
 
 const workflowDocumentSchema: JsonSchema = {
   type: "object",
@@ -81,6 +81,16 @@ const workflowDocumentSchema: JsonSchema = {
         role: { type: "string", minLength: 1 },
         output: { $ref: "#/$defs/schemaReference" },
         attemptPolicy: { $ref: "#/$defs/attemptPolicy" },
+        mutation: { enum: ["readonly", "isolated"] },
+        command: {
+          type: "object", additionalProperties: false, required: ["argv", "maxDuration"],
+          properties: {
+            argv: { type: "array", minItems: 1, items: { type: "string", minLength: 1 } },
+            cwd: { type: "string" },
+            maxDuration: { type: "string", pattern: "^[1-9][0-9]*(?:ms|s|m|h)$" },
+            maxOutputBytes: { type: "integer", minimum: 1, maximum: 16777216 },
+          },
+        },
       },
     },
   },
@@ -116,8 +126,13 @@ function assertSemanticValidity(document: WorkflowDocument): void {
     if (node.kind !== "agent" && node.role !== undefined) {
       issues.push(`/nodes/${nodeId}/role is only valid for agent nodes`);
     }
+    if (node.mutation !== undefined && node.kind !== "agent") issues.push(`/nodes/${nodeId}/mutation is only valid for agent nodes`);
+    if (node.command !== undefined && node.kind !== "command") issues.push(`/nodes/${nodeId}/command is only valid for command nodes`);
+    if (node.command?.cwd !== undefined && (isAbsolute(node.command.cwd) || node.command.cwd.split(/[\\/]/).includes(".."))) {
+      issues.push(`/nodes/${nodeId}/command/cwd must stay within the workspace`);
+    }
     for (const dependency of node.needs ?? []) {
-      if (!(dependency in document.nodes)) {
+      if (!Object.hasOwn(document.nodes, dependency)) {
         issues.push(`/nodes/${nodeId}/needs references unknown node ${JSON.stringify(dependency)}`);
       }
       if (dependency === nodeId) {
@@ -137,7 +152,7 @@ function assertSemanticValidity(document: WorkflowDocument): void {
     if (visited.has(nodeId)) return;
     visiting.add(nodeId);
     for (const dependency of document.nodes[nodeId]?.needs ?? []) {
-      if (dependency in document.nodes) visit(dependency, [...path, nodeId]);
+      if (Object.hasOwn(document.nodes, dependency)) visit(dependency, [...path, nodeId]);
     }
     visiting.delete(nodeId);
     visited.add(nodeId);
@@ -165,14 +180,16 @@ export function parseWorkflowYaml(source: string): WorkflowDocument {
   return document;
 }
 
-function durationToMilliseconds(duration: string | undefined): number | undefined {
+export function durationToMilliseconds(duration: string | undefined): number | undefined {
   if (duration === undefined) return undefined;
   const match = /^(\d+)(ms|s|m|h)$/.exec(duration);
   if (match === null) throw new WorkflowValidationError([`invalid duration ${JSON.stringify(duration)}`]);
   const value = Number(match[1]);
   const unit = match[2];
   const multiplier = unit === "ms" ? 1 : unit === "s" ? 1_000 : unit === "m" ? 60_000 : 3_600_000;
-  return value * multiplier;
+  const milliseconds = value * multiplier;
+  if (!Number.isSafeInteger(milliseconds) || milliseconds > 2_147_483_647) throw new WorkflowValidationError(["duration exceeds supported timer range"]);
+  return milliseconds;
 }
 
 function normalizeBudget(policy: AttemptPolicyDocument | undefined, fallback?: AttemptBudget): AttemptBudget {
@@ -253,6 +270,13 @@ export async function normalizeWorkflow(
         ...(node.role === undefined ? {} : { role: node.role }),
         output: { ref: node.output.schema, schema: await load(node.output.schema) },
         attemptBudget: normalizeBudget(node.attemptPolicy, defaultAttemptBudget),
+        ...(node.mutation === undefined ? {} : { mutation: node.mutation }),
+        ...(node.command === undefined ? {} : { command: {
+          argv: [...node.command.argv],
+          cwd: node.command.cwd ?? ".",
+          maxDurationMs: durationToMilliseconds(node.command.maxDuration) as number,
+          maxOutputBytes: node.command.maxOutputBytes ?? 1_048_576,
+        } }),
       };
       return [id, normalized] as const;
     }),
