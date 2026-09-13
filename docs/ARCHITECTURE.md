@@ -1,355 +1,222 @@
 # Architecture
 
-## Architectural objective
+## Status and objective
 
-Anastom must keep engineering policy independent from agent runtime implementation.
+This document describes the implemented M0 boundary and the accepted M1 extension. Later milestone ideas are labeled explicitly.
+
+Anastom keeps engineering policy independent from agent runtime implementation. The control plane owns authoritative state and verification; a runtime adapter owns one bounded agent loop.
 
 ## Layer model
 
 ```text
 +-------------------------------------------------------------+
-| User Interface                                              |
-| CLI now; TUI/API/UI later                                   |
+| User interface                                              |
+| CLI now; TUI, API, and UI later                             |
 +-------------------------------+-----------------------------+
                                 |
 +-------------------------------v-----------------------------+
-| Control Plane                                                |
-| scheduler | policy | transitions | budgets | routing | gates |
+| Control plane                                                |
+| scheduler | policy | transitions | budgets | command checks |
 +-------------------------------+-----------------------------+
                                 |
 +-------------------------------v-----------------------------+
-| Workflow Runtime                                             |
-| IR interpreter | nested flows | evidence | context builder   |
+| Workflow runtime                                             |
+| IR interpreter | context builder | artifacts | event replay  |
 +-------------------------------+-----------------------------+
                                 |
 +-------------------------------v-----------------------------+
-| Runtime Adapter Contract                                     |
-+-----+-----------+------------+-------------+-----------------+
-| Pi  | Codex     | Mycelium   | TrueForge   | OpenHands ...  |
-+-----+-----------+------------+-------------+-----------------+
+| Runtime adapter contract                                     |
++-------------+---------------+-------------------------------+
+| Fake (M0)   | Pi (M1)       | Codex and others (later)      |
++-------------+---------------+-------------------------------+
                                 |
 +-------------------------------v-----------------------------+
-| Execution Capabilities                                       |
+| Execution capabilities                                       |
 | models | tools | LSP | debugger | MCP | browser | sandbox   |
 +-------------------------------------------------------------+
 ```
 
 ## Domain concepts
 
-### Run
-One durable execution of one root workflow.
+- **Run:** one durable execution of one root workflow.
+- **Workflow definition:** a versioned executable methodology graph.
+- **Workflow instance:** runtime state of a workflow within a run.
+- **Node:** the smallest schedulable workflow unit.
+- **Attempt:** one execution attempt of a node.
+- **Role:** a semantic capability profile requested by an agent node.
+- **Runtime:** the harness used for one agent attempt.
+- **Model:** the LLM selected for an attempt; model selection remains adapter configuration in M1.
+- **Context envelope:** the explicit immutable input to an attempt.
+- **Artifact:** a durable output such as a worker report, diff, log, or command result.
+- **Evidence:** an artifact or observation supporting a later decision; a general evidence graph is deferred.
+- **Gate:** a machine or human authorization condition; executable gates are deferred beyond M1.
+- **Policy:** deterministic constraints governing execution.
+- **Workspace:** the filesystem and Git isolation boundary assigned by the control plane.
 
-### Workflow definition
-Versioned executable methodology graph.
+## Ownership boundary
 
-### Workflow instance
-Runtime state of a workflow within a run.
+Anastom owns workflow state, scheduling, dependencies, roles, budgets, retries, context construction, verification, workspace assignment, authoritative status, adapter selection, and trace replay.
 
-### Node
-Smallest schedulable workflow unit.
+A harness owns one agent loop, model communication, harness-native tool execution, session mechanics, streaming, and optional editor or browser integrations. A harness response is an observation until Anastom validates and records it.
 
-### Attempt
-One execution attempt of a node.
+The control plane must not delegate scheduling, retry policy, acceptance decisions, workspace selection, or durable state to a prompt or harness session.
 
-### Role
-Semantic capability profile requested by a node.
+## Execution ownership
 
-### Runtime
-Harness used to execute an attempt.
+M0 deliberately sends all four node kinds through the fake adapter so the scheduler and transition model can be tested without side effects. M1 replaces that test convenience with separate execution paths:
 
-### Model
-LLM selected for an attempt.
+| Node kind | M1 owner | M1 behavior |
+| --- | --- | --- |
+| `agent` | `RuntimeAdapter` | Pi executes one fresh bounded session in the assigned workspace. |
+| `command` | control-plane command executor | Spawn an exact argument vector, capture bounded output, and decide success from exit status. |
+| `verifier` | fake adapter only | General verifier plugins remain deferred; the M1 demo verifies with a `command` node. |
+| `gate` | fake adapter only | Human approval, machine conditions, audit, and resume remain deferred. |
 
-### Context envelope
-Explicit immutable description of what an attempt receives.
-
-### Artifact
-Durable output: plan, code diff, hypothesis, benchmark, review, test result, etc.
-
-### Evidence
-Artifact or observation that can support/refute a claim or transition.
-
-### Gate
-Condition requiring machine or human authorization before transition.
-
-### Policy
-Deterministic constraints governing execution.
-
-### Workspace
-Filesystem/git isolation boundary.
-
-## Control-plane ownership
-
-Anastom owns:
-
-- workflow state;
-- scheduling;
-- dependency resolution;
-- role requirements;
-- budgets;
-- retry/escalation rules;
-- context construction;
-- evidence references;
-- verification;
-- workspace assignment;
-- authoritative status;
-- adapter selection;
-- trace/replay.
-
-Harness owns:
-
-- one agent loop;
-- model communication;
-- native tool execution;
-- harness-local session mechanics;
-- harness-specific streaming;
-- optional LSP/debugger/browser integration.
-
-This ownership boundary should be aggressively defended.
+Unsupported executable node kinds must fail before an attempt starts. They must not fall back to Pi.
 
 ## Runtime adapter contract
 
-Suggested initial shape:
+The implemented lifecycle is:
 
 ```ts
 export interface RuntimeAdapter {
   readonly id: string;
 
   capabilities(): Promise<RuntimeCapabilities>;
-
   start(request: ExecutionRequest): Promise<ExecutionHandle>;
-
   events(handle: ExecutionHandle): AsyncIterable<RuntimeEvent>;
-
   collect(handle: ExecutionHandle): Promise<ExecutionResult>;
-
   cancel(handle: ExecutionHandle): Promise<void>;
-
   recover?(
     persisted: PersistedExecutionRef
   ): Promise<RecoveredExecution | null>;
 }
 ```
 
-`ExecutionRequest` includes:
+The implemented M0 request includes `nodeKind`; `role` is optional because deterministic nodes do not have roles:
 
 ```ts
 type ExecutionRequest = {
-  runId: RunId;
-  workflowInstanceId: WorkflowInstanceId;
-  nodeId: NodeId;
+  runId: string;
+  workflowInstanceId: string;
+  nodeId: string;
+  nodeKind: NodeKind;
   attempt: number;
-
-  role: ResolvedRole;
-  model?: ModelSelection;
-
+  role?: ResolvedRole;
   workspace: WorkspaceRef;
   context: ContextEnvelope;
   budget: AttemptBudget;
-
   requiredOutputSchema: JsonSchema;
   toolPolicy: ToolPolicy;
 };
 ```
 
-## Adapter capability negotiation
+M1 does not add model selection to this request. Runtime and model configuration resolve outside the workflow role. M2 adds capability negotiation and makes portability across Pi and Codex observable.
 
-Adapters should declare capabilities rather than forcing Anastom to assume parity:
+`recover` is optional contract space and is not implemented for live Pi attempts in M1. SQLite durability in M1 supports cross-process `status` and `inspect`; M3 defines ownership leases, orphan detection, and safe execution recovery.
+
+## Runtime capabilities
+
+Adapters declare observable capabilities such as streaming, cancellation, structured output, usage reporting, tool integrations, and sandboxing. M1 records Pi capabilities but does not route by them. Capability requirements and conformance-driven routing begin in M2.
+
+## Workspace contract
+
+The workspace reference evolves from the M0 in-memory fixture to this M1 union:
 
 ```ts
-type RuntimeCapabilities = {
-  streaming: boolean;
-  cancellation: boolean;
-  resumableSession: boolean;
-  nativeSubagents: boolean;
-  mcp: boolean;
-  lsp: boolean;
-  debugger: boolean;
-  browser: boolean;
-  structuredOutput: "native" | "prompted" | "none";
-  usageReporting: "tokens" | "cost" | "partial" | "none";
-  sandboxing: string[];
-};
+type WorkspaceRef =
+  | { id: string; mode: "memory" }
+  | {
+      id: string;
+      mode: "readonly";
+      repoRoot: string;
+      path: string;
+      baseCommit: string;
+    }
+  | {
+      id: string;
+      mode: "isolated";
+      repoRoot: string;
+      path: string;
+      branch: string;
+      baseCommit: string;
+    };
 ```
 
-Workflow policy may require or prefer capabilities.
+The control plane creates an isolated Git worktree from an exact base commit, assigns its path to Pi, records the branch and resulting head, and captures the final diff as an artifact. A run never asks Pi to create or select its own worktree.
 
-## Event sourcing
+M1 retains successful and failed worktrees for inspection and provides explicit cleanup. It never deletes a worktree that it cannot prove it owns. Shared integration and runtime-managed external workspaces are later modes.
 
-Anastom should use an append-only event stream as its source of history.
-
-Examples:
-
-```text
-RunCreated
-WorkflowInstantiated
-NodeReady
-AttemptScheduled
-AttemptStarted
-RuntimeEventObserved
-ArtifactProduced
-EvidenceRecorded
-VerifierStarted
-VerifierPassed
-VerifierFailed
-CircuitBreakerOpened
-NodeCompleted
-NodeFailed
-WorkflowCalled
-WorkflowReturned
-RunPaused
-RunResumed
-RunCompleted
-```
-
-Snapshots are optimization, not authority.
-
-## Failure semantics
-
-Failures should have categories:
-
-- runtime unavailable;
-- model/provider failure;
-- tool failure;
-- schema violation;
-- verification failure;
-- budget exhausted;
-- policy violation;
-- workspace conflict;
-- human rejection;
-- unknown/internal.
-
-Policies can react differently to each category.
-
-Do not let "failure" mean "ask the same model to try again."
-
-## Circuit-breaker model
-
-Possible deterministic inputs:
-
-```text
-attempt_count
-same_verifier_failure_count
-normalized_error_fingerprint
-diff_similarity
-files_touched
-budget_consumed
-time_elapsed
-tool_call_loop_score
-review_rejection_count
-```
-
-Actions:
-
-```text
-retry_same
-retry_fresh_context
-switch_model
-switch_runtime
-spawn_diagnostician
-roll_back
-request_human
-fail_node
-fail_workflow
-```
+Git worktrees isolate branches and concurrent edits. They are not a security sandbox. Pi currently runs with the host process permissions, so M1's security claim is traceable workspace isolation under local trust.
 
 ## Context construction
 
-Default context composition:
+Every agent attempt receives a newly built, immutable envelope containing:
+
+- envelope version and digest;
+- task objective and acceptance criteria;
+- role ID;
+- validated workflow inputs and dependency outputs;
+- assigned workspace and allowed mutation mode;
+- selected artifact references;
+- deterministic verification command;
+- required structured-output schema;
+- attempt budget.
+
+The envelope excludes parent transcripts, failed reasoning branches unless promoted to an artifact, sibling scratchpads, superseded plans, credentials, and irrelevant repository content. The exact serialized envelope is stored before the adapter starts so inspection can explain what the worker received.
+
+## Pi adapter
+
+M1 integrates the maintained `@earendil-works/pi-coding-agent` TypeScript SDK directly. The adapter creates an in-memory Pi session rooted at the assigned worktree, subscribes to session events, sends one context-derived prompt, collects the final assistant response, and disposes the session. Cancellation calls Pi's abort operation.
+
+The adapter uses Pi's normal authentication and model configuration. Anastom does not copy provider credentials into events or artifacts and does not treat Pi session storage as durable Anastom state. The dependency is pinned to an exact reviewed version in the implementation PR.
+
+If the embedded SDK cannot meet one of these contracts at the pinned version, the implementation must document the mismatch before choosing RPC or subprocess integration. The adapter boundary must not change merely to mirror Pi internals.
+
+## Deterministic command verification
+
+The M1 command executor receives an argument vector rather than a shell string. It:
+
+- resolves a workspace-relative working directory and rejects escapes;
+- starts the executable without shell interpolation;
+- supplies only the inherited environment allowed by policy;
+- applies a wall-clock limit and bounded stdout/stderr capture;
+- records exit code, signal, duration, truncation flags, and output artifacts;
+- passes only when the process exits with code zero before timeout.
+
+Pi may run commands while implementing a task, but only the control-plane command result authorizes the verification transition.
+
+## Timeout and cancellation race
+
+The control plane owns attempt deadlines. At the deadline it records a timeout request, calls adapter cancellation once, waits a bounded grace period, and records the attempt as a `budget-exhausted` failure. A timeout consumes an attempt.
+
+A result observed after the timeout may be retained as diagnostic evidence but cannot change the terminal attempt or run state. Cancellation failure is recorded and does not extend the deadline. Tests use an injected clock or deterministic timer control.
+
+## Events and persistence
+
+The append-only event stream remains the authoritative transition history. Run state is reconstructed by replaying events in sequence; projections and snapshots are derived data.
+
+M1 uses SQLite for two authoritative records:
 
 ```text
-system role contract
-+ node objective
-+ acceptance criteria
-+ allowed mutations
-+ selected source context
-+ relevant durable artifacts
-+ known evidence
-+ verifier definitions
-+ required output schema
-+ budget
+runs(run_id, workflow_digest, workflow_json, created_at)
+events(run_id, sequence, event_type, event_json, recorded_at)
 ```
 
-Explicitly exclude:
+`(run_id, sequence)` is unique. Creating a run and appending events are transactional. Appends compare the expected sequence and fail on conflict. SQLite enables foreign keys and WAL where the storage location supports it.
 
-- unrelated parent transcript;
-- failed reasoning branches unless relevant as evidence;
-- sibling private scratchpads;
-- superseded plans.
+`workflow_json` contains the normalized immutable definition. `workflow_digest` covers a canonical serialization of that definition. Database timestamps support operator inspection; event sequence remains the only transition ordering authority.
 
-## Workspace strategy
+Artifact bodies live below a per-run filesystem directory. Their digest and metadata enter the event stream. M1 does not add mutable node, attempt, lease, snapshot, evidence, usage, or projection tables. Those tables require a milestone that uses them.
 
-Use git worktrees as the default implementation isolation primitive.
+## Failure semantics
 
-Possible modes:
+Failures retain typed categories: runtime unavailable, model/provider, tool, schema violation, verification, budget exhausted, policy violation, workspace conflict, human rejection, and unknown/internal.
 
-- `readonly`: inspection only;
-- `isolated`: dedicated branch/worktree;
-- `shared-integration`: controlled integrator;
-- `external`: runtime-managed sandbox.
+Retry policy reacts to the category and budget. Exhaustion is fail-fast in M1. Repeating a failed instruction without a new recorded reason is not a recovery policy.
 
-A node must declare mutation intent.
+## Deferred architecture
 
-## Persistence strategy
+M1 does not implement Codex, human gates, nested workflows, fan-out, shared integration, capability routing, snapshots, execution leases, crash recovery, pause/resume, cost routing, circuit breakers beyond attempt and duration limits, or a general evidence graph.
 
-### MLP
-SQLite + local filesystem.
-
-Tables roughly:
-
-```text
-runs
-workflow_instances
-nodes
-attempts
-events
-artifacts
-evidence
-workspaces
-leases
-usage
-```
-
-### Later
-Abstract persistence behind repository interfaces.
-
-Add:
-- Postgres for shared state;
-- Redis for low-latency coordination/eventing;
-- Temporal for durable distributed workflows.
-
-Temporal should implement Anastom semantics, not define them.
-
-## Security posture
-
-A runtime adapter is potentially executing arbitrary code.
-
-Anastom should record:
-
-- workspace;
-- allowed tool classes;
-- approval policy;
-- environment exposure;
-- secret references;
-- network policy if available.
-
-MLP can rely on local trust but should design contracts that allow later sandbox enforcement.
-
-## Observability
-
-Every attempt should produce:
-
-- runtime/model;
-- elapsed time;
-- token/cost usage if available;
-- tool/event counts;
-- artifacts;
-- diff statistics;
-- verifier outcomes;
-- retry/escalation reason.
-
-Metrics should support future routing decisions.
-
-## Architectural rule of thumb
-
-If a new feature is only meaningful for one harness, it probably belongs in an adapter or capability plugin rather than `core`.
+The controlling decisions are recorded in `docs/adr/`. A later milestone may supersede an ADR with another ADR; it must not silently edit away the reason for the earlier choice.

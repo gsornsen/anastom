@@ -48,6 +48,12 @@ Pi receives a fresh context envelope, modifies an isolated worktree, runs a veri
 - durable SQLite run/event store;
 - `run`, `status`, `inspect`.
 
+### Boundary
+
+M1 has one agent worker and one deterministic command verifier. It retains one authoritative structured output per node and records context, diffs, logs, and verification output as artifacts. Cross-process inspection is required; recovery of work running during a crash remains M3.
+
+The accepted implementation contract and completion evidence are in [M1_BUILD_BRIEF.md](M1_BUILD_BRIEF.md).
+
 ### Why it matters
 First useful end-to-end slice.
 
