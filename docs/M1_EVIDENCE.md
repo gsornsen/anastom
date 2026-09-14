@@ -1,6 +1,6 @@
 # M1 completion evidence
 
-Status: functional M1 evidence complete; the owner approved revision `84b394c` of PR #9. The PR remains open, with a subsequent JSDoc policy correction documented below. The original implementation baseline is commit `96a6594a5a6c9247b36d788fa8aa32449583bebf`: its recorded commands and digests below describe the retained originals. Owner-review revisions and current reproduction names are documented separately; historical evidence is not rewritten to match newer schemas.
+Status: M1 is merged. The owner approved final revision `1dde54da4de0f13e7d49e59adf71159aa5eb35a0`, and [PR #9](https://github.com/gsornsen/anastom/pull/9) was squash-merged as `af8eb878dad1a7168dfda84dcbc911022d44cbc6`. Its tree matches the reviewed revision. The original implementation baseline is commit `96a6594a5a6c9247b36d788fa8aa32449583bebf`: its recorded commands and digests below describe the retained originals. Owner-review revisions and current reproduction names are documented separately; historical evidence is not rewritten to match newer schemas.
 
 ## Environment
 

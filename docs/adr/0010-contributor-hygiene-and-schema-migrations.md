@@ -1,6 +1,6 @@
 # 0010 — Enforce contributor hygiene and version database schemas
 
-- Status: Implemented in PR #9; owner approved revision `84b394c`
+- Status: Accepted and implemented; final revision `1dde54d` approved and PR #9 merged as `af8eb87`
 - Date: 2026-09-13
 
 ## Context
@@ -21,6 +21,6 @@ Allow fake file contents to use `{ fromFile: "./relative-source.mjs" }`, confine
 
 ## Consequences
 
-`buildContext` takes named options rather than six positional parameters; this is an unreleased API refinement covered by tests and package docs. New worker definitions embed the stronger schema, so their digests differ from historical runs. Existing normalized snapshots and event histories remain inspectable. Startup validates migrations even for status/inspection; incompatible or damaged databases fail closed. The optional API generator and standards are tooling, not new worker orchestration capabilities. Human approval remains required before merging PR #9.
+`buildContext` takes named options rather than six positional parameters; this is an unreleased API refinement covered by tests and package docs. New worker definitions embed the stronger schema, so their digests differ from historical runs. Existing normalized snapshots and event histories remain inspectable. Startup validates migrations even for status/inspection; incompatible or damaged databases fail closed. The optional API generator and standards are tooling, not new worker orchestration capabilities. The owner reviewed the final lint correction and authorized merge; PR #9 is merged.
 
 The [engineering standards](../ENGINEERING.md) contain test conventions, CI ownership, UUIDv4 rationale, and release/migration procedures.
