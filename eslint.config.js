@@ -52,7 +52,7 @@ export default tseslint.config(
           ],
         },
       ],
-      "jsdoc/require-description": "error",
+      "jsdoc/require-description": ["error", { contexts: ["any"] }],
       "jsdoc/check-param-names": "error",
       "jsdoc/check-tag-names": [
         "error",

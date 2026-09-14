@@ -1,6 +1,6 @@
 # 0010 — Enforce contributor hygiene and version database schemas
 
-- Status: Implemented in PR #9; awaiting owner review
+- Status: Implemented in PR #9; owner approved revision `84b394c`
 - Date: 2026-09-13
 
 ## Context

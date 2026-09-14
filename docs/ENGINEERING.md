@@ -10,6 +10,8 @@ Prefer one statement per line, named options over long positional argument lists
 
 Public functions, classes, methods, interfaces, and type aliases need useful JSDoc. Describe purpose, side effects, ownership, defaults, invariants, errors, and security boundaries where they affect callers. Use `@remarks`, `@throws`, `@returns`, and examples when helpful; TypeScript owns type information, so avoid redundant JSDoc types. Private helpers need documentation when their rationale or behavior is not evident from their name. Documentation must explain the behavior, not paraphrase the identifier.
 
+ESLint requires a description on every JSDoc block, including classes, interfaces, type aliases, and constants. Reviewers assess whether that description is useful; the lint rule catches empty documentation.
+
 Every workspace package has a README and CHANGELOG. Package READMEs describe purpose, public entry point, supported behavior, boundaries, and development commands. Update them when their contract changes. Optional `pnpm docs:api <package>` generates HTML from exported TypeScript and JSDoc under `.generated/api/<package>/`; omit the package to generate all eight. Generated documentation stays untracked and is not published automatically. `pnpm docs:api core` is a useful API review check when changing core contracts.
 
 Standard ESLint rules and the JSDoc plugin cover current readability needs. The repository-specific `pnpm hygiene` gate checks package metadata, documentation, and release plans. Add a custom ESLint rule only for a concrete recurring AST-level mistake that existing rules cannot express; include positive and negative cases. Avoid maintaining custom duplicates of standard checks.
