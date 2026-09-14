@@ -25,12 +25,19 @@ async function adapterConformanceExample(adapter: RuntimeAdapter): Promise<void>
   expect(capabilities.structuredOutput).not.toBe("none");
   const handle = await adapter.start(request());
   const events = [];
-  for await (const event of adapter.events(handle)) events.push(event);
+  for await (const event of adapter.events(handle)) {
+    events.push(event);
+  }
   expect(events.map((event) => event.type)).toEqual(["started", "log", "completed"]);
-  await expect(adapter.collect(handle)).resolves.toEqual({ status: "succeeded", output: { value: 1 } });
+  await expect(adapter.collect(handle)).resolves.toEqual({
+    status: "succeeded",
+    output: { value: 1 },
+  });
   await adapter.cancel(handle);
   await expect(adapter.collect(handle)).resolves.toMatchObject({ status: "cancelled" });
-  await expect(adapter.recover?.({ adapterId: adapter.id, handleId: handle.id })).resolves.toBeNull();
+  await expect(
+    adapter.recover?.({ adapterId: adapter.id, handleId: handle.id }),
+  ).resolves.toBeNull();
 }
 
 describe("FakeRuntimeAdapter", () => {
@@ -60,6 +67,8 @@ describe("FakeRuntimeAdapter", () => {
     expect(parseFakeScenario("nodes:\n  work:\n    - output: { value: 1 }")).toEqual({
       nodes: { work: [{ output: { value: 1 } }] },
     });
-    expect(() => parseFakeScenario("nodes:\n  work:\n    - outcome: magic")).toThrow("Invalid fake scenario");
+    expect(() => parseFakeScenario("nodes:\n  work:\n    - outcome: magic")).toThrow(
+      "Invalid fake scenario",
+    );
   });
 });

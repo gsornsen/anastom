@@ -19,6 +19,10 @@
 - [ ] Compatibility and migration impact is documented, or this change has none.
 - [ ] The change fits the currently approved milestone or linked design decision.
 - [ ] README.md is updated, or the reason no overview update is needed is documented below.
+- [ ] Affected package READMEs and changelogs are current, and a SemVer Changeset is included for package code/contract changes.
+- [ ] Public APIs have useful JSDoc; optional API docs were reviewed when relevant.
+- [ ] Formatting, hygiene, types, lint, and relevant behavior checks pass.
+- [ ] CI changes identify their unique failure boundary and consolidate duplicate coverage.
 
 <!-- Update README.md in every PR by default. If unchanged, explain the specific reason this change does not affect the project overview, supported behavior, setup, limitations, milestone status, or documentation links. -->
 

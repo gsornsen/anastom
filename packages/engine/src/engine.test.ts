@@ -51,7 +51,10 @@ function successScenario(): FakeScenario {
   };
 }
 
-function engineFor(scenario: FakeScenario, persistence = new InMemoryRunPersistence()): WorkflowEngine {
+function engineFor(
+  scenario: FakeScenario,
+  persistence = new InMemoryRunPersistence(),
+): WorkflowEngine {
   return new WorkflowEngine({ runtime: new FakeRuntimeAdapter(scenario), persistence });
 }
 
@@ -73,7 +76,7 @@ describe("dependency scheduling", () => {
 });
 
 describe("WorkflowEngine", () => {
-  it("executes every M0 node kind through the fake boundary", async () => {
+  it("executes every authored node kind through the fake boundary", async () => {
     const document = parseWorkflowYaml(`
 apiVersion: anastom.dev/v1alpha1
 kind: Workflow

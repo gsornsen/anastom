@@ -21,6 +21,8 @@ pnpm anastom validate examples/workflows/demo-feature.yaml
 pnpm anastom run examples/workflows/demo-feature.yaml --fake-scenario examples/fake/success.yaml
 ```
 
+Automated M1 tests use temporary Git repositories and a deterministic Pi session test double. They must not call real models or require provider credentials. The [M1 demo guide](docs/M1_DEMO.md) documents the separate, explicitly invoked live integration check and durable inspection commands.
+
 ## Engineering expectations
 
 Contributions should preserve the boundaries in [VISION.md](docs/VISION.md), [ARCHITECTURE.md](docs/ARCHITECTURE.md), and [WORKFLOW_IR.md](docs/WORKFLOW_IR.md):
@@ -44,6 +46,8 @@ A README edit may be omitted when the change has no meaningful effect on that ov
 Record notable user-facing or project changes in `CHANGELOG.md`. Keep the README's changelog link working; the overview and detailed change history serve different purposes.
 
 ## Tests and evidence
+
+Follow the [engineering standards](docs/ENGINEERING.md) for readability, JSDoc, test fixtures, package documentation, SemVer, migrations, and CI ownership. Run `pnpm format` to apply the formatter. Before requesting review, run `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, and `pnpm hygiene`. Add a Changeset with `pnpm changeset` for changed package code or contracts; update the affected package README and changelog. Generate optional package API documentation with `pnpm docs:api <package>` when reviewing an API change.
 
 Tests should prove observable behavior and failure handling. Avoid tests that merely repeat an implementation. A pull request should state which checks ran and include relevant output or fixtures for behavior that cannot be covered by the standard commands.
 

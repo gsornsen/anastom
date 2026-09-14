@@ -4,6 +4,10 @@
 
 Use a TypeScript monorepo.
 
+The implemented M1 workspace contains eight packages: `core`, `engine`, `runtime-contract`, `runtime-fake`, `runtime-pi`, `persistence`, `workspaces`, and `cli`. Each package has a README and CHANGELOG. `core/schemas/` holds versioned authored/normalized workflow, task, and result contracts; `runtime-fake/schemas/` holds the scenario contract. The context builder and deterministic command executor remain in `engine`; SQLite migrations and filesystem artifact storage live in `persistence`. The controlled HTTP repository is in `examples/demo-repos/health-endpoint/`, with a copy/setup helper in `scripts/create-endpoint-fixture.ts`. See [engineering standards](ENGINEERING.md) for enforced development and package conventions.
+
+The broader tree below is design intent. Routing, telemetry, other adapters, generalized methodologies, and recovery packages have not been scaffolded for M1.
+
 A good initial structure:
 
 ```text
@@ -166,6 +170,7 @@ The engine supplies primitives; methodologies compose them.
 Roles should be reusable.
 
 `debugger` may appear in:
+
 - SDLC;
 - hypothesis debugging;
 - incident analysis;
@@ -178,6 +183,7 @@ A methodology may override a role locally when necessary.
 Keep the list small.
 
 Likely:
+
 - TypeScript;
 - schema validator such as Zod;
 - SQLite client;
@@ -189,6 +195,7 @@ Likely:
 - package manager workspace tooling.
 
 Avoid introducing:
+
 - Temporal;
 - Redis;
 - full DI framework;
@@ -200,22 +207,29 @@ until a milestone demands them.
 ## Testing layers
 
 ### Unit
+
 Pure workflow/policy transitions.
 
 ### Contract
+
 Runtime adapter conformance.
 
 ### Integration
+
 Fake runtime + SQLite + workspace.
 
 ### Harness integration
+
 Pi/Codex against controlled fixture repos.
 
 ### Regression
+
 Seeded bugs and workflow scenarios.
 
 ### Long-run reliability
+
 Fault injection:
+
 - kill process;
 - kill worker;
 - corrupt tool result;

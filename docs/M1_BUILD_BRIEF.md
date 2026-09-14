@@ -87,6 +87,8 @@ The Markdown body after front matter is a non-empty objective. Unknown fields ar
 
 The task compiler produces an immutable internal workflow with stable node IDs `implement` and `verify`. `implement` uses the built-in worker-report JSON Schema. `verify` uses the built-in command-result JSON Schema. These schemas are versioned repository assets and are recorded in the normalized run definition.
 
+Each optional worker attempt-policy field has its own default: one attempt and a ten-minute duration. Supplying only `maxAttempts` does not remove the deadline.
+
 ## Worker report
 
 The Pi adapter must normalize its final response into:
@@ -172,7 +174,7 @@ Required behavior:
 
 Create `packages/persistence` and implement the existing `RunPersistence` interface with Node's SQLite support unless an implementation test demonstrates a portability or correctness gap.
 
-The initial schema contains only `runs` and `events`. It must enforce:
+The application schema contains `runs` and `events`. Following owner review, a `schema_migrations` metadata table and SQLite `user_version` track validated, checksummed migrations; failed upgrades roll back transactionally. They do not introduce new orchestration state. It must enforce:
 
 - primary key uniqueness for run IDs;
 - foreign keys from events to runs;
@@ -196,11 +198,14 @@ Preserve the M0 commands. Add:
 
 ```text
 anastom run <task.md> --runtime pi [--repo <path>]
+anastom run <task.md> --runtime fake --fake-scenario <file> [--repo <path>]
 anastom status <run-id> [--state-dir <path>]
 anastom inspect <run-id> [--state-dir <path>] [--json]
 ```
 
 Human output goes to stdout. Actionable errors go to stderr and return a nonzero exit status. `run` prints the run ID immediately after durable creation so a failure can still be inspected.
+
+Fake task execution requires an explicit scenario; the CLI never infers fixture-specific behavior. Successful scripted attempts may declare workspace-relative `files` to make deterministic changes in an isolated worktree. Pi may optionally select a configured model with paired `--provider` and `--model` flags; this is explicit selection, without routing or capability negotiation. Task runs also accept `--state-dir` for repository state placement.
 
 `status` shows the current run and node outcomes. `inspect` shows the immutable task/workflow identity, workspace, attempts, event sequence, context and artifact references, verifier result, and failures. Secret material and unrestricted environment dumps are never rendered.
 
@@ -236,7 +241,7 @@ M1 is incomplete without focused evidence for:
 
 ## Controlled fixture
 
-Add a small, dependency-light HTTP repository below `examples/demo-repos/m1-endpoint/` with a failing acceptance test and a task at `tasks/add-endpoint.md`. The fixture must be quick to copy into a temporary Git repository and must not require network access after dependencies are installed.
+Add a small, dependency-light HTTP repository below `examples/demo-repos/health-endpoint/` with a failing acceptance test and a task at `tasks/add-endpoint.md`. The fixture must be quick to copy into a temporary Git repository and must not require network access after dependencies are installed.
 
 The real Pi evidence must operate on a temporary copy, never on Anastom's own working tree.
 
@@ -255,10 +260,10 @@ pnpm anastom run examples/workflows/demo-feature.yaml --fake-scenario examples/f
 M1 additionally requires:
 
 ```bash
-pnpm anastom run examples/demo-repos/m1-endpoint/tasks/add-endpoint.md --runtime fake --repo <temporary-fixture-repo>
+pnpm anastom run examples/demo-repos/health-endpoint/tasks/add-endpoint.md --runtime fake --fake-scenario examples/fake/health-endpoint.yaml --repo <temporary-fixture-repo>
 pnpm anastom status <run-id> --state-dir <temporary-fixture-repo>/.anastom
 pnpm anastom inspect <run-id> --state-dir <temporary-fixture-repo>/.anastom
-pnpm anastom run examples/demo-repos/m1-endpoint/tasks/add-endpoint.md --runtime pi --repo <temporary-fixture-repo>
+pnpm anastom run examples/demo-repos/health-endpoint/tasks/add-endpoint.md --runtime pi --repo <temporary-fixture-repo>
 ```
 
 The final evidence record must include versions of Node, pnpm, Pi SDK, selected provider/model, operating system, the sanitized run ID, terminal outcome, verifier exit code, workflow/context/artifact digests, and the retained diff. It must not contain credentials or private model reasoning.

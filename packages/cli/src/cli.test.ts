@@ -22,7 +22,7 @@ function capture() {
 const workflowPath = resolve("examples/workflows/demo-feature.yaml");
 const scenarioPath = resolve("examples/fake/success.yaml");
 
-describe("M0 CLI", () => {
+describe("Workflow CLI", () => {
   it("validates and graphs a workflow", async () => {
     const validation = capture();
     expect(await runCli(["validate", workflowPath], { io: validation.io })).toBe(0);
@@ -37,7 +37,10 @@ describe("M0 CLI", () => {
     const persistence = new InMemoryRunPersistence();
     const run = capture();
     expect(
-      await runCli(["run", workflowPath, "--fake-scenario", scenarioPath], { io: run.io, persistence }),
+      await runCli(["run", workflowPath, "--fake-scenario", scenarioPath], {
+        io: run.io,
+        persistence,
+      }),
     ).toBe(0);
     expect(run.stdout[0]).toContain("[succeeded]");
     const runId = /^Run ([^ ]+)/.exec(run.stdout[0] ?? "")?.[1];

@@ -6,7 +6,7 @@ Anastom is building a local-first, vendor-neutral control plane for software-eng
 
 The goal is to make work that spans hours or days understandable, bounded, and recoverable, even as models and coding tools change.
 
-**Current stage: M0 is complete.** The repository supports validated workflows and deterministic fake execution. The M1 contract is accepted; real Pi execution, Git worktrees, and SQLite persistence are the next implementation milestone.
+**Current stage: M1 is complete.** Anastom can delegate a bounded task to Pi in an isolated Git worktree, verify it independently, and preserve history for later inspection. The controlled live run with Anthropic `claude-opus-4-8` passed; see the [M1 completion evidence](docs/M1_EVIDENCE.md).
 
 [Changelog](CHANGELOG.md) · [Roadmap](docs/MILESTONES.md) · [Design documents](#learn-more) · [Contributing](CONTRIBUTING.md)
 
@@ -41,16 +41,25 @@ The name comes from **anastomosis**: branching structures that reconnect to exch
 
 ## What works today
 
-M0 provides a TypeScript pnpm workspace with:
+The TypeScript pnpm workspace supports:
 
 - strict YAML Workflow IR validation, local JSON Schema loading, and normalized workflow definitions;
 - dependency scheduling with stable ordering and one active node at a time;
 - a scriptable fake runtime with per-node, per-attempt outcomes;
 - schema-validated results, verifier pass/fail handling, retries, and failure propagation;
-- typed append-only events, state replay, and in-memory persistence; and
-- CLI commands to validate, render a graph, run a fake scenario, and inspect a run within the same process.
+- strict Markdown tasks compiled into one worker followed by one deterministic verification command;
+- a Pi adapter with a fresh in-memory session and explicit context per attempt;
+- owned Git worktrees retained for review, with base commit, final head, and diff capture;
+- bounded command execution with separate stdout/stderr artifacts and typed failures;
+- canonical context artifacts, structured reports, public tool summaries, and SHA-256 digests;
+- typed append-only events, SQLite persistence, and inspection from later processes; and
+- CLI commands to validate, render a graph, run, inspect, and show status.
 
-There are currently no real model calls, repository mutations, durable cross-process storage, or live human approval flows. `inspect` uses process-local storage; a separate shell invocation cannot inspect an earlier run yet.
+Markdown task runs persist under the target repository's ignored `.anastom/` directory. The original YAML fake demo retains M0's process-local persistence. A worker report describes the change; the control plane accepts it only after the declared command exits successfully.
+
+Packages have documented APIs and their own READMEs/changelogs. Prettier, ESLint/JSDoc, contributor hygiene checks, and reviewed SemVer release plans establish the development baseline. SQLite uses versioned, validated migrations with transactional failure rollback. Fake scenarios can reference separate source files for readable diffs and IDE support. See the [engineering standards](docs/ENGINEERING.md) for development, migration, and CI practices.
+
+Pi uses your normal provider authentication and model settings. A Git worktree provides checkout isolation; it is not an operating-system sandbox. Run trusted tasks and verification commands on repositories you are comfortable exposing to the configured provider. Live crash recovery, human approval, multiple workers, and other real adapters remain future milestones.
 
 See the [M0 retrospective](docs/M0_RETROSPECTIVE.md) for the implemented boundary and decisions.
 
@@ -75,24 +84,38 @@ To check the development baseline:
 pnpm test
 pnpm typecheck
 pnpm lint
+pnpm format:check
+pnpm hygiene
 ```
+
+To exercise M1 without a model, create a temporary copy of the dependency-free HTTP fixture and use its explicit script:
+
+```bash
+fixture="$(pnpm exec tsx scripts/create-endpoint-fixture.ts)"
+pnpm anastom run examples/demo-repos/health-endpoint/tasks/add-endpoint.md \
+  --runtime fake --fake-scenario examples/fake/health-endpoint.yaml --repo "$fixture"
+pnpm anastom status <printed-run-id> --state-dir "$fixture/.anastom"
+pnpm anastom inspect <printed-run-id> --state-dir "$fixture/.anastom"
+```
+
+The demo implements `GET /health`, runs the fixture's acceptance tests, and leaves the source checkout unchanged. The printed worktree and artifact paths remain available for review. See the [M1 demo guide](docs/M1_DEMO.md) for Pi login, a live run on a fresh fixture, JSON inspection, cleanup, and limitations.
 
 ## Roadmap
 
 Each milestone must produce a useful, testable demonstration. These are planned capabilities, with no promised release dates.
 
-| Milestone | Status | Outcome |
-| --- | --- | --- |
-| **M0 — Skeleton** | Complete | Validate workflows and execute deterministic fake runs. |
-| **M1 — Single worker** | Contract accepted; implementation next | One Pi worker, fresh context, isolated Git worktree, command verification, SQLite history, and durable `status` / `inspect`. |
-| **M2 — Portable worker** | Planned | Run the same contract through Codex; compare normalized events and capabilities. |
-| **M3 — Durable execution** | Planned | Recover safely after interruption, with ownership, orphan detection, pause, and resume semantics. |
-| **M4 — Defined SDLC** | Planned | Plan, delegate parallel work, integrate, review, and verify a feature. |
-| **M5 — Circuit breakers** | Planned | Detect repeated failure, enforce budgets, stop mutation, and escalate with evidence. |
-| **M6 — Hypothesis debugging** | Planned | Maintain competing explanations and run experiments that distinguish them. |
-| **M7 — Delegated TDD** | Planned | Separate planning and review from bounded implementation, with role-to-model configuration. |
-| **M8 — Mycelium bridge** | Planned | Translate selected Mycelium agents, skills, and workflows into portable Anastom resources. |
-| **M9–M12 — Further composition** | Planned | Specialist councils, adversarial evaluation, nested methodologies, and adaptive routing. |
+| Milestone                        | Status   | Outcome                                                                                                                      |
+| -------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **M0 — Skeleton**                | Complete | Validate workflows and execute deterministic fake runs.                                                                      |
+| **M1 — Single worker**           | Complete | One Pi worker, fresh context, isolated Git worktree, command verification, SQLite history, and durable `status` / `inspect`. |
+| **M2 — Portable worker**         | Planned  | Run the same contract through Codex; compare normalized events and capabilities.                                             |
+| **M3 — Durable execution**       | Planned  | Recover safely after interruption, with ownership, orphan detection, pause, and resume semantics.                            |
+| **M4 — Defined SDLC**            | Planned  | Plan, delegate parallel work, integrate, review, and verify a feature.                                                       |
+| **M5 — Circuit breakers**        | Planned  | Detect repeated failure, enforce budgets, stop mutation, and escalate with evidence.                                         |
+| **M6 — Hypothesis debugging**    | Planned  | Maintain competing explanations and run experiments that distinguish them.                                                   |
+| **M7 — Delegated TDD**           | Planned  | Separate planning and review from bounded implementation, with role-to-model configuration.                                  |
+| **M8 — Mycelium bridge**         | Planned  | Translate selected Mycelium agents, skills, and workflows into portable Anastom resources.                                   |
+| **M9–M12 — Further composition** | Planned  | Specialist councils, adversarial evaluation, nested methodologies, and adaptive routing.                                     |
 
 M1 persistence enables inspection from later processes. Recovery of an attempt that was running during a crash is explicitly M3 work.
 
@@ -100,17 +123,20 @@ See the [full milestones](docs/MILESTONES.md), [M1 build brief](docs/M1_BUILD_BR
 
 ## Learn more
 
-| Question | Document |
-| --- | --- |
-| What principles guide the project? | [Vision](docs/VISION.md) |
-| Who is it for, and how will it grow? | [Strategy](docs/STRATEGY.md) |
-| What is the first useful product target? | [Minimum lovable product requirements](docs/PRD_MLP.md) |
-| Who owns execution, state, and verification? | [Architecture](docs/ARCHITECTURE.md) |
-| How are workflows represented? | [Workflow IR](docs/WORKFLOW_IR.md) |
-| Why were foundational decisions made? | [Architecture decision records](docs/adr/) |
-| What did M0 settle? | [M0 retrospective](docs/M0_RETROSPECTIVE.md) |
-| How does Mycelium carry forward? | [Migration strategy](docs/MYCELIUM_MIGRATION.md) |
-| Which existing systems inform the design? | [Runtimes and inspiration](docs/RUNTIMES_AND_INSPIRATION.md) |
+| Question                                                | Document                                                     |
+| ------------------------------------------------------- | ------------------------------------------------------------ |
+| What principles guide the project?                      | [Vision](docs/VISION.md)                                     |
+| Who is it for, and how will it grow?                    | [Strategy](docs/STRATEGY.md)                                 |
+| What is the first useful product target?                | [Minimum lovable product requirements](docs/PRD_MLP.md)      |
+| Who owns execution, state, and verification?            | [Architecture](docs/ARCHITECTURE.md)                         |
+| How are workflows represented?                          | [Workflow IR](docs/WORKFLOW_IR.md)                           |
+| How do we keep contributions readable and maintainable? | [Engineering standards](docs/ENGINEERING.md)                 |
+| Why were foundational decisions made?                   | [Architecture decision records](docs/adr/)                   |
+| What did M0 settle?                                     | [M0 retrospective](docs/M0_RETROSPECTIVE.md)                 |
+| How do I run and inspect a single worker?               | [M1 demo guide](docs/M1_DEMO.md)                             |
+| What proves M1 works?                                   | [M1 completion evidence](docs/M1_EVIDENCE.md)                |
+| How does Mycelium carry forward?                        | [Migration strategy](docs/MYCELIUM_MIGRATION.md)             |
+| Which existing systems inform the design?               | [Runtimes and inspiration](docs/RUNTIMES_AND_INSPIRATION.md) |
 
 ## License and community
 

@@ -1,0 +1,8 @@
+pnpm-lock.yaml
+LICENSE
+.anastom/
+.agents/
+.codex/
+.generated/
+node_modules/
+dist/

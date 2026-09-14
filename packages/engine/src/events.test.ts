@@ -33,7 +33,13 @@ describe("event transitions", () => {
     expect(() =>
       replayRun([
         created,
-        { type: "NodeReady", runId: "run", sequence: 3, nodeId: "work", reason: "dependencies-satisfied" },
+        {
+          type: "NodeReady",
+          runId: "run",
+          sequence: 3,
+          nodeId: "work",
+          reason: "dependencies-satisfied",
+        },
       ]),
     ).toThrow("Expected event sequence 2");
   });

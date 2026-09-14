@@ -1,80 +1,61 @@
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { readFile, writeFile, realpath, mkdir, lstat } from "node:fs/promises";
+import { resolve, relative, isAbsolute, dirname } from "node:path";
 
 import type { JsonValue } from "@anastom/core";
-import { FAILURE_CATEGORIES, type ExecutionHandle, type ExecutionRequest, type ExecutionResult, type RuntimeAdapter, type RuntimeCapabilities, type RuntimeEvent } from "@anastom/runtime-contract";
+import type { FAILURE_CATEGORIES } from "@anastom/runtime-contract";
+import {
+  type ExecutionHandle,
+  type ExecutionRequest,
+  type ExecutionResult,
+  type RuntimeAdapter,
+  type RuntimeCapabilities,
+  type RuntimeEvent,
+} from "@anastom/runtime-contract";
 import Ajv, { type ErrorObject } from "ajv";
 import { parse } from "yaml";
+import scenarioSchema from "../schemas/scenario.v1alpha1.json" with { type: "json" };
 
+/**
+ * A deterministic result script, optionally including logs and isolated workspace file changes.
+ */
 export type FakeAttemptDefinition =
-  | { outcome?: "succeeded"; output: JsonValue; events?: string[] }
-  | { outcome: "failed"; failure?: { category?: (typeof FAILURE_CATEGORIES)[number]; message?: string }; events?: string[] }
+  | {
+      outcome?: "succeeded";
+      output: JsonValue;
+      events?: string[];
+      files?: Record<string, string | FakeFileReference>;
+    }
+  | {
+      outcome: "failed";
+      failure?: { category?: (typeof FAILURE_CATEGORIES)[number]; message?: string };
+      events?: string[];
+    }
   | { outcome: "blocked"; reason?: string; events?: string[] }
   | { outcome: "cancelled"; reason?: string; events?: string[] };
 
+/**
+ * Ordered attempt scripts selected by node ID; no real model or subprocess integration is involved.
+ */
 export interface FakeScenario {
   nodes: Record<string, FakeAttemptDefinition[]>;
 }
 
-const scenarioSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["nodes"],
-  properties: {
-    nodes: {
-      type: "object",
-      additionalProperties: {
-        type: "array",
-        minItems: 1,
-        items: {
-          oneOf: [
-            {
-              type: "object",
-              additionalProperties: false,
-              required: ["output"],
-              properties: {
-                outcome: { const: "succeeded" },
-                output: true,
-                events: { type: "array", items: { type: "string" } },
-              },
-            },
-            {
-              type: "object",
-              additionalProperties: false,
-              required: ["outcome"],
-              properties: {
-                outcome: { const: "failed" },
-                failure: {
-                  type: "object",
-                  additionalProperties: false,
-                  properties: {
-                    category: { enum: [...FAILURE_CATEGORIES] },
-                    message: { type: "string" },
-                  },
-                },
-                events: { type: "array", items: { type: "string" } },
-              },
-            },
-            {
-              type: "object",
-              additionalProperties: false,
-              required: ["outcome"],
-              properties: {
-                outcome: { enum: ["blocked", "cancelled"] },
-                reason: { type: "string" },
-                events: { type: "array", items: { type: "string" } },
-              },
-            },
-          ],
-        },
-      },
-    },
-  },
-} as const;
+/** Source file relative to the scenario directory, materialized before execution. */
+export interface FakeFileReference {
+  fromFile: string;
+}
 
-const validateScenario = new Ajv({ allErrors: true, strict: false }).compile(scenarioSchema);
+const validateScenario = new Ajv({ allErrors: true, strict: false }).compile<FakeScenario>(
+  scenarioSchema,
+);
 
+/**
+ * Actionable diagnostics for malformed scenarios or unsafe file references.
+ */
 export class FakeScenarioValidationError extends Error {
+  /**
+   * Collect actionable scenario parsing and file-reference diagnostics.
+   */
   constructor(readonly issues: readonly string[]) {
     super(`Invalid fake scenario:\n${issues.map((issue) => `- ${issue}`).join("\n")}`);
     this.name = "FakeScenarioValidationError";
@@ -82,9 +63,14 @@ export class FakeScenarioValidationError extends Error {
 }
 
 function formatErrors(errors: ErrorObject[] | null | undefined): string[] {
-  return (errors ?? []).map((error) => `${error.instancePath || "/"} ${error.message ?? "is invalid"}`);
+  return (errors ?? []).map(
+    (error) => `${error.instancePath || "/"} ${error.message ?? "is invalid"}`,
+  );
 }
 
+/**
+ * Parse and validate a deterministic scenario; file references remain unresolved until loadFakeScenario.
+ */
 export function parseFakeScenario(source: string): FakeScenario {
   let candidate: unknown;
   try {
@@ -99,15 +85,42 @@ export function parseFakeScenario(source: string): FakeScenario {
   return candidate;
 }
 
+/**
+ * Load a local scenario and materialize file references relative to its directory.
+ * @remarks References cannot escape that directory lexically or through symlinks. Inline file text remains supported.
+ */
 export async function loadFakeScenario(filePath: string): Promise<FakeScenario> {
   const absolutePath = resolve(filePath);
   try {
-    return parseFakeScenario(await readFile(absolutePath, "utf8"));
+    const scenario = parseFakeScenario(await readFile(absolutePath, "utf8"));
+    const root = await realpath(dirname(absolutePath));
+    for (const attempts of Object.values(scenario.nodes)) {
+      for (const attempt of attempts) {
+        await materializeFiles(root, attempt);
+      }
+    }
+    return scenario;
   } catch (error) {
-    if (error instanceof FakeScenarioValidationError) throw error;
+    if (error instanceof FakeScenarioValidationError) {
+      throw error;
+    }
     const message = error instanceof Error ? error.message : String(error);
     throw new FakeScenarioValidationError([`cannot load scenario ${absolutePath}: ${message}`]);
   }
+}
+
+async function loadReferencedFile(root: string, source: string): Promise<string> {
+  if (isAbsolute(source) || source.split(/[\\/]/).includes("..") || source.includes("\0")) {
+    throw new FakeScenarioValidationError([
+      "Scenario file reference must stay within its directory",
+    ]);
+  }
+  const path = await realpath(resolve(root, source));
+  const rel = relative(root, path);
+  if (!rel || rel === ".." || rel.startsWith("../") || rel.startsWith("..\\") || isAbsolute(rel)) {
+    throw new FakeScenarioValidationError(["Scenario file reference escapes its directory"]);
+  }
+  return readFile(path, "utf8");
 }
 
 interface PendingExecution {
@@ -115,7 +128,11 @@ interface PendingExecution {
   events: RuntimeEvent[];
 }
 
-function normalizeAttempt(nodeId: string, attempt: number, definition: FakeAttemptDefinition | undefined): PendingExecution {
+function normalizeAttempt(
+  nodeId: string,
+  attempt: number,
+  definition: FakeAttemptDefinition | undefined,
+): PendingExecution {
   if (definition === undefined) {
     return {
       result: {
@@ -143,7 +160,9 @@ function normalizeAttempt(nodeId: string, attempt: number, definition: FakeAttem
   } else {
     result = {
       status: definition.outcome,
-      reason: definition.reason ?? `Scripted ${definition.outcome} result for ${nodeId} attempt ${attempt}`,
+      reason:
+        definition.reason ??
+        `Scripted ${definition.outcome} result for ${nodeId} attempt ${attempt}`,
     };
   }
   return {
@@ -152,12 +171,21 @@ function normalizeAttempt(nodeId: string, attempt: number, definition: FakeAttem
   };
 }
 
+/**
+ * A deterministic RuntimeAdapter for contracts, fixtures, and repeatable failure-handling tests.
+ */
 export class FakeRuntimeAdapter implements RuntimeAdapter {
   readonly id = "fake";
   private readonly executions = new Map<string, PendingExecution>();
 
+  /**
+   * Bind explicit scripted results; unresolved file references must be materialized by loadFakeScenario.
+   */
   constructor(private readonly scenario: FakeScenario) {}
 
+  /**
+   * Describe deterministic fake execution and its supported observable contract features.
+   */
   async capabilities(): Promise<RuntimeCapabilities> {
     return {
       streaming: true,
@@ -174,38 +202,126 @@ export class FakeRuntimeAdapter implements RuntimeAdapter {
     };
   }
 
+  /**
+   * Select the node's scripted attempt and apply only authorized isolated workspace changes.
+   */
   async start(request: ExecutionRequest): Promise<ExecutionHandle> {
     const id = `fake:${request.runId}:${request.nodeId}:${request.attempt}`;
-    this.executions.set(
-      id,
-      normalizeAttempt(request.nodeId, request.attempt, this.scenario.nodes[request.nodeId]?.[request.attempt - 1]),
-    );
+    const definition = this.scenario.nodes[request.nodeId]?.[request.attempt - 1];
+    if (definition && "files" in definition && definition.files) {
+      await applyFileChanges(request, definition.files);
+    }
+    this.executions.set(id, normalizeAttempt(request.nodeId, request.attempt, definition));
     return { id };
   }
 
+  /**
+   * Stream the scripted public lifecycle and log observations in deterministic order.
+   */
   async *events(handle: ExecutionHandle): AsyncIterable<RuntimeEvent> {
     const execution = this.requireExecution(handle);
     yield { type: "started" };
-    for (const event of execution.events) yield event;
+    for (const event of execution.events) {
+      yield event;
+    }
     yield { type: "completed", status: execution.result.status };
   }
 
+  /**
+   * Return a defensive copy of the selected terminal result.
+   */
   async collect(handle: ExecutionHandle): Promise<ExecutionResult> {
     return structuredClone(this.requireExecution(handle).result);
   }
 
+  /**
+   * Replace the pending scripted result with a cancelled outcome.
+   */
   async cancel(handle: ExecutionHandle): Promise<void> {
     const execution = this.requireExecution(handle);
     execution.result = { status: "cancelled", reason: "Cancelled by control plane" };
   }
 
+  /**
+   * Return null because fake execution handles are process-local.
+   */
   async recover(): Promise<null> {
     return null;
   }
 
   private requireExecution(handle: ExecutionHandle): PendingExecution {
     const execution = this.executions.get(handle.id);
-    if (execution === undefined) throw new Error(`Unknown fake execution handle: ${handle.id}`);
+    if (execution === undefined) {
+      throw new Error(`Unknown fake execution handle: ${handle.id}`);
+    }
     return execution;
+  }
+}
+
+async function materializeFiles(root: string, attempt: FakeAttemptDefinition): Promise<void> {
+  if (!("files" in attempt) || !attempt.files) {
+    return;
+  }
+  for (const [target, content] of Object.entries(attempt.files)) {
+    if (typeof content !== "string") {
+      attempt.files[target] = await loadReferencedFile(root, content.fromFile);
+    }
+  }
+}
+
+function isMissingFile(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+async function rejectSymlink(path: string): Promise<void> {
+  try {
+    if ((await lstat(path)).isSymbolicLink()) {
+      throw new Error("Fake file path is a symlink");
+    }
+  } catch (error) {
+    if (!isMissingFile(error)) {
+      throw error;
+    }
+  }
+}
+
+async function createSafeParents(root: string, target: string): Promise<void> {
+  let parent = root;
+  for (const segment of relative(root, dirname(target)).split(/[\\/]/).filter(Boolean)) {
+    parent = resolve(parent, segment);
+    await rejectSymlink(parent);
+    await mkdir(parent, { recursive: false }).catch((error: unknown) => {
+      if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) {
+        throw error;
+      }
+    });
+  }
+}
+
+async function applyFileChanges(
+  request: ExecutionRequest,
+  files: Record<string, string | FakeFileReference>,
+): Promise<void> {
+  if (request.workspace.mode !== "isolated" || !request.toolPolicy.allowMutations) {
+    throw new Error("Fake file changes require an isolated mutable workspace");
+  }
+  const root = await realpath(request.workspace.path);
+  for (const [path, content] of Object.entries(files)) {
+    if (typeof content !== "string") {
+      throw new FakeScenarioValidationError([
+        "Load file references with loadFakeScenario before execution",
+      ]);
+    }
+    if (isAbsolute(path) || path.split(/[\\/]/).includes("..") || path.includes("\0")) {
+      throw new Error("Fake file path escapes workspace");
+    }
+    const target = resolve(root, path);
+    const rel = relative(root, target);
+    if (!rel || rel.startsWith("..") || isAbsolute(rel)) {
+      throw new Error("Invalid fake file path");
+    }
+    await createSafeParents(root, target);
+    await rejectSymlink(target);
+    await writeFile(target, content);
   }
 }

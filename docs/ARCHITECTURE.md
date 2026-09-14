@@ -65,12 +65,12 @@ The control plane must not delegate scheduling, retry policy, acceptance decisio
 
 M0 deliberately sends all four node kinds through the fake adapter so the scheduler and transition model can be tested without side effects. M1 replaces that test convenience with separate execution paths:
 
-| Node kind | M1 owner | M1 behavior |
-| --- | --- | --- |
-| `agent` | `RuntimeAdapter` | Pi executes one fresh bounded session in the assigned workspace. |
-| `command` | control-plane command executor | Spawn an exact argument vector, capture bounded output, and decide success from exit status. |
-| `verifier` | fake adapter only | General verifier plugins remain deferred; the M1 demo verifies with a `command` node. |
-| `gate` | fake adapter only | Human approval, machine conditions, audit, and resume remain deferred. |
+| Node kind  | M1 owner                       | M1 behavior                                                                                  |
+| ---------- | ------------------------------ | -------------------------------------------------------------------------------------------- |
+| `agent`    | `RuntimeAdapter`               | Pi executes one fresh bounded session in the assigned workspace.                             |
+| `command`  | control-plane command executor | Spawn an exact argument vector, capture bounded output, and decide success from exit status. |
+| `verifier` | fake adapter only              | General verifier plugins remain deferred; the M1 demo verifies with a `command` node.        |
+| `gate`     | fake adapter only              | Human approval, machine conditions, audit, and resume remain deferred.                       |
 
 Unsupported executable node kinds must fail before an attempt starts. They must not fall back to Pi.
 
@@ -87,9 +87,7 @@ export interface RuntimeAdapter {
   events(handle: ExecutionHandle): AsyncIterable<RuntimeEvent>;
   collect(handle: ExecutionHandle): Promise<ExecutionResult>;
   cancel(handle: ExecutionHandle): Promise<void>;
-  recover?(
-    persisted: PersistedExecutionRef
-  ): Promise<RecoveredExecution | null>;
+  recover?(persisted: PersistedExecutionRef): Promise<RecoveredExecution | null>;
 }
 ```
 

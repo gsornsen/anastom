@@ -10,6 +10,7 @@ This document distinguishes **execution substrates** from **workflow/methodology
 Pi is unusually attractive as a substrate because it exposes a TypeScript SDK and RPC mode while keeping higher-level workflow opinions minimal.
 
 **Borrow / use**
+
 - session/runtime boundary;
 - extension/event architecture;
 - explicit resource loading;
@@ -36,6 +37,7 @@ The maintained SDK package is `@earendil-works/pi-coding-agent`. Earlier release
 Codex is a strategically important independent execution substrate and model family. Supporting it early proves portability and provides a useful comparison against Anthropic-centric workflows.
 
 **Borrow / use**
+
 - autonomous execution behavior;
 - sandbox/workspace semantics where exposed;
 - event/stream normalization;
@@ -54,6 +56,7 @@ https://github.com/openai/codex
 
 **Why**
 Mycelium already contains validated operational ideas:
+
 - 130+ expert agents;
 - lazy discovery;
 - Redis/TaskQueue/Markdown coordination;
@@ -64,6 +67,7 @@ Mycelium already contains validated operational ideas:
 - operational health commands.
 
 **Borrow / preserve**
+
 - agent catalog metadata;
 - specialist taxonomies;
 - coordination concepts;
@@ -74,6 +78,7 @@ Mycelium already contains validated operational ideas:
 
 **Anastom use**
 Treat Mycelium as:
+
 1. source material for the role/skill library;
 2. a compatibility adapter where useful;
 3. a regression corpus for workflows that were reliable under older Claude Code behavior.
@@ -92,6 +97,7 @@ https://github.com/gsornsen/mycelium
 TrueForge explicitly separates the agent execution loop from higher-level applications and provides model, MCP, skill, sandbox, approval, context, and session facilities behind an HTTP/TypeScript API.
 
 **Borrow / study**
+
 - resource catalogs;
 - deferred tools;
 - sandbox-as-tool;
@@ -114,6 +120,7 @@ https://github.com/truefoundry/trueforge
 OpenHands exposes Python, TypeScript, and REST APIs and supports local or ephemeral Docker/Kubernetes workspaces.
 
 **Borrow / study**
+
 - workspace lifecycle;
 - local vs remote execution;
 - server/runtime separation;
@@ -133,6 +140,7 @@ https://github.com/OpenHands/software-agent-sdk
 OMP is a batteries-included Pi fork with extensive built-ins including LSP, debugger integration, many providers, subagents, extensions, and import from existing agent configuration.
 
 **Borrow / study**
+
 - LSP-aware mutation;
 - debugger as agent capability;
 - hash-anchored edits;
@@ -154,6 +162,7 @@ https://github.com/can1357/oh-my-pi
 Large open-source coding-agent ecosystem with model portability.
 
 **Borrow / study**
+
 - provider abstraction;
 - agent UX;
 - ecosystem packaging;
@@ -172,6 +181,7 @@ https://github.com/anomalyco/opencode
 ### Superpowers
 
 **Best ideas to borrow**
+
 - brainstorming/design before implementation for defined work;
 - fresh context per subagent;
 - worktree isolation;
@@ -194,6 +204,7 @@ https://github.com/obra/superpowers
 
 **Best ideas to borrow**
 Its workflow system now includes:
+
 - commands/prompts/shell steps;
 - gates;
 - conditionals;
@@ -217,6 +228,7 @@ https://github.com/github/spec-kit
 ### OpenSpec
 
 **Best ideas to borrow**
+
 - lightweight intent/spec artifacts;
 - brownfield friendliness;
 - separating intent from implementation.
@@ -232,6 +244,7 @@ https://github.com/Fission-AI/openspec
 ### BMAD
 
 **Best ideas to borrow**
+
 - workflow catalogs;
 - role specialization;
 - multi-lens review;
@@ -250,7 +263,9 @@ https://github.com/bmad-code-org/BMAD-METHOD
 ## Systems concepts worth borrowing outside coding agents
 
 ### Temporal
+
 Borrow:
+
 - durable execution;
 - replay/idempotency discipline;
 - retries as declared policy;
@@ -264,7 +279,9 @@ Reference:
 https://temporal.io/
 
 ### Git
+
 Git remains the best local transaction/isolation primitive for source modification:
+
 - branches;
 - worktrees;
 - diffs;
@@ -273,31 +290,41 @@ Git remains the best local transaction/isolation primitive for source modificati
 - merge.
 
 ### Event sourcing
+
 Use append-only events and projections/snapshots to make long-running state inspectable and recoverable.
 
 ### Blackboard systems
+
 Useful for specialist councils:
+
 - agents publish findings/evidence to a shared board;
 - they do not need full transcript sharing.
 
 ### Actor systems
+
 Useful conceptual model for isolated agents communicating through messages while owning local state.
 
 ### Behavior trees / statecharts
+
 Useful references for explicit transition logic and debugging workflow execution.
 
 ### Scientific method / Bayesian experiment design
+
 Important for hypothesis workflows:
+
 - maintain competing explanations;
 - select experiments for information gain;
 - record evidence;
 - avoid confirmation-only experiments.
 
 ### Property-based testing
+
 Useful for delegated TDD and verifier design: let the frontier model define invariants while cheaper workers satisfy them.
 
 ### Build systems (Bazel/Nix-style thinking)
+
 Useful analogy:
+
 - explicit inputs;
 - explicit outputs;
 - content addressing;
@@ -309,6 +336,7 @@ Anastom should increasingly treat agent work like a build graph whose expensive 
 ## Interoperability standards
 
 Prefer compatibility with:
+
 - `SKILL.md` / Agent Skills conventions;
 - MCP;
 - JSON Schema;

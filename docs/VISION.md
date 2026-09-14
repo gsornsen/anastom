@@ -139,6 +139,7 @@ If Redis, Temporal, a remote sandbox, or a preferred model is unavailable, Anast
 Anastom should support at least these methodology families:
 
 ### Defined SDLC
+
 For known full-stack work with known or discoverable requirements.
 
 Typical graph:
@@ -148,6 +149,7 @@ clarify -> design -> plan -> implement -> integrate -> review -> verify
 ```
 
 ### Five Whys / Root Cause Analysis
+
 For systemic defects and incidents.
 
 ```text
@@ -155,6 +157,7 @@ symptom -> evidence -> causal why -> evidence -> causal why -> ... -> root cause
 ```
 
 ### Hypothesis-driven debugging
+
 For unknown defects.
 
 ```text
@@ -168,6 +171,7 @@ reproduce -> generate hypotheses -> rank -> discriminating experiment
 ```
 
 ### Hypothesis-driven development
+
 For uncertain feasibility, ML/AI exploration, prototypes, and R&D.
 
 ```text
@@ -176,6 +180,7 @@ goal -> candidate approaches -> cheapest falsifying experiments
 ```
 
 ### Delegated TDD
+
 For using expensive models to define complex behavior while cheaper agents execute bounded implementation.
 
 ```text
@@ -188,6 +193,7 @@ frontier planner
 ```
 
 ### Specialist council
+
 For cross-domain problems.
 
 ```text
@@ -199,6 +205,7 @@ independent specialist analyses
 ```
 
 ### Adversarial search
+
 For multiple viable paths.
 
 ```text

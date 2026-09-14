@@ -1,0 +1,16 @@
+{
+  "$id": "anastom.dev/worker-report/v1alpha1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "changedFiles", "notes"],
+  "properties": {
+    "summary": {
+      "type": "string",
+      "minLength": 30,
+      "pattern": "^(?:\\s*\\S){30}",
+      "description": "Describe the work and its outcome using at least 30 non-whitespace characters. Verification is reported independently."
+    },
+    "changedFiles": { "type": "array", "items": { "type": "string" } },
+    "notes": { "type": "array", "items": { "type": "string" } }
+  }
+}

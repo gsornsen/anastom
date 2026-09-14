@@ -3,9 +3,9 @@ import { dirname, isAbsolute, resolve } from "node:path";
 
 import Ajv, { type ErrorObject } from "ajv";
 import { parse } from "yaml";
+import workflowDocumentSchema from "../schemas/workflow-document.v1alpha1.json" with { type: "json" };
 
 import {
-  NODE_KINDS,
   type AttemptBudget,
   type AttemptPolicyDocument,
   type JsonSchema,
@@ -16,81 +16,17 @@ import {
   type WorkflowNode,
 } from "./types.js";
 
-const ajv = new Ajv({ allErrors: true, strict: false });
+const ajv = new Ajv({ allErrors: true, strict: false, addUsedSchema: false });
 
-const workflowDocumentSchema: JsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["apiVersion", "kind", "metadata", "inputs", "nodes"],
-  properties: {
-    apiVersion: { const: "anastom.dev/v1alpha1" },
-    kind: { const: "Workflow" },
-    metadata: {
-      type: "object",
-      additionalProperties: false,
-      required: ["id", "version"],
-      properties: {
-        id: { type: "string", pattern: "^[a-z0-9][a-z0-9/._-]*$" },
-        version: { type: "string", pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$" },
-      },
-    },
-    inputs: {
-      type: "object",
-      additionalProperties: { $ref: "#/$defs/schemaReference" },
-    },
-    policies: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        defaultAttemptBudget: { $ref: "#/$defs/attemptPolicy" },
-      },
-    },
-    nodes: {
-      type: "object",
-      minProperties: 1,
-      propertyNames: { pattern: "^[a-zA-Z0-9][a-zA-Z0-9._-]*$" },
-      additionalProperties: { $ref: "#/$defs/node" },
-    },
-  },
-  $defs: {
-    schemaReference: {
-      type: "object",
-      additionalProperties: false,
-      required: ["schema"],
-      properties: { schema: { type: "string", minLength: 1 } },
-    },
-    attemptPolicy: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        maxAttempts: { type: "integer", minimum: 1 },
-        maxDuration: { type: "string", pattern: "^[1-9][0-9]*(?:ms|s|m|h)$" },
-      },
-    },
-    node: {
-      type: "object",
-      additionalProperties: false,
-      required: ["kind", "output"],
-      properties: {
-        kind: { enum: [...NODE_KINDS] },
-        needs: {
-          type: "array",
-          uniqueItems: true,
-          items: { type: "string", minLength: 1 },
-        },
-        role: { type: "string", minLength: 1 },
-        output: { $ref: "#/$defs/schemaReference" },
-        attemptPolicy: { $ref: "#/$defs/attemptPolicy" },
-      },
-    },
-  },
-};
+const validateWorkflowDocument = ajv.compile<WorkflowDocument>(workflowDocumentSchema);
 
-const validateWorkflowDocument = ajv.compile(workflowDocumentSchema);
-
+/** Invalid authored workflow or task, with actionable field and graph diagnostics. */
 export class WorkflowValidationError extends Error {
   readonly issues: readonly string[];
 
+  /**
+   * Collect actionable validation issues into a single operator-readable error.
+   */
   constructor(issues: readonly string[]) {
     super(`Invalid workflow:\n${issues.map((issue) => `- ${issue}`).join("\n")}`);
     this.name = "WorkflowValidationError";
@@ -116,8 +52,20 @@ function assertSemanticValidity(document: WorkflowDocument): void {
     if (node.kind !== "agent" && node.role !== undefined) {
       issues.push(`/nodes/${nodeId}/role is only valid for agent nodes`);
     }
+    if (node.mutation !== undefined && node.kind !== "agent") {
+      issues.push(`/nodes/${nodeId}/mutation is only valid for agent nodes`);
+    }
+    if (node.command !== undefined && node.kind !== "command") {
+      issues.push(`/nodes/${nodeId}/command is only valid for command nodes`);
+    }
+    if (
+      node.command?.cwd !== undefined &&
+      (isAbsolute(node.command.cwd) || node.command.cwd.split(/[\\/]/).includes(".."))
+    ) {
+      issues.push(`/nodes/${nodeId}/command/cwd must stay within the workspace`);
+    }
     for (const dependency of node.needs ?? []) {
-      if (!(dependency in document.nodes)) {
+      if (!Object.hasOwn(document.nodes, dependency)) {
         issues.push(`/nodes/${nodeId}/needs references unknown node ${JSON.stringify(dependency)}`);
       }
       if (dependency === nodeId) {
@@ -134,19 +82,30 @@ function assertSemanticValidity(document: WorkflowDocument): void {
       issues.push(`dependency cycle: ${[...path.slice(start), nodeId].join(" -> ")}`);
       return;
     }
-    if (visited.has(nodeId)) return;
+    if (visited.has(nodeId)) {
+      return;
+    }
     visiting.add(nodeId);
     for (const dependency of document.nodes[nodeId]?.needs ?? []) {
-      if (dependency in document.nodes) visit(dependency, [...path, nodeId]);
+      if (Object.hasOwn(document.nodes, dependency)) {
+        visit(dependency, [...path, nodeId]);
+      }
     }
     visiting.delete(nodeId);
     visited.add(nodeId);
   };
-  for (const nodeId of nodeIds) visit(nodeId, []);
+  for (const nodeId of nodeIds) {
+    visit(nodeId, []);
+  }
 
-  if (issues.length > 0) throw new WorkflowValidationError([...new Set(issues)]);
+  if (issues.length > 0) {
+    throw new WorkflowValidationError([...new Set(issues)]);
+  }
 }
 
+/**
+ * Parse strict Workflow YAML and validate field ownership, dependencies, and acyclicity.
+ */
 export function parseWorkflowYaml(source: string): WorkflowDocument {
   let candidate: unknown;
   try {
@@ -160,32 +119,51 @@ export function parseWorkflowYaml(source: string): WorkflowDocument {
     throw new WorkflowValidationError(formatAjvErrors(validateWorkflowDocument.errors));
   }
 
-  const document = candidate as WorkflowDocument;
+  const document = candidate;
   assertSemanticValidity(document);
   return document;
 }
 
-function durationToMilliseconds(duration: string | undefined): number | undefined {
-  if (duration === undefined) return undefined;
+/**
+ * Convert a supported ms/s/m/h duration to milliseconds within the platform timer range.
+ * @throws WorkflowValidationError for invalid or overflowing durations.
+ */
+export function durationToMilliseconds(duration: string | undefined): number | undefined {
+  if (duration === undefined) {
+    return undefined;
+  }
   const match = /^(\d+)(ms|s|m|h)$/.exec(duration);
-  if (match === null) throw new WorkflowValidationError([`invalid duration ${JSON.stringify(duration)}`]);
+  if (match === null) {
+    throw new WorkflowValidationError([`invalid duration ${JSON.stringify(duration)}`]);
+  }
   const value = Number(match[1]);
   const unit = match[2];
-  const multiplier = unit === "ms" ? 1 : unit === "s" ? 1_000 : unit === "m" ? 60_000 : 3_600_000;
-  return value * multiplier;
+  const multipliers: Record<string, number> = { ms: 1, s: 1_000, m: 60_000, h: 3_600_000 };
+  const multiplier = multipliers[unit ?? ""]!;
+  const milliseconds = value * multiplier;
+  if (!Number.isSafeInteger(milliseconds) || milliseconds > 2_147_483_647) {
+    throw new WorkflowValidationError(["duration exceeds supported timer range"]);
+  }
+  return milliseconds;
 }
 
-function normalizeBudget(policy: AttemptPolicyDocument | undefined, fallback?: AttemptBudget): AttemptBudget {
-  return {
-    maxAttempts: policy?.maxAttempts ?? fallback?.maxAttempts ?? 1,
-    ...(policy?.maxDuration !== undefined
-      ? { maxDurationMs: durationToMilliseconds(policy.maxDuration) }
-      : fallback?.maxDurationMs !== undefined
-        ? { maxDurationMs: fallback.maxDurationMs }
-        : {}),
-  };
+function normalizeBudget(
+  policy: AttemptPolicyDocument | undefined,
+  fallback?: AttemptBudget,
+): AttemptBudget {
+  const budget: AttemptBudget = { maxAttempts: policy?.maxAttempts ?? fallback?.maxAttempts ?? 1 };
+  const duration = policy?.maxDuration;
+  const maxDurationMs =
+    duration === undefined ? fallback?.maxDurationMs : durationToMilliseconds(duration);
+  if (maxDurationMs !== undefined) {
+    budget.maxDurationMs = maxDurationMs;
+  }
+  return budget;
 }
 
+/**
+ * Load a schema from an absolute local filename; injected loaders support deterministic tests.
+ */
 export type SchemaLoader = (absolutePath: string) => Promise<JsonSchema>;
 
 async function defaultSchemaLoader(absolutePath: string): Promise<JsonSchema> {
@@ -210,11 +188,15 @@ async function defaultSchemaLoader(absolutePath: string): Promise<JsonSchema> {
 
 function resolveSchemaPath(sourcePath: string, schemaRef: string): string {
   if (/^[a-zA-Z][a-zA-Z+.-]*:/.test(schemaRef)) {
-    throw new WorkflowValidationError([`remote schema references are outside M0: ${schemaRef}`]);
+    throw new WorkflowValidationError([`remote schema references are unsupported: ${schemaRef}`]);
   }
   return isAbsolute(schemaRef) ? schemaRef : resolve(dirname(sourcePath), schemaRef);
 }
 
+/**
+ * Resolve local schemas and independent budget defaults into a replayable workflow snapshot.
+ * @throws WorkflowValidationError if a referenced schema cannot be loaded or compiled.
+ */
 export async function normalizeWorkflow(
   document: WorkflowDocument,
   options: { sourcePath: string; loadSchema?: SchemaLoader },
@@ -226,7 +208,9 @@ export async function normalizeWorkflow(
   const load = async (ref: string): Promise<JsonSchema> => {
     const path = resolveSchemaPath(sourcePath, ref);
     const cached = schemaCache.get(path);
-    if (cached !== undefined) return cached;
+    if (cached !== undefined) {
+      return cached;
+    }
     const schema = await loadSchema(path);
     try {
       ajv.compile(schema);
@@ -239,10 +223,10 @@ export async function normalizeWorkflow(
   };
 
   const inputEntries = await Promise.all(
-    Object.entries(document.inputs).map(async ([id, input]) => [
-      id,
-      { id, ref: input.schema, schema: await load(input.schema) },
-    ] as const),
+    Object.entries(document.inputs).map(
+      async ([id, input]) =>
+        [id, { id, ref: input.schema, schema: await load(input.schema) }] as const,
+    ),
   );
   const nodeEntries = await Promise.all(
     Object.entries(document.nodes).map(async ([id, node]) => {
@@ -253,6 +237,17 @@ export async function normalizeWorkflow(
         ...(node.role === undefined ? {} : { role: node.role }),
         output: { ref: node.output.schema, schema: await load(node.output.schema) },
         attemptBudget: normalizeBudget(node.attemptPolicy, defaultAttemptBudget),
+        ...(node.mutation === undefined ? {} : { mutation: node.mutation }),
+        ...(node.command === undefined
+          ? {}
+          : {
+              command: {
+                argv: [...node.command.argv],
+                cwd: node.command.cwd ?? ".",
+                maxDurationMs: durationToMilliseconds(node.command.maxDuration) as number,
+                maxOutputBytes: node.command.maxOutputBytes ?? 1_048_576,
+              },
+            }),
       };
       return [id, normalized] as const;
     }),
@@ -270,6 +265,10 @@ export async function normalizeWorkflow(
   };
 }
 
+/**
+ * Load an operator-selected local Workflow file and resolve schemas relative to that file.
+ * @remarks Remote callers must authorize the workflow and schema filenames before using this local-file API.
+ */
 export async function loadWorkflow(filePath: string): Promise<WorkflowDefinition> {
   const absolutePath = resolve(filePath);
   let source: string;
@@ -282,6 +281,9 @@ export async function loadWorkflow(filePath: string): Promise<WorkflowDefinition
   return normalizeWorkflow(parseWorkflowYaml(source), { sourcePath: absolutePath });
 }
 
+/**
+ * Validate a structured value against its output schema and return actionable validation errors.
+ */
 export function validateJsonValue(schema: JsonSchema, value: JsonValue): ValidationResult {
   let validate;
   try {

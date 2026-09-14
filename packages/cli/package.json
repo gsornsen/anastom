@@ -6,6 +6,9 @@
   "type": "module",
   "exports": "./src/index.ts",
   "dependencies": {
+    "@anastom/persistence": "workspace:*",
+    "@anastom/workspaces": "workspace:*",
+    "@anastom/runtime-pi": "workspace:*",
     "@anastom/core": "workspace:*",
     "@anastom/engine": "workspace:*",
     "@anastom/runtime-fake": "workspace:*"

@@ -53,17 +53,17 @@ Do not create a modified AGPL or a bespoke “contribute back” clause without 
 
 ### Expected behavior under AGPL-3.0-only
 
-| Activity | Intended result |
-| --- | --- |
-| A company runs Anastom for its own engineers or internal systems | Permitted without publishing private internal code |
-| Anastom generates code for a proprietary product | The generated product is not covered merely because Anastom was used as a tool |
-| An unrelated SaaS product uses Anastom internally | Permitted without licensing that unrelated product merely because Anastom is used as a tool |
-| A consultant installs or operates Anastom inside a client's environment | Permitted, subject to ordinary distribution obligations when copies are conveyed |
-| A vendor distributes a modified Anastom binary or appliance | Covered source and license notices must accompany the distribution as the license requires |
-| An operator runs a modified network-interactive Anastom | Remote users must receive a prominent opportunity to obtain the corresponding source of that modified version at no charge |
-| An operator runs unmodified Anastom behind a separate proprietary service | Anastom remains under AGPL, but the independent service may remain outside its scope; this is the accepted wrapper gap |
-| A community group hosts Anastom for others | Permitted; the same network-source rules apply when it operates a modified version |
-| A company independently implements the public Workflow IR without copying protected code | Generally outside Anastom's copyright license; compatibility and branding are governed separately |
+| Activity                                                                                 | Intended result                                                                                                            |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| A company runs Anastom for its own engineers or internal systems                         | Permitted without publishing private internal code                                                                         |
+| Anastom generates code for a proprietary product                                         | The generated product is not covered merely because Anastom was used as a tool                                             |
+| An unrelated SaaS product uses Anastom internally                                        | Permitted without licensing that unrelated product merely because Anastom is used as a tool                                |
+| A consultant installs or operates Anastom inside a client's environment                  | Permitted, subject to ordinary distribution obligations when copies are conveyed                                           |
+| A vendor distributes a modified Anastom binary or appliance                              | Covered source and license notices must accompany the distribution as the license requires                                 |
+| An operator runs a modified network-interactive Anastom                                  | Remote users must receive a prominent opportunity to obtain the corresponding source of that modified version at no charge |
+| An operator runs unmodified Anastom behind a separate proprietary service                | Anastom remains under AGPL, but the independent service may remain outside its scope; this is the accepted wrapper gap     |
+| A community group hosts Anastom for others                                               | Permitted; the same network-source rules apply when it operates a modified version                                         |
+| A company independently implements the public Workflow IR without copying protected code | Generally outside Anastom's copyright license; compatibility and branding are governed separately                          |
 
 This table states project intent and is not a substitute for the license text. Ambiguous boundaries should be resolved before integrations depend on them.
 

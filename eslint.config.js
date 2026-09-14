@@ -1,9 +1,17 @@
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
+import jsdoc from "eslint-plugin-jsdoc";
 
 export default tseslint.config(
   {
-    ignores: ["eslint.config.js", "**/dist/**", "**/node_modules/**"],
+    ignores: [
+      "eslint.config.js",
+      "**/dist/**",
+      "**/node_modules/**",
+      ".generated/**",
+      ".agents/**",
+      ".codex/**",
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -15,10 +23,47 @@ export default tseslint.config(
       },
     },
     rules: {
+      curly: ["error", "all"],
+      "no-nested-ternary": "error",
+      "max-depth": ["error", 4],
+      "max-nested-callbacks": ["error", 3],
+      "max-params": ["error", 4],
+      complexity: ["error", { max: 20, variant: "modified" }],
       "@typescript-eslint/consistent-type-imports": "error",
       "@typescript-eslint/no-confusing-void-expression": "off",
       "@typescript-eslint/no-unnecessary-condition": "off",
-      "@typescript-eslint/require-await": "off"
+      "@typescript-eslint/require-await": "off",
     },
+  },
+  {
+    files: ["packages/**/src/**/*.ts"],
+    ignores: ["**/*.test.ts", "**/testing/**"],
+    plugins: { jsdoc },
+    settings: { jsdoc: { mode: "typescript" } },
+    rules: {
+      "jsdoc/require-jsdoc": [
+        "error",
+        {
+          publicOnly: true,
+          require: { FunctionDeclaration: true, ClassDeclaration: true, MethodDefinition: true },
+          contexts: [
+            "ExportNamedDeclaration > TSInterfaceDeclaration",
+            "ExportNamedDeclaration > TSTypeAliasDeclaration",
+          ],
+        },
+      ],
+      "jsdoc/require-description": ["error", { contexts: ["any"] }],
+      "jsdoc/check-param-names": "error",
+      "jsdoc/check-tag-names": [
+        "error",
+        { definedTags: ["remarks", "example", "packageDocumentation"] },
+      ],
+      "jsdoc/no-types": "error",
+    },
+  },
+  {
+    files: ["examples/**/*.mjs"],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: { parserOptions: { projectService: false }, globals: { fetch: "readonly" } },
   },
 );
