@@ -2,7 +2,7 @@
 
 ## Status and mission
 
-Proposed contract for owner review. M1 is merged and is the compatibility baseline. This design stage produces the M1 retrospective, this brief, and [ADR 0011](adr/0011-portable-worker-boundary.md); implementation starts after their review.
+Accepted contract following the owner's review of `ecd5ba5` in [PR #11](https://github.com/gsornsen/anastom/pull/11), merged as `8659117`. M1 is merged and is the compatibility baseline. Implementation starts from this approved brief and [ADR 0011](adr/0011-portable-worker-boundary.md); feasibility findings may require an explicitly reviewed refinement before live integration.
 
 Build M2 only: execute the same strict Markdown Task through Pi or Codex, negotiate the selected adapter's support, preserve normalized public observations and available token usage, and independently verify and inspect both runs. Portability means the engineering contract survives the harness change.
 
@@ -17,7 +17,11 @@ Build M2 only: execute the same strict Markdown Task through Pi or Codex, negoti
 | Abort versus stopped execution        | Cancellation resolves only after owned execution has stopped. Termination uncertainty prevents retry.                                                                                                        |
 | Ambient harness context               | Prove discovery suppression before live integration; inability to do so requires a reviewed contract/interface revision.                                                                                     |
 
-These decisions are proposals, not delivered APIs. Source and feasibility evidence appear in ADR 0011. The implementation must use the reviewed pin, or submit a justified pin update with equivalent evidence.
+These decisions are accepted design intent, not delivered APIs. Source and feasibility evidence appear in ADR 0011. The implementation must use the reviewed pin, or submit a justified pin update with equivalent evidence.
+
+The owner accepted Codex CLI as the supported interface, placed SDK reconsideration in the [blocked backlog](https://github.com/gsornsen/anastom/issues/12), and added [M2.5 Claude Code CLI/SDK support](https://github.com/gsornsen/anastom/issues/13) after M2 and before M3. M2.5 must investigate supported subscription authentication during its separate design stage.
+
+The initial [offline feasibility audit](M2_FEASIBILITY.md) found discovery, reserved-provider tuning, and native telemetry limits. [ADR 0012](adr/0012-codex-discovery-and-authentication-profile.md) proposes a narrower profile for review. It does not silently replace the accepted provider/authentication boundary or mark the original feasibility gates complete.
 
 ## Portability demonstration
 
