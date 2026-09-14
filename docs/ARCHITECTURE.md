@@ -115,7 +115,9 @@ M1 does not add model selection to this request. Runtime and model configuration
 
 ## Runtime capabilities
 
-Adapters declare observable capabilities such as streaming, cancellation, structured output, usage reporting, tool integrations, and sandboxing. M1 records Pi capabilities but does not route by them. Capability requirements and conformance-driven routing begin in M2.
+Adapters declare observable capabilities such as streaming, cancellation, structured output, usage reporting, tool integrations, and sandboxing. M1's Pi adapter declares its enabled capabilities; the engine does not yet negotiate or persist a snapshot.
+
+The [proposed M2 contract](M2_BUILD_BRIEF.md) validates the explicitly selected adapter against a Task's fixed worker requirements and records the accepted snapshot before execution. It proposes shared adapter conformance and available token observations. These are not implemented yet. Automatic runtime/model routing and fallback remain M12.
 
 ## Workspace contract
 

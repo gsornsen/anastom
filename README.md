@@ -8,6 +8,8 @@ The goal is to make work that spans hours or days understandable, bounded, and r
 
 **Current stage: M1 is complete.** Anastom can delegate a bounded task to Pi in an isolated Git worktree, verify it independently, and preserve history for later inspection. The controlled live run with Anthropic `claude-opus-4-8` passed; see the [M1 completion evidence](docs/M1_EVIDENCE.md).
 
+**Next: M2's portable-worker contract is proposed for review.** The plan adds Codex execution, capability checks for the selected runtime, shared adapter conformance tests, and available token usage. See the [M2 build brief](docs/M2_BUILD_BRIEF.md); the Codex adapter is not implemented yet.
+
 [Changelog](CHANGELOG.md) · [Roadmap](docs/MILESTONES.md) · [Design documents](#learn-more) · [Contributing](CONTRIBUTING.md)
 
 ## Why Anastom exists
@@ -61,7 +63,7 @@ Packages have documented APIs and their own READMEs/changelogs. Prettier, ESLint
 
 Pi uses your normal provider authentication and model settings. A Git worktree provides checkout isolation; it is not an operating-system sandbox. Run trusted tasks and verification commands on repositories you are comfortable exposing to the configured provider. Live crash recovery, human approval, multiple workers, and other real adapters remain future milestones.
 
-See the [M0 retrospective](docs/M0_RETROSPECTIVE.md) for the implemented boundary and decisions.
+See the [M0 retrospective](docs/M0_RETROSPECTIVE.md) and [M1 retrospective](docs/M1_RETROSPECTIVE.md) for the implemented boundaries, evidence, and lessons informing portability.
 
 ## Try the current demo
 
@@ -104,22 +106,22 @@ The demo implements `GET /health`, runs the fixture's acceptance tests, and leav
 
 Each milestone must produce a useful, testable demonstration. These are planned capabilities, with no promised release dates.
 
-| Milestone                        | Status   | Outcome                                                                                                                      |
-| -------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| **M0 — Skeleton**                | Complete | Validate workflows and execute deterministic fake runs.                                                                      |
-| **M1 — Single worker**           | Complete | One Pi worker, fresh context, isolated Git worktree, command verification, SQLite history, and durable `status` / `inspect`. |
-| **M2 — Portable worker**         | Planned  | Run the same contract through Codex; compare normalized events and capabilities.                                             |
-| **M3 — Durable execution**       | Planned  | Recover safely after interruption, with ownership, orphan detection, pause, and resume semantics.                            |
-| **M4 — Defined SDLC**            | Planned  | Plan, delegate parallel work, integrate, review, and verify a feature.                                                       |
-| **M5 — Circuit breakers**        | Planned  | Detect repeated failure, enforce budgets, stop mutation, and escalate with evidence.                                         |
-| **M6 — Hypothesis debugging**    | Planned  | Maintain competing explanations and run experiments that distinguish them.                                                   |
-| **M7 — Delegated TDD**           | Planned  | Separate planning and review from bounded implementation, with role-to-model configuration.                                  |
-| **M8 — Mycelium bridge**         | Planned  | Translate selected Mycelium agents, skills, and workflows into portable Anastom resources.                                   |
-| **M9–M12 — Further composition** | Planned  | Specialist councils, adversarial evaluation, nested methodologies, and adaptive routing.                                     |
+| Milestone                        | Status        | Outcome                                                                                                                      |
+| -------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **M0 — Skeleton**                | Complete      | Validate workflows and execute deterministic fake runs.                                                                      |
+| **M1 — Single worker**           | Complete      | One Pi worker, fresh context, isolated Git worktree, command verification, SQLite history, and durable `status` / `inspect`. |
+| **M2 — Portable worker**         | Design review | Proposed: the same Task through Pi/Codex, selected-runtime capability checks, shared conformance, and available token usage. |
+| **M3 — Durable execution**       | Planned       | Recover safely after interruption, with ownership, orphan detection, pause, and resume semantics.                            |
+| **M4 — Defined SDLC**            | Planned       | Plan, delegate parallel work, integrate, review, and verify a feature.                                                       |
+| **M5 — Circuit breakers**        | Planned       | Detect repeated failure, enforce budgets, stop mutation, and escalate with evidence.                                         |
+| **M6 — Hypothesis debugging**    | Planned       | Maintain competing explanations and run experiments that distinguish them.                                                   |
+| **M7 — Delegated TDD**           | Planned       | Separate planning and review from bounded implementation, with role-to-model configuration.                                  |
+| **M8 — Mycelium bridge**         | Planned       | Translate selected Mycelium agents, skills, and workflows into portable Anastom resources.                                   |
+| **M9–M12 — Further composition** | Planned       | Specialist councils, adversarial evaluation, nested methodologies, and adaptive routing.                                     |
 
 M1 persistence enables inspection from later processes. Recovery of an attempt that was running during a crash is explicitly M3 work.
 
-See the [full milestones](docs/MILESTONES.md), [M1 build brief](docs/M1_BUILD_BRIEF.md), and [changelog](CHANGELOG.md) for scope and progress.
+See the [full milestones](docs/MILESTONES.md), [M1 build brief](docs/M1_BUILD_BRIEF.md), [proposed M2 build brief](docs/M2_BUILD_BRIEF.md), and [changelog](CHANGELOG.md) for scope and progress.
 
 ## Learn more
 
@@ -135,6 +137,8 @@ See the [full milestones](docs/MILESTONES.md), [M1 build brief](docs/M1_BUILD_BR
 | What did M0 settle?                                     | [M0 retrospective](docs/M0_RETROSPECTIVE.md)                 |
 | How do I run and inspect a single worker?               | [M1 demo guide](docs/M1_DEMO.md)                             |
 | What proves M1 works?                                   | [M1 completion evidence](docs/M1_EVIDENCE.md)                |
+| What did M1 teach us?                                   | [M1 retrospective](docs/M1_RETROSPECTIVE.md)                 |
+| What contract is proposed for portable workers?         | [M2 build brief](docs/M2_BUILD_BRIEF.md)                     |
 | How does Mycelium carry forward?                        | [Migration strategy](docs/MYCELIUM_MIGRATION.md)             |
 | Which existing systems inform the design?               | [Runtimes and inspiration](docs/RUNTIMES_AND_INSPIRATION.md) |
 

@@ -10,6 +10,8 @@ The parser rejects unknown fields, unknown node kinds, invalid schema references
 
 The Workflow IR describes engineering policy without embedding model- or harness-specific behavior. It must remain versioned, deterministic, typed, inspectable, serializable, and executable with a fake runtime.
 
+The [proposed M2 brief](M2_BUILD_BRIEF.md) preserves the current authored Task and normalized workflow contract. Runtime/model selection and fixed capability preflight remain outside authored roles; available token observations enter the run history rather than task outputs. Those proposed additions are not executable IR features yet.
+
 ## Implemented M0 profile
 
 The compatible M0 authored shape is:

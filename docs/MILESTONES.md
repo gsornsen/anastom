@@ -69,6 +69,8 @@ First useful end-to-end slice.
 
 ## M2 — Portable worker: "The same contract runs somewhere else"
 
+Status: design review. The proposed contract and required evidence are in [M2_BUILD_BRIEF.md](M2_BUILD_BRIEF.md), informed by the [M1 retrospective](M1_RETROSPECTIVE.md). The Codex adapter has not been implemented.
+
 ### Demo
 
 Execute the exact same workflow via:
@@ -80,6 +82,8 @@ Execute the exact same workflow via:
 
 and compare trace/results.
 
+Runtime and model selection remain external to the unchanged Task. The proposed Codex slice requires paired explicit provider/model selections; the brief gives the complete demonstration commands and capability preflight. Normalized traces share an event contract, not necessarily identical observations or implementation text.
+
 ### Deliverables
 
 - Codex adapter;
@@ -87,6 +91,10 @@ and compare trace/results.
 - normalized event mapping;
 - normalized usage/telemetry where available;
 - conformance test suite for runtime adapters.
+
+### Boundary
+
+One selected worker and one independent command verifier. Capability negotiation checks that selected adapter; automatic routing and fallback remain M12. M2 records available token telemetry with explicit unknown/partial values, without estimating billing or adding cost-budget policy. Recovery remains M3.
 
 ### Why it matters
 
