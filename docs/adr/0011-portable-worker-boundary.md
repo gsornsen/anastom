@@ -1,13 +1,13 @@
-# 0011 — Propose the portable worker boundary
+# 0011 — Portable worker boundary
 
-- Status: Proposed; requires owner review before implementation
+- Status: Accepted in PR #11 at `ecd5ba5`, merged as `8659117`; feasibility gates remain required before live integration
 - Date: 2026-09-13
 
 ## Context
 
 M1 proves the single-worker contract through Pi. M2 must demonstrate the same Task through Codex and make runtime differences observable. The milestone calls for capability negotiation, but architecture wording also mentions routing, which the roadmap places in M12. Current public events lack usage, and a successful abort request alone is insufficient to authorize retry.
 
-## Proposed decision
+## Accepted decision
 
 Use the documented `codex exec --json` interface behind `packages/runtime-codex`, with the official `@openai/codex` executable package pinned to the inspected `0.154.0` baseline. Own one process group per attempt on Linux/macOS, frame and validate bounded JSONL, whitelist public observations, and validate the final report with Anastom's schema. The process seam is injectable for deterministic tests.
 
@@ -28,6 +28,10 @@ The [SDK documentation](https://learn.chatgpt.com/docs/codex-sdk) recommends its
 The [app-server documentation](https://learn.chatgpt.com/docs/app-server) provides explicit interruption and richer events, but marks the interface experimental. Locally generated non-experimental `0.154.0` bindings confirm ephemeral-thread and output-schema fields. That transport introduces a larger protocol surface than this Task slice needs.
 
 This is an engineering choice inferred from the documented interfaces and inspected release, not an OpenAI recommendation to bypass the SDK.
+
+The owner accepted the CLI as the supported interface in [review](https://github.com/gsornsen/anastom/pull/11#discussion_r4002124447). [SDK reconsideration](https://github.com/gsornsen/anastom/issues/12) is blocked until independent evidence disproves the inspected limitations, a future version closes them, or upstream contributions become a justified priority. [M2.5](https://github.com/gsornsen/anastom/issues/13) adds Claude Code CLI and/or SDK support after M2, with supported subscription authentication investigated before interface selection.
+
+Initial offline execution exposed limits not established by help/schema inspection. [ADR 0012](0012-codex-discovery-and-authentication-profile.md) proposes a discovery/authentication and provider-profile refinement, with [reproducible evidence](../M2_FEASIBILITY.md). That proposal requires owner review; the CLI direction is accepted while the new profile remains unimplemented.
 
 ## Alternatives and tradeoffs
 

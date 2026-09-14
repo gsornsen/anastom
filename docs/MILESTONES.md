@@ -69,7 +69,7 @@ First useful end-to-end slice.
 
 ## M2 — Portable worker: "The same contract runs somewhere else"
 
-Status: design review. The proposed contract and required evidence are in [M2_BUILD_BRIEF.md](M2_BUILD_BRIEF.md), informed by the [M1 retrospective](M1_RETROSPECTIVE.md). The Codex adapter has not been implemented.
+Status: design approved in [PR #11](https://github.com/gsornsen/anastom/pull/11); implementation in progress. The accepted contract and required evidence are in [M2_BUILD_BRIEF.md](M2_BUILD_BRIEF.md), informed by the [M1 retrospective](M1_RETROSPECTIVE.md). The Codex adapter has not been implemented.
 
 ### Demo
 
@@ -82,7 +82,7 @@ Execute the exact same workflow via:
 
 and compare trace/results.
 
-Runtime and model selection remain external to the unchanged Task. The proposed Codex slice requires paired explicit provider/model selections; the brief gives the complete demonstration commands and capability preflight. Normalized traces share an event contract, not necessarily identical observations or implementation text.
+Runtime and model selection remain external to the unchanged Task. The accepted Codex CLI slice requires paired explicit provider/model selections; the brief gives the complete demonstration commands and capability preflight. Normalized traces share an event contract, not necessarily identical observations or implementation text. SDK reconsideration is [blocked in the backlog](https://github.com/gsornsen/anastom/issues/12) until the inspected limitations are disproven, resolved upstream, or justify an upstream contribution workstream.
 
 ### Deliverables
 
@@ -99,6 +99,20 @@ One selected worker and one independent command verifier. Capability negotiation
 ### Why it matters
 
 This is the architectural proof that Anastom is not another harness.
+
+---
+
+## M2.5 — Claude Code worker: "Another supported harness"
+
+Status: planned after M2, before M3, following the owner's [design review](https://github.com/gsornsen/anastom/pull/11#discussion_r4002124447). Track design and implementation in [issue #13](https://github.com/gsornsen/anastom/issues/13).
+
+### Demo and deliverables
+
+Run the unchanged Task through a Claude Code CLI and/or SDK adapter with the same shared conformance, independent verification, and durable inspection contract.
+
+### Boundary
+
+Investigate supported subscription-authenticated automation through current official Anthropic interfaces and applicable terms. The owner prefers subscription usage over mandatory API-credit billing. Authentication support is a design question to prove before promising it; credential copying, unsupported workarounds, and silent API-billing fallback are excluded. Select and review the concrete interface and build brief after M2's implementation is accepted.
 
 ---
 
