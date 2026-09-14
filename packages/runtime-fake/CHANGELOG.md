@@ -1,0 +1,9 @@
+# @anastom/runtime-fake changelog
+
+## Unreleased
+
+- Support authorized deterministic workspace edits for worker task demonstrations.
+- Allow file references relative to the scenario directory alongside inline text.
+- Validate scenario assets with a versioned schema and reject unsafe source or target paths.
+
+No package releases have been tagged. Changesets will prepend reviewed SemVer release entries when maintainers run `pnpm version:packages`; `0.0.0` is the initial development version.

@@ -2,7 +2,7 @@ packages:
   - packages/*
 
 allowBuilds:
-  '@google/genai': false
+  "@google/genai": false
   esbuild: true
   protobufjs: false
 confirmModulesPurge: false

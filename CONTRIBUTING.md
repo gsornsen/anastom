@@ -47,6 +47,8 @@ Record notable user-facing or project changes in `CHANGELOG.md`. Keep the README
 
 ## Tests and evidence
 
+Follow the [engineering standards](docs/ENGINEERING.md) for readability, JSDoc, test fixtures, package documentation, SemVer, migrations, and CI ownership. Run `pnpm format` to apply the formatter. Before requesting review, run `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, and `pnpm hygiene`. Add a Changeset with `pnpm changeset` for changed package code or contracts; update the affected package README and changelog. Generate optional package API documentation with `pnpm docs:api <package>` when reviewing an API change.
+
 Tests should prove observable behavior and failure handling. Avoid tests that merely repeat an implementation. A pull request should state which checks ran and include relevant output or fixtures for behavior that cannot be covered by the standard commands.
 
 ## Commits

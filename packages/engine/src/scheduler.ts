@@ -2,6 +2,9 @@ import type { WorkflowDefinition } from "@anastom/core";
 
 import type { RunState } from "./events.js";
 
+/**
+ * Find pending nodes whose declared dependencies have all succeeded, in authored node order.
+ */
 export function findExecutableNodes(workflow: WorkflowDefinition, state: RunState): string[] {
   return workflow.nodeOrder.filter((nodeId) => {
     const nodeState = state.nodes[nodeId];
@@ -14,6 +17,9 @@ export function findExecutableNodes(workflow: WorkflowDefinition, state: RunStat
   });
 }
 
+/**
+ * Return ready nodes in authored order for deterministic sequential scheduling.
+ */
 export function findReadyNodes(workflow: WorkflowDefinition, state: RunState): string[] {
   return workflow.nodeOrder.filter((nodeId) => state.nodes[nodeId]?.status === "ready");
 }

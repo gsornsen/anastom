@@ -21,16 +21,29 @@
   "scripts": {
     "anastom": "tsx packages/cli/src/bin.ts",
     "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "hygiene": "tsx scripts/check-hygiene.ts",
+    "docs:api": "tsx scripts/generate-api-docs.ts",
+    "changeset": "changeset",
+    "version:packages": "changeset version",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@changesets/cli": "3.0.2",
     "@types/node": "^24.3.1",
+    "@types/semver": "7.8.0",
     "eslint": "^10.10.0",
+    "eslint-plugin-jsdoc": "64.3.10",
+    "prettier": "3.9.6",
+    "semver": "7.8.5",
+    "typedoc": "0.28.20",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.42.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "yaml": "2.9.1"
   }
 }

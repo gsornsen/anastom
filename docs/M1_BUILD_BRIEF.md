@@ -174,7 +174,7 @@ Required behavior:
 
 Create `packages/persistence` and implement the existing `RunPersistence` interface with Node's SQLite support unless an implementation test demonstrates a portability or correctness gap.
 
-The initial schema contains only `runs` and `events`. It must enforce:
+The application schema contains `runs` and `events`. Following owner review, a `schema_migrations` metadata table and SQLite `user_version` track validated, checksummed migrations; failed upgrades roll back transactionally. They do not introduce new orchestration state. It must enforce:
 
 - primary key uniqueness for run IDs;
 - foreign keys from events to runs;
@@ -241,7 +241,7 @@ M1 is incomplete without focused evidence for:
 
 ## Controlled fixture
 
-Add a small, dependency-light HTTP repository below `examples/demo-repos/m1-endpoint/` with a failing acceptance test and a task at `tasks/add-endpoint.md`. The fixture must be quick to copy into a temporary Git repository and must not require network access after dependencies are installed.
+Add a small, dependency-light HTTP repository below `examples/demo-repos/health-endpoint/` with a failing acceptance test and a task at `tasks/add-endpoint.md`. The fixture must be quick to copy into a temporary Git repository and must not require network access after dependencies are installed.
 
 The real Pi evidence must operate on a temporary copy, never on Anastom's own working tree.
 
@@ -260,10 +260,10 @@ pnpm anastom run examples/workflows/demo-feature.yaml --fake-scenario examples/f
 M1 additionally requires:
 
 ```bash
-pnpm anastom run examples/demo-repos/m1-endpoint/tasks/add-endpoint.md --runtime fake --fake-scenario examples/fake/m1-endpoint.yaml --repo <temporary-fixture-repo>
+pnpm anastom run examples/demo-repos/health-endpoint/tasks/add-endpoint.md --runtime fake --fake-scenario examples/fake/health-endpoint.yaml --repo <temporary-fixture-repo>
 pnpm anastom status <run-id> --state-dir <temporary-fixture-repo>/.anastom
 pnpm anastom inspect <run-id> --state-dir <temporary-fixture-repo>/.anastom
-pnpm anastom run examples/demo-repos/m1-endpoint/tasks/add-endpoint.md --runtime pi --repo <temporary-fixture-repo>
+pnpm anastom run examples/demo-repos/health-endpoint/tasks/add-endpoint.md --runtime pi --repo <temporary-fixture-repo>
 ```
 
 The final evidence record must include versions of Node, pnpm, Pi SDK, selected provider/model, operating system, the sanitized run ID, terminal outcome, verifier exit code, workflow/context/artifact digests, and the retained diff. It must not contain credentials or private model reasoning.

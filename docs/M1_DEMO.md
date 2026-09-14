@@ -4,14 +4,14 @@ Run these commands from the Anastom checkout with Node.js 24 or newer and pnpm 1
 
 ## Deterministic run
 
-The setup helper copies `examples/demo-repos/m1-endpoint/` into a temporary Git repository and commits its initial state using a fixture identity. Its two acceptance tests require `GET /health` to return `{ "status": "ok" }` and unmatched routes to return 404. The initial implementation intentionally fails the health test.
+The setup helper copies `examples/demo-repos/health-endpoint/` into a temporary Git repository and commits its initial state using a fixture identity. Its two acceptance tests require `GET /health` to return `{ "status": "ok" }` and unmatched routes to return 404. The initial implementation intentionally fails the health test.
 
 ```bash
-fixture="$(pnpm exec tsx scripts/create-m1-fixture.ts)"
-pnpm anastom validate examples/demo-repos/m1-endpoint/tasks/add-endpoint.md
-pnpm anastom graph examples/demo-repos/m1-endpoint/tasks/add-endpoint.md
-pnpm anastom run examples/demo-repos/m1-endpoint/tasks/add-endpoint.md \
-  --runtime fake --fake-scenario examples/fake/m1-endpoint.yaml --repo "$fixture"
+fixture="$(pnpm exec tsx scripts/create-endpoint-fixture.ts)"
+pnpm anastom validate examples/demo-repos/health-endpoint/tasks/add-endpoint.md
+pnpm anastom graph examples/demo-repos/health-endpoint/tasks/add-endpoint.md
+pnpm anastom run examples/demo-repos/health-endpoint/tasks/add-endpoint.md \
+  --runtime fake --fake-scenario examples/fake/health-endpoint.yaml --repo "$fixture"
 ```
 
 Copy the printed run ID into later invocations:
@@ -42,8 +42,8 @@ Use `/login` and select a provider/model. Keep credentials in Pi's auth storage 
 Create a fresh fixture for the live demonstration:
 
 ```bash
-live_fixture="$(pnpm exec tsx scripts/create-m1-fixture.ts)"
-pnpm anastom run examples/demo-repos/m1-endpoint/tasks/add-endpoint.md \
+live_fixture="$(pnpm exec tsx scripts/create-endpoint-fixture.ts)"
+pnpm anastom run examples/demo-repos/health-endpoint/tasks/add-endpoint.md \
   --runtime pi --repo "$live_fixture"
 pnpm anastom status <run-id> --state-dir "$live_fixture/.anastom"
 pnpm anastom inspect <run-id> --state-dir "$live_fixture/.anastom"

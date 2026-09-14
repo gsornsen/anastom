@@ -2,7 +2,16 @@
   "$id": "anastom.dev/command-result/v1alpha1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["passed", "exitCode", "signal", "durationMs", "stdoutBytes", "stderrBytes", "stdoutTruncated", "stderrTruncated"],
+  "required": [
+    "passed",
+    "exitCode",
+    "signal",
+    "durationMs",
+    "stdoutBytes",
+    "stderrBytes",
+    "stdoutTruncated",
+    "stderrTruncated"
+  ],
   "properties": {
     "passed": { "type": "boolean" },
     "exitCode": { "type": ["integer", "null"] },

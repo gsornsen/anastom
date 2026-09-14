@@ -56,3 +56,4 @@ anastom.db-wal
 .cache/
 .tmp/
 tmp/
+.generated/

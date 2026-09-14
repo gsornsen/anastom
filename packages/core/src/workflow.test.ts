@@ -33,11 +33,14 @@ describe("Workflow IR", () => {
     expect(workflow.metadata).toEqual({ id: "demo/feature", version: "0.1.0" });
     expect(workflow.nodeOrder).toEqual(["analyze", "implement", "verify"]);
     expect(workflow.nodes.implement?.needs).toEqual(["analyze"]);
-    expect(workflow.nodes.analyze?.attemptBudget).toEqual({ maxAttempts: 2, maxDurationMs: 60_000 });
+    expect(workflow.nodes.analyze?.attemptBudget).toEqual({
+      maxAttempts: 2,
+      maxDurationMs: 60_000,
+    });
     expect(workflow.nodes.verify?.output.schema).toMatchObject({ type: "object" });
   });
 
-  it("supports exactly the four M0 node kinds", async () => {
+  it("supports exactly the four authored node kinds", async () => {
     const document = parseWorkflowYaml(
       workflowYaml(`
   agent_node:

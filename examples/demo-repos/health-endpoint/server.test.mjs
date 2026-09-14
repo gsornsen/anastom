@@ -12,7 +12,9 @@ test("GET /health returns JSON status", async () => {
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { status: "ok" });
     assert.match(response.headers.get("content-type"), /application\/json/);
-  } finally { await new Promise((done) => app.close(done)); }
+  } finally {
+    await new Promise((done) => app.close(done));
+  }
 });
 test("unmatched routes stay 404", async () => {
   const app = createApp();
@@ -21,5 +23,7 @@ test("unmatched routes stay 404", async () => {
   try {
     const response = await fetch("http://127.0.0.1:" + app.address().port + "/missing");
     assert.equal(response.status, 404);
-  } finally { await new Promise((done) => app.close(done)); }
+  } finally {
+    await new Promise((done) => app.close(done));
+  }
 });

@@ -14,6 +14,7 @@ Create a growing corpus of:
 - integration failures.
 
 Record:
+
 - workflow version;
 - runtime;
 - model;
@@ -52,6 +53,7 @@ This makes behavior debuggable.
 ## 4. Treat prompts like compiled assets
 
 Prompt templates should have:
+
 - versions;
 - tests;
 - expected structured outputs;
@@ -76,6 +78,7 @@ rather than remaining as thousands of transcript tokens.
 ## 6. Make clean-room review easy
 
 Add a reviewer context mode that intentionally hides:
+
 - implementation reasoning;
 - previous reviews;
 - author/model identity.
@@ -93,12 +96,14 @@ That could become one of Anastom's most useful capabilities.
 ## 8. Distinguish execution budget from reasoning budget
 
 Budgets should eventually exist at:
+
 - run;
 - workflow;
 - node;
 - attempt.
 
 And may include:
+
 - tokens;
 - cost;
 - elapsed time;
@@ -118,6 +123,7 @@ sdlc/default
 ```
 
 An overlay can add:
+
 - required reviewers;
 - gates;
 - verifiers;
@@ -140,6 +146,7 @@ anastom plan feature.md --method sdlc/default
 ```
 
 should eventually show:
+
 - expected graph;
 - candidate runtimes/models;
 - estimated parallelism;
@@ -205,6 +212,7 @@ This would make bug reports, benchmarking, audit, and replay dramatically easier
 Most agent evals test worker intelligence.
 
 Anastom should test:
+
 - wrong retry;
 - wrong escalation;
 - accidental context leakage;

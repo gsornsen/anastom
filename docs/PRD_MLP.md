@@ -280,21 +280,27 @@ Workflow definitions may request capabilities instead of hardcoded models.
 ## Non-functional requirements
 
 ### Reliability
+
 A process crash after any persisted transition must not corrupt the run.
 
 ### Reproducibility
+
 Workflow package version, prompts/templates, relevant config, runtime/model identifiers, and verifier definitions should be recorded.
 
 ### Observability
+
 All node attempts must expose elapsed time, model/runtime identity, status, and usage if available.
 
 ### Portability
+
 Core packages must not import Pi-, Codex-, or Claude-specific types.
 
 ### Testability
+
 A fake deterministic runtime adapter must allow workflow tests without calling an LLM.
 
 ### Local-first
+
 The default MLP requires no hosted Anastom service.
 
 ## Explicit MLP non-goals

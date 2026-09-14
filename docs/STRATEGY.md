@@ -121,21 +121,27 @@ Each agent invocation should receive a deliberately assembled context envelope.
 ## Build strategy
 
 ### Phase A — prove the abstraction
+
 Build the smallest workflow IR and runtime that can execute one workflow on Pi.
 
 ### Phase B — prove portability
+
 Run the same workflow through Codex without changing workflow semantics.
 
 ### Phase C — prove durability
+
 Interrupt a real multi-agent task, restart Anastom, and continue from durable state.
 
 ### Phase D — prove methodological value
+
 Implement hypothesis debugging and delegated TDD as workflows using the same primitives.
 
 ### Phase E — prove collaboration
+
 Add specialist council and adversarial tournament primitives.
 
 ### Phase F — prove adaptive routing
+
 Route roles dynamically using model/harness capability and empirical run history.
 
 ## Technology strategy
@@ -165,10 +171,12 @@ Use a TypeScript monorepo so core contracts, adapters, workflow packages, CLI, a
 ### Persistence
 
 MLP:
+
 - SQLite for runs, events, artifacts metadata, leases, and metrics;
 - filesystem for large artifacts/workspaces.
 
 Later:
+
 - Postgres;
 - Redis for real-time/distributed coordination;
 - Temporal for long-duration workflows once the core semantics are stable.
@@ -214,23 +222,29 @@ This encourages an ecosystem of:
 ## Avoid these traps
 
 ### Building another universal agent SDK
+
 Pi, TrueForge, OpenHands and others already do this.
 
 Anastom should orchestrate them.
 
 ### Reimplementing every harness tool
+
 Do not own editor/LSP/debugger/browser implementations unless the abstraction demands it.
 
 ### Porting all 130+ Mycelium agents first
+
 Start with a tiny role catalog that exercises routing and workflow composition.
 
 ### Premature distributed architecture
+
 Prove semantics in one process with SQLite. Then distribute.
 
 ### UI before reliability
+
 An excellent trace/inspection CLI is enough for the MLP.
 
 ### Prompt-as-code without typed state
+
 Prompts may be versioned assets, but they should not be the workflow engine.
 
 ## Success over the first year

@@ -24,20 +24,20 @@ These map naturally into Anastom.
 
 ## Concept mapping
 
-| Mycelium | Anastom |
-|---|---|
-| Spore / expert agent | Role + capability profile + skill assets |
-| Fruiting body / orchestrator | Methodology/workflow |
-| Hypha / workflow thread | Workflow instance / nested workflow |
-| Substrate | Persistence/event/runtime infrastructure |
-| Coordination client | Control-plane event/state interfaces |
-| Redis pub/sub | Event transport / distributed projection |
-| TaskQueue | Scheduler/task backend |
-| Markdown mode | Local artifact/state projection |
-| Temporal workflows | Durable execution backend |
-| Claude plugin agent | Claude/Mycelium runtime adapter |
-| Agent discovery index | Role/skill registry |
-| Local analytics | Runtime/model/workflow telemetry |
+| Mycelium                     | Anastom                                  |
+| ---------------------------- | ---------------------------------------- |
+| Spore / expert agent         | Role + capability profile + skill assets |
+| Fruiting body / orchestrator | Methodology/workflow                     |
+| Hypha / workflow thread      | Workflow instance / nested workflow      |
+| Substrate                    | Persistence/event/runtime infrastructure |
+| Coordination client          | Control-plane event/state interfaces     |
+| Redis pub/sub                | Event transport / distributed projection |
+| TaskQueue                    | Scheduler/task backend                   |
+| Markdown mode                | Local artifact/state projection          |
+| Temporal workflows           | Durable execution backend                |
+| Claude plugin agent          | Claude/Mycelium runtime adapter          |
+| Agent discovery index        | Role/skill registry                      |
+| Local analytics              | Runtime/model/workflow telemetry         |
 
 ## Migration rule
 
@@ -103,6 +103,7 @@ Claude becomes one runtime among several.
 Only after Anastom's local workflow semantics are proven, map durable nodes/workflows to Temporal.
 
 Potential reusable lessons:
+
 - activity boundaries;
 - retries;
 - signals;

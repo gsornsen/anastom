@@ -2,11 +2,16 @@
 
 All notable changes to Anastom will be documented in this file.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Releases will use semantic versioning once the public API reaches its first tagged version.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Every package uses SemVer with Changesets release plans and its own changelog. Initial private versions remain 0.0.0 until the first reviewed versioning step.
 
 ## [Unreleased]
 
 ### Added
+
+- Prettier formatting and editor defaults, public API JSDoc enforcement, readability/complexity limits, package documentation, optional TypeDoc generation, and contributor hygiene checks.
+- Changesets release planning for all eight private packages, with CI validation and a reviewed manual versioning process.
+- Versioned SQLite migrations with checksummed history, schema validation, atomic failure rollback, and safe adoption of existing unversioned stores.
+- Confined file references for fake workspace changes and tests for unsafe pointers, schema summaries, migration failures, and hygiene gate failures.
 
 - M0 TypeScript workspace with a validated Workflow IR.
 - Event-sourced fake execution engine and in-memory persistence.
@@ -23,6 +28,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Rel
 - Successful live Pi/Anthropic `claude-opus-4-8` fixture demonstration with independent acceptance and recorded sanitized evidence.
 
 ### Changed
+
+- Replaced milestone-based executable fixture and CI names with capability names, and removed duplicated durable demo coverage from CI.
+- Refactored inspection, engine execution, and event transitions into readable stages and rewrote durable CLI tests around contributor-facing behavior.
+- Moved authored and normalized workflow/task/scenario schemas into versioned assets; worker reports require at least 30 non-whitespace summary characters.
 
 - Reframed the README for external readers with Mycelium origins, project goals, current support, roadmap, and documentation links.
 - Made README updates the default for every pull request, with documented reasons for exceptions.

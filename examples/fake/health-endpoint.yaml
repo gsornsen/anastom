@@ -1,0 +1,9 @@
+nodes:
+  implement:
+    - output:
+        summary: Added GET /health with a JSON response while preserving unmatched-route behavior.
+        changedFiles: [server.mjs]
+        notes: []
+      files:
+        server.mjs:
+          fromFile: ./health-endpoint/server.mjs
