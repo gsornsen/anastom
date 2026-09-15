@@ -8,7 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
-- M2 portable-worker implementation checkpoint with selected-runtime capability negotiation, normalized identity/usage events, Codex CLI process adapter, shared conformance doubles, and an accepted fail-closed managed-policy preflight in ADR 0014. An owner-authenticated paired Pi/Codex endpoint demonstration passed; final CI and completion review remain pending.
+- M2 portable-worker implementation checkpoint with selected-runtime capability negotiation, normalized identity/usage events, Codex CLI process adapter, shared conformance doubles, and an accepted fail-closed managed-policy preflight in ADR 0014. An owner-authenticated paired Pi/Codex endpoint demonstration and final-code Linux/macOS/CodeQL CI passed; owner completion review remains pending.
 - Accumulated-context Codex regression fixture and accepted owned-catalog compaction control in ADR 0013; accepted ADR 0012 status and the owner-selected Terra/medium live configuration are recorded. M2 implementation remains in progress.
 
 - Reproducible offline Codex CLI feasibility probe and proposed profile refinement covering ambient discovery exclusion, original file-authentication ownership, bounded OpenAI transport, and native cache-write placeholders.
