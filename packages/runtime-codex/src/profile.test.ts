@@ -8,7 +8,7 @@ import {
   open,
   symlink,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { conformanceRequest } from "../../runtime-contract/src/testing/conformance.js";
@@ -46,6 +46,11 @@ describe("bounded Codex execution profile", () => {
     await expect(resolveAuthFile(linkedDirectory)).rejects.toMatchObject({
       category: "policy-violation",
     });
+    await symlink(homedir(), join(root, "escaped-directory"));
+    await expect(resolveAuthFile(join(root, "escaped-directory"))).rejects.toMatchObject({
+      category: "policy-violation",
+    });
+    await expect(resolveAuthFile("/")).rejects.toMatchObject({ category: "policy-violation" });
     validateSelection("openai", "gpt-5.6-terra", "medium");
     expect(() => validateSelection("other", "gpt-5.6-terra")).toThrow();
   });

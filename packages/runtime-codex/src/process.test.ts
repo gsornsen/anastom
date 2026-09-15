@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { conformanceRequest, drainEvents } from "../../runtime-contract/src/testing/conformance.js";
@@ -112,6 +112,34 @@ describe("owned Codex process boundaries", () => {
       await fixture.dispose();
     }
   });
+  it.skipIf(process.platform !== "darwin")(
+    "confirms descendant cleanup when Darwin group-wide kill(0) denies inspection",
+    async () => {
+      const fixture = await syntheticCodex("term-resistant");
+      const nativeKill = process.kill.bind(process);
+      try {
+        const runtime = adapter(fixture.executable, fixture.authDirectory);
+        const handle = await runtime.start(conformanceRequest(fixture.workspace));
+        const intercepted = vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
+          if (pid < 0 && signal === 0) {
+            throw Object.assign(new Error("synthetic group inspection denial"), {
+              code: "EPERM",
+            });
+          }
+          return nativeKill(pid, signal);
+        });
+        try {
+          await runtime.cancel(handle);
+          expect((await runtime.collect(handle)).status).toBe("cancelled");
+          expect(await descendantGone(fixture.root)).toBe(true);
+        } finally {
+          intercepted.mockRestore();
+        }
+      } finally {
+        await fixture.dispose();
+      }
+    },
+  );
   it("stops a surviving descendant before accepting the final report", async () => {
     const fixture = await syntheticCodex("descendant");
     try {

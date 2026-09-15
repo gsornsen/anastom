@@ -13,7 +13,7 @@ import {
 import { constants } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { canonicalJson } from "@anastom/core";
 import { RuntimePreflightError } from "@anastom/runtime-contract";
 import type { ExecutionRequest } from "@anastom/runtime-contract";
@@ -140,11 +140,19 @@ export async function resolveCodexExecutable(): Promise<string> {
 
 /** Locate normal file-backed authentication using metadata only; never read or convert credentials. */
 export async function resolveAuthFile(authDirectory?: string): Promise<string> {
+  const root = resolve(authDirectory === undefined ? homedir() : tmpdir());
   const configuredDirectory = resolve(
     authDirectory ?? process.env.CODEX_HOME ?? join(homedir(), ".codex"),
   );
   try {
+    if (configuredDirectory !== root && !configuredDirectory.startsWith(root + sep)) {
+      throw new Error("Authentication directory is outside its supported root");
+    }
+    const canonicalRoot = await realpath(root);
     const directory = await realpath(configuredDirectory);
+    if (directory !== canonicalRoot && !directory.startsWith(canonicalRoot + sep)) {
+      throw new Error("Authentication directory escapes its supported root");
+    }
     const file = join(directory, "auth.json");
     const metadata = await lstat(file);
     if (metadata.isSymbolicLink() || !metadata.isFile() || metadata.size === 0) {

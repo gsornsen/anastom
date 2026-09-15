@@ -1,14 +1,48 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import { execFile } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 import { performance } from "node:perf_hooks";
+import { promisify } from "node:util";
 
-function groupExists(pid: number): boolean {
+const execFileAsync = promisify(execFile);
+
+async function macGroupHasLiveMembers(pid: number, deadline: number): Promise<boolean> {
+  // Darwin's group-wide kill(0) can return EPERM if any member cannot be signalled.
+  // Inspect the group instead of treating that error as proof of either state.
+  const { stdout } = await execFileAsync("/bin/ps", ["-axo", "pgid=,stat="], {
+    timeout: Math.max(1, Math.min(100, deadline - performance.now())),
+    maxBuffer: 1_048_576,
+  });
+  for (const line of stdout.split("\n")) {
+    const match = /^\s*(\d+)\s+(\S+)/.exec(line);
+    if (match && Number(match[1]) === pid && !["Z", "X"].includes(match[2]![0]!)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function groupExists(pid: number, deadline: number): Promise<boolean> {
   try {
     process.kill(-pid, 0);
     return true;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ESRCH") {
       return false;
+    }
+    if (process.platform === "darwin" && (error as NodeJS.ErrnoException).code === "EPERM") {
+      try {
+        if (performance.now() >= deadline) {
+          throw new Error("Owned process group inspection exceeded its deadline", {
+            cause: error,
+          });
+        }
+        return await macGroupHasLiveMembers(pid, deadline);
+      } catch (inspectionError) {
+        throw new Error("Owned process group termination cannot be inspected", {
+          cause: inspectionError,
+        });
+      }
     }
     throw new Error("Owned process group termination cannot be confirmed", { cause: error });
   }
@@ -37,17 +71,18 @@ export async function terminateOwnedGroup(
     return;
   }
   const started = performance.now();
+  const deadline = started + 300;
   signalGroup(pid, "SIGTERM");
-  while (groupExists(pid) && performance.now() - started < 100) {
+  while ((await groupExists(pid, deadline)) && performance.now() - started < 100) {
     await delay(5);
   }
-  if (groupExists(pid)) {
+  if (await groupExists(pid, deadline)) {
     signalGroup(pid, "SIGKILL");
   }
-  while (groupExists(pid) && performance.now() - started < 300) {
+  while ((await groupExists(pid, deadline)) && performance.now() < deadline) {
     await delay(5);
   }
-  if (groupExists(pid)) {
+  if (await groupExists(pid, deadline)) {
     throw new Error("Owned process group termination was not confirmed within 300 ms");
   }
   if (waitForLeaderExit) {
