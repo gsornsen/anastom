@@ -13,7 +13,7 @@ import {
 import { constants } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { canonicalJson } from "@anastom/core";
 import { RuntimePreflightError } from "@anastom/runtime-contract";
 import type { ExecutionRequest } from "@anastom/runtime-contract";
@@ -145,12 +145,14 @@ export async function resolveAuthFile(authDirectory?: string): Promise<string> {
     authDirectory ?? process.env.CODEX_HOME ?? join(homedir(), ".codex"),
   );
   try {
-    if (configuredDirectory !== root && !configuredDirectory.startsWith(root + sep)) {
+    const lexical = relative(root, configuredDirectory);
+    if (lexical === ".." || lexical.startsWith(".." + sep) || isAbsolute(lexical)) {
       throw new Error("Authentication directory is outside its supported root");
     }
     const canonicalRoot = await realpath(root);
     const directory = await realpath(configuredDirectory);
-    if (directory !== canonicalRoot && !directory.startsWith(canonicalRoot + sep)) {
+    const canonical = relative(canonicalRoot, directory);
+    if (canonical === ".." || canonical.startsWith(".." + sep) || isAbsolute(canonical)) {
       throw new Error("Authentication directory escapes its supported root");
     }
     const file = join(directory, "auth.json");
