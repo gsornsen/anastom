@@ -6,11 +6,9 @@ Anastom is building a local-first, vendor-neutral control plane for software-eng
 
 The goal is to make work that spans hours or days understandable, bounded, and recoverable, even as models and coding tools change.
 
-**Current stage: M1 is complete.** Anastom can delegate a bounded task to Pi in an isolated Git worktree, verify it independently, and preserve history for later inspection. The controlled live run with Anthropic `claude-opus-4-8` passed; see the [M1 completion evidence](docs/M1_EVIDENCE.md).
+**Current stage: M2 is complete.** Anastom can run the same strict Markdown Task through Pi or an exact-pinned Codex CLI worker, check the selected runtime's capabilities before work starts, independently verify the result, and replay public identity and available token observations from durable history. The owner-authenticated paired endpoint demonstration passed with both harnesses; see the [M2 completion evidence](docs/M2_EVIDENCE.md). [M1 evidence](docs/M1_EVIDENCE.md) remains the single-worker compatibility baseline.
 
-**Next: M2's portable-worker implementation is in progress.** The feature branch adds selected-runtime capability checks, normalized identity and available-token observations, a pinned Codex CLI adapter, and shared deterministic conformance tests. The Codex adapter passed offline provider/process fixtures, an owner-authenticated paired Pi/Codex endpoint demonstration, and Linux/macOS CI on the final code commit; owner review of the [M2 completion evidence](docs/M2_EVIDENCE.md) and implementation PR remains. M1 is the completed support baseline.
-
-The [offline CLI audit](docs/M2_FEASIBILITY.md) led to an [approved discovery/authentication profile](docs/adr/0012-codex-discovery-and-authentication-profile.md). An accumulated-context fixture reproduced native compaction, leading to the [accepted catalog control](docs/adr/0013-codex-client-compaction-profile.md). A managed-policy fixture then found hidden instructions despite native success; [accepted ADR 0014](docs/adr/0014-codex-managed-policy-preflight.md) adds a model-free policy gate before live integration. Codex support remains under development.
+The [offline CLI audit](docs/M2_FEASIBILITY.md) led to an [approved discovery/authentication profile](docs/adr/0012-codex-discovery-and-authentication-profile.md). An accumulated-context fixture reproduced native compaction, leading to the [accepted catalog control](docs/adr/0013-codex-client-compaction-profile.md). A managed-policy fixture then found hidden instructions despite native success; [accepted ADR 0014](docs/adr/0014-codex-managed-policy-preflight.md) adds a model-free policy gate before Codex execution. This release supports one selected worker and one verifier; automatic routing and crash recovery are later milestones.
 
 [Changelog](CHANGELOG.md) · [Roadmap](docs/MILESTONES.md) · [Design documents](#learn-more) · [Contributing](CONTRIBUTING.md)
 
@@ -52,7 +50,9 @@ The TypeScript pnpm workspace supports:
 - a scriptable fake runtime with per-node, per-attempt outcomes;
 - schema-validated results, verifier pass/fail handling, retries, and failure propagation;
 - strict Markdown tasks compiled into one worker followed by one deterministic verification command;
-- a Pi adapter with a fresh in-memory session and explicit context per attempt;
+- Pi and exact-pinned Codex CLI adapters with fresh, explicit context per attempt;
+- selected-runtime capability preflight before state creation, with durable accepted snapshots;
+- configured identity provenance and available attempt-scoped partial token observations;
 - owned Git worktrees retained for review, with base commit, final head, and diff capture;
 - bounded command execution with separate stdout/stderr artifacts and typed failures;
 - canonical context artifacts, structured reports, public tool summaries, and SHA-256 digests;
@@ -63,7 +63,7 @@ Markdown task runs persist under the target repository's ignored `.anastom/` dir
 
 Packages have documented APIs and their own READMEs/changelogs. Prettier, ESLint/JSDoc, contributor hygiene checks, and reviewed SemVer release plans establish the development baseline. SQLite uses versioned, validated migrations with transactional failure rollback. Fake scenarios can reference separate source files for readable diffs and IDE support. See the [engineering standards](docs/ENGINEERING.md) for development, migration, and CI practices.
 
-Pi uses your normal provider authentication and model settings. A Git worktree provides checkout isolation; it is not an operating-system sandbox. Run trusted tasks and verification commands on repositories you are comfortable exposing to the configured provider. Live crash recovery, human approval, multiple workers, and other real adapters remain future milestones.
+Pi uses your normal provider authentication and model settings; its Git worktree is checkout isolation, not an operating-system sandbox. Codex uses its normal file-backed CLI authentication, requires an explicit OpenAI model, and runs its worker commands in read-only or workspace-write sandboxing. It rejects managed policy that the bounded profile cannot certify. The independent verifier runs with local command permissions in either case. Run trusted tasks and verification commands on repositories you are comfortable exposing to the selected provider. Live crash recovery, human approval, multiple workers, routing, and further adapters remain future milestones.
 
 See the [M0 retrospective](docs/M0_RETROSPECTIVE.md) and [M1 retrospective](docs/M1_RETROSPECTIVE.md) for the implemented boundaries, evidence, and lessons informing portability.
 
@@ -102,25 +102,25 @@ pnpm anastom status <printed-run-id> --state-dir "$fixture/.anastom"
 pnpm anastom inspect <printed-run-id> --state-dir "$fixture/.anastom"
 ```
 
-The demo implements `GET /health`, runs the fixture's acceptance tests, and leaves the source checkout unchanged. The printed worktree and artifact paths remain available for review. See the [M1 demo guide](docs/M1_DEMO.md) for Pi login, a live run on a fresh fixture, JSON inspection, cleanup, and limitations.
+The demo implements `GET /health`, runs the fixture's acceptance tests, and leaves the source checkout unchanged. The printed worktree and artifact paths remain available for review. The same Task can be run on separate fresh fixtures through `--runtime pi` or `--runtime codex --provider openai --model YOUR_CODEX_MODEL`; Codex also accepts `--reasoning-effort medium`. Authenticate each selected CLI in your own terminal, and keep credentials out of Task files. See the [M1 demo guide](docs/M1_DEMO.md) for Pi setup and the [M2 evidence](docs/M2_EVIDENCE.md) for the paired commands, limits, and later-process inspection.
 
 ## Roadmap
 
-Each milestone must produce a useful, testable demonstration. These are planned capabilities, with no promised release dates.
+Each milestone must produce a useful, testable demonstration. Planned milestones have no promised release dates.
 
-| Milestone                        | Status      | Outcome                                                                                                                                 |
-| -------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **M0 — Skeleton**                | Complete    | Validate workflows and execute deterministic fake runs.                                                                                 |
-| **M1 — Single worker**           | Complete    | One Pi worker, fresh context, isolated Git worktree, command verification, SQLite history, and durable `status` / `inspect`.            |
-| **M2 — Portable worker**         | In progress | Approved design: the same Task through Pi/Codex CLI, selected-runtime capability checks, shared conformance, and available token usage. |
-| **M2.5 — Claude Code worker**    | Planned     | Claude Code CLI and/or SDK support, with supported subscription authentication investigated during design.                              |
-| **M3 — Durable execution**       | Planned     | Recover safely after interruption, with ownership, orphan detection, pause, and resume semantics.                                       |
-| **M4 — Defined SDLC**            | Planned     | Plan, delegate parallel work, integrate, review, and verify a feature.                                                                  |
-| **M5 — Circuit breakers**        | Planned     | Detect repeated failure, enforce budgets, stop mutation, and escalate with evidence.                                                    |
-| **M6 — Hypothesis debugging**    | Planned     | Maintain competing explanations and run experiments that distinguish them.                                                              |
-| **M7 — Delegated TDD**           | Planned     | Separate planning and review from bounded implementation, with role-to-model configuration.                                             |
-| **M8 — Mycelium bridge**         | Planned     | Translate selected Mycelium agents, skills, and workflows into portable Anastom resources.                                              |
-| **M9–M12 — Further composition** | Planned     | Specialist councils, adversarial evaluation, nested methodologies, and adaptive routing.                                                |
+| Milestone                        | Status   | Outcome                                                                                                                      |
+| -------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **M0 — Skeleton**                | Complete | Validate workflows and execute deterministic fake runs.                                                                      |
+| **M1 — Single worker**           | Complete | One Pi worker, fresh context, isolated Git worktree, command verification, SQLite history, and durable `status` / `inspect`. |
+| **M2 — Portable worker**         | Complete | The same Task through Pi/Codex CLI, selected-runtime capability checks, shared conformance, and available token usage.       |
+| **M2.5 — Claude Code worker**    | Planned  | Claude Code CLI and/or SDK support, with supported subscription authentication investigated during design.                   |
+| **M3 — Durable execution**       | Planned  | Recover safely after interruption, with ownership, orphan detection, pause, and resume semantics.                            |
+| **M4 — Defined SDLC**            | Planned  | Plan, delegate parallel work, integrate, review, and verify a feature.                                                       |
+| **M5 — Circuit breakers**        | Planned  | Detect repeated failure, enforce budgets, stop mutation, and escalate with evidence.                                         |
+| **M6 — Hypothesis debugging**    | Planned  | Maintain competing explanations and run experiments that distinguish them.                                                   |
+| **M7 — Delegated TDD**           | Planned  | Separate planning and review from bounded implementation, with role-to-model configuration.                                  |
+| **M8 — Mycelium bridge**         | Planned  | Translate selected Mycelium agents, skills, and workflows into portable Anastom resources.                                   |
+| **M9–M12 — Further composition** | Planned  | Specialist councils, adversarial evaluation, nested methodologies, and adaptive routing.                                     |
 
 M1 persistence enables inspection from later processes. Recovery of an attempt that was running during a crash is explicitly M3 work.
 
@@ -144,7 +144,7 @@ See the [full milestones](docs/MILESTONES.md), [M1 build brief](docs/M1_BUILD_BR
 | What proves M1 works?                                   | [M1 completion evidence](docs/M1_EVIDENCE.md)                |
 | What did M1 teach us?                                   | [M1 retrospective](docs/M1_RETROSPECTIVE.md)                 |
 | What contract governs portable workers?                 | [M2 build brief](docs/M2_BUILD_BRIEF.md)                     |
-| What M2 evidence is available so far?                   | [M2 evidence](docs/M2_EVIDENCE.md)                           |
+| What proves M2 works?                                   | [M2 completion evidence](docs/M2_EVIDENCE.md)                |
 | How does Mycelium carry forward?                        | [Migration strategy](docs/MYCELIUM_MIGRATION.md)             |
 | Which existing systems inform the design?               | [Runtimes and inspiration](docs/RUNTIMES_AND_INSPIRATION.md) |
 

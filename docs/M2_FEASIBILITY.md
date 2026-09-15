@@ -1,6 +1,6 @@
 # M2 Codex feasibility audit
 
-Status: exact-release offline fixtures and adapter implementation are in progress; **M2 is not complete**. [ADR 0012](adr/0012-codex-discovery-and-authentication-profile.md) was approved in PR #15 and merged as `c5ba209`, closing [issue #14](https://github.com/gsornsen/anastom/issues/14). [ADR 0013](adr/0013-codex-client-compaction-profile.md) was approved in PR #18 and merged as `e9217e5`. The owner accepted [ADR 0014](adr/0014-codex-managed-policy-preflight.md)'s managed-policy gate before live integration. The owner approved the original CLI direction in PR #11 at `ecd5ba5`, merged as `8659117`.
+Status: exact-release offline fixtures and the M2 adapter implementation are complete; paired live and CI proof is in [M2_EVIDENCE.md](M2_EVIDENCE.md). [ADR 0012](adr/0012-codex-discovery-and-authentication-profile.md) was approved in PR #15 and merged as `c5ba209`, closing [issue #14](https://github.com/gsornsen/anastom/issues/14). [ADR 0013](adr/0013-codex-client-compaction-profile.md) was approved in PR #18 and merged as `e9217e5`. The owner accepted [ADR 0014](adr/0014-codex-managed-policy-preflight.md)'s managed-policy gate before live integration. The owner approved the original CLI direction in PR #11 at `ecd5ba5`, merged as `8659117`.
 
 ## Inspected identities
 
