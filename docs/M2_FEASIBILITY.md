@@ -1,6 +1,6 @@
 # M2 Codex feasibility audit
 
-Status: offline research complete for the paths below; **M2 is not complete**. [ADR 0012](adr/0012-codex-discovery-and-authentication-profile.md) proposes a profile refinement for review in [issue #14](https://github.com/gsornsen/anastom/issues/14). The owner approved the original CLI direction in PR #11 at `ecd5ba5`, merged as `8659117`.
+Status: offline research complete for the paths below; **M2 is not complete**. [ADR 0012](adr/0012-codex-discovery-and-authentication-profile.md) was approved in PR #15 and merged as `c5ba209`, closing [issue #14](https://github.com/gsornsen/anastom/issues/14). The accumulated-context profile in ADR 0013 remains proposed for review. The owner approved the original CLI direction in PR #11 at `ecd5ba5`, merged as `8659117`.
 
 ## Inspected identities
 
@@ -55,4 +55,12 @@ These initial results do not close all M2 feasibility gates:
 - owned descendants must stop on normal completion, cancellation during startup/execution, and SIGTERM resistance within the accepted limits;
 - framing, event pressure, late results, output validation, public-data filtering, identity/usage mapping, replay, and paired live evidence require the actual adapter and shared conformance suite.
 
-No M2 live model call, production adapter, or M2.5 implementation has been performed. The approved [M2 brief](M2_BUILD_BRIEF.md) requires review of an unproven profile refinement before live integration; the proposed narrower profile remains subject to owner review.
+No M2 live model call, production adapter, or M2.5 implementation has been performed. The approved [M2 brief](M2_BUILD_BRIEF.md) requires review of an unproven profile refinement before live integration; the subsequent accumulated-context control remains subject to owner review.
+
+## Accumulated-context follow-up
+
+The immediate provider context error does not prove the native context-window threshold is disabled. The exact source clamps automatic compaction to model-window metadata and independently triggers compaction at the full usable window. An added synthetic tool turn with 500,000 input tokens reproduced three Responses requests, including a schema-free compaction request. An owned supported model catalog with unknown context-window metadata produced two schema-preserving requests instead. [ADR 0013](adr/0013-codex-client-compaction-profile.md) documents the concrete proposed control and its consequences; it requires owner review before live use. All other M2 gates remain required.
+
+The opt-in commands append `context` (reproduce the failure) or `catalog` (test the candidate) to the previously documented pinned-package invocation. No real provider authentication is consulted, and both provider endpoint configurations remain explicit loopback URLs.
+
+Finalized regression runs retained `anastom-codex-feasibility-J2tuXg` (three requests under ADR 0012) and `anastom-codex-feasibility-Io9q1T` (two schema-preserving requests with the proposed catalog). The original five cases passed again, retaining `nJsBrG`, `USGGju`, `Q2qT9X`, `dlswLW` and `IZ3TwW` summaries under the same system temporary root. These are synthetic local evidence, not provider billing or model-quality comparisons.

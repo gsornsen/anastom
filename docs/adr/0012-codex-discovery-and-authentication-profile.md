@@ -1,6 +1,9 @@
 # 0012 — Refine Codex discovery and authentication ownership
 
-- Status: Proposed in [issue #14](https://github.com/gsornsen/anastom/issues/14); requires review before adapter implementation uses this profile
+- Status: Accepted by owner review of `5dad579` in PR #15, merged as `c5ba209`. Accumulated-context behavior remains under review in [ADR 0013](0013-codex-client-compaction-profile.md).
+
+- Proposal: [issue #14](https://github.com/gsornsen/anastom/issues/14), closed by the reviewed merge
+
 - Date: 2026-09-13
 - Refines: [ADR 0011](0011-portable-worker-boundary.md), retaining its CLI direction and M2 completion requirements
 
@@ -12,7 +15,7 @@ The CLI rejects overrides under the reserved built-in `model_providers.openai` I
 
 [M2_FEASIBILITY.md](../M2_FEASIBILITY.md) records the exact package/source identities, reproducible probe, observed outcomes, and remaining gates. The probe exercises native execution against a synthetic local endpoint with fake authentication. It does not call a real model or inspect owner credentials.
 
-## Proposed refinement
+## Accepted refinement
 
 Keep the reviewed CLI pin and public selection `--runtime codex --provider openai --model <owner-selected-model>`. Own a private, fresh child-process home and Codex discovery directory per attempt. Do not mutate the parent's environment. Link only the normal file-backed `auth.json`; do not link user configuration, AGENTS.md, rules, skills, plugins, or environment registries.
 

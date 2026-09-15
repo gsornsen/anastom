@@ -31,7 +31,7 @@ This is an engineering choice inferred from the documented interfaces and inspec
 
 The owner accepted the CLI as the supported interface in [review](https://github.com/gsornsen/anastom/pull/11#discussion_r4002124447). [SDK reconsideration](https://github.com/gsornsen/anastom/issues/12) is blocked until independent evidence disproves the inspected limitations, a future version closes them, or upstream contributions become a justified priority. [M2.5](https://github.com/gsornsen/anastom/issues/13) adds Claude Code CLI and/or SDK support after M2, with supported subscription authentication investigated before interface selection.
 
-Initial offline execution exposed limits not established by help/schema inspection. [ADR 0012](0012-codex-discovery-and-authentication-profile.md) proposes a discovery/authentication and provider-profile refinement, with [reproducible evidence](../M2_FEASIBILITY.md). That proposal requires owner review; the CLI direction is accepted while the new profile remains unimplemented.
+Initial offline execution exposed limits not established by help/schema inspection. [ADR 0012](0012-codex-discovery-and-authentication-profile.md) was accepted through owner review of PR #15 and merged as `c5ba209`, with [reproducible evidence](../M2_FEASIBILITY.md). The accumulated-context follow-up in [ADR 0013](0013-codex-client-compaction-profile.md) proposes a supported client compaction control for review; Codex support remains unimplemented.
 
 ## Alternatives and tradeoffs
 
