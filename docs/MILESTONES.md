@@ -104,7 +104,7 @@ This is the architectural proof that Anastom is not another harness.
 
 ## M2.5 — Claude Code worker: "Another supported harness"
 
-Status: planned after M2, before M3, following the owner's [design review](https://github.com/gsornsen/anastom/pull/11#discussion_r4002124447). Track design and implementation in [issue #13](https://github.com/gsornsen/anastom/issues/13).
+Status: design accepted by the owner on 2026-09-15 after M2 and before M3, following the owner's [design review](https://github.com/gsornsen/anastom/pull/11#discussion_r4002124447). Track implementation in [issue #13](https://github.com/gsornsen/anastom/issues/13). [ADR 0015](adr/0015-claude-code-worker-profile.md) and the [M2.5 build brief](M2_5_BUILD_BRIEF.md) set the reviewed design; [partial feasibility evidence](M2_5_FEASIBILITY.md) does not yet establish the adapter or live demonstration.
 
 ### Demo and deliverables
 
@@ -112,7 +112,7 @@ Run the unchanged Task through a Claude Code CLI and/or SDK adapter with the sam
 
 ### Boundary
 
-Investigate supported subscription-authenticated automation through current official Anthropic interfaces and applicable terms. The owner prefers subscription usage over mandatory API-credit billing. Authentication support is a design question to prove before promising it; credential copying, unsupported workarounds, and silent API-billing fallback are excluded. Select and review the concrete interface and build brief after M2's implementation is accepted.
+Investigate supported subscription-authenticated automation through current official Anthropic interfaces and applicable terms. The owner wants both subscription and API-key modes. The proposed local-direct profile invokes an end user's separately installed, unmodified Claude Code CLI with explicit source selection, without Anastom login, credential intermediation, request proxying, or resale. The remaining interpretation of Anthropic's third-party restrictions and native source verification need owner review; neither mode is delivered yet. Credential copying, unsupported workarounds, and silent API-billing fallback are excluded. Review the concrete interface and build brief before implementation.
 
 ---
 

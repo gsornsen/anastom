@@ -63,12 +63,13 @@ export default tseslint.config(
     },
   },
   {
-    files: ["packages/**/src/**/*.{ts,mjs}", "scripts/**/*.ts"],
+    files: ["packages/**/src/**/*.{ts,mjs}", "scripts/**/*.{ts,mjs}"],
+    ignores: ["scripts/eslint-rules/**/*.mjs"],
     plugins: { anastom: { rules: { "no-inline-scripts": noInlineScripts } } },
     rules: { "anastom/no-inline-scripts": "error" },
   },
   {
-    files: ["packages/**/*.mjs", "scripts/eslint-rules/**/*.mjs"],
+    files: ["packages/**/*.mjs", "scripts/**/*.mjs"],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
       parserOptions: { projectService: false },
