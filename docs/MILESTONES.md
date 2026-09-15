@@ -104,7 +104,7 @@ This is the architectural proof that Anastom is not another harness.
 
 ## M2.5 — Claude Code worker: "Another supported harness"
 
-Status: design proposed after M2, before M3, following the owner's [design review](https://github.com/gsornsen/anastom/pull/11#discussion_r4002124447). Track design and implementation in [issue #13](https://github.com/gsornsen/anastom/issues/13). [ADR 0015](adr/0015-claude-code-worker-profile.md), the [M2.5 build brief](M2_5_BUILD_BRIEF.md), and [partial feasibility evidence](M2_5_FEASIBILITY.md) require owner review; the adapter and live demonstration have not been implemented.
+Status: design accepted by the owner on 2026-09-15 after M2 and before M3, following the owner's [design review](https://github.com/gsornsen/anastom/pull/11#discussion_r4002124447). Track implementation in [issue #13](https://github.com/gsornsen/anastom/issues/13). [ADR 0015](adr/0015-claude-code-worker-profile.md) and the [M2.5 build brief](M2_5_BUILD_BRIEF.md) set the reviewed design; [partial feasibility evidence](M2_5_FEASIBILITY.md) does not yet establish the adapter or live demonstration.
 
 ### Demo and deliverables
 

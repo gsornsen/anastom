@@ -1,6 +1,6 @@
 # 0015 — Claude Code worker profile
 
-- Status: Proposed for owner review in [issue #13](https://github.com/gsornsen/anastom/issues/13)
+- Status: Accepted by the owner on 2026-09-15 for implementation under [issue #13](https://github.com/gsornsen/anastom/issues/13); native and authentication gates remain open
 - Date: 2026-09-15
 
 ## Context
@@ -38,4 +38,4 @@ Keep the existing `RuntimeAdapter` lifecycle, selected-capability preflight, eve
 
 Implementation should record Claude-specific path cases: end-user-installed executable, adapter-owned temporary schema/prompt files, workspace-constrained file tools, and durable run artifacts. Extract shared path-policy operations only where at least two concrete consumers require the same root, symlink, file-type, and lifetime rules. Keep operator-selected Task paths distinct from worker-relative paths. Review that result with M2.5, then decide whether a separate shared package is justified.
 
-The design PR changes no worker package or public API. Owner review of this ADR and the [M2.5 build brief](../M2_5_BUILD_BRIEF.md) is required by issue #13 before adding the production adapter or a live demonstration.
+The design PR changes no worker package or public API. The owner reviewed and approved this ADR and the [M2.5 build brief](../M2_5_BUILD_BRIEF.md) on 2026-09-15, satisfying issue #13's design-review gate before adding the production adapter. Approval of the design does not establish the native feasibility gates or authorize a live demonstration.

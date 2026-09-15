@@ -2,7 +2,7 @@
 
 ## Status and mission
 
-**Proposed design for owner review under [issue #13](https://github.com/gsornsen/anastom/issues/13).** M2 is complete and remains the compatibility baseline. [ADR 0015](adr/0015-claude-code-worker-profile.md) proposes a pinned Claude Code CLI interface; [design-stage feasibility](M2_5_FEASIBILITY.md) records official sources and a synthetic native probe. Review this brief and the ADR before adding a production adapter or a live call, as requested in issue #13. An accepted design identity must be recorded before implementation begins.
+**Accepted for implementation by the owner on 2026-09-15 under [issue #13](https://github.com/gsornsen/anastom/issues/13).** M2 is complete and remains the compatibility baseline. [ADR 0015](adr/0015-claude-code-worker-profile.md) records the reviewed CLI decision; [design-stage feasibility](M2_5_FEASIBILITY.md) records official sources and a synthetic native probe. The owner approved this brief and ADR before adding a production adapter. Native gates and a separate live-call approval remain required.
 
 Execute the same strict Markdown Task through one explicitly selected Claude Code worker. Preserve Anastom's capability preflight, immutable context, bounded lifecycle, engine-validated report, independent command verifier, durable event/artifact history, and later-process inspection. The third adapter is also the evidence base for any shared path-policy API; extract only rules that survive comparison across concrete path uses.
 

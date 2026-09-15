@@ -8,7 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
-- Proposed M2.5 Claude Code worker ADR and build brief, with an exact-version native loopback probe, official-interface/authentication audit, and explicit end-user subscription/API-key modes for review. This is design evidence; no adapter or live Claude Code support is delivered.
+- Owner-accepted M2.5 Claude Code worker ADR and build brief, with an exact-version native loopback probe, official-interface/authentication audit, and explicit end-user subscription/API-key modes. This is design evidence; no adapter or live Claude Code support is delivered.
 - Completed M2 portable-worker support with selected-runtime capability negotiation, normalized identity/usage events, an exact-pinned Codex CLI process adapter, shared conformance doubles, and accepted fail-closed managed-policy preflight in ADR 0014. The owner-authenticated paired Pi/Codex endpoint demonstration and Linux/macOS/CodeQL CI passed.
 - Accumulated-context Codex regression fixture and accepted owned-catalog compaction control in ADR 0013; accepted ADR 0012 status and the owner-selected Terra/medium live configuration are recorded.
 

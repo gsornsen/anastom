@@ -1,6 +1,6 @@
 # M2.5 Claude Code feasibility — design-stage evidence
 
-Status: **partial, model-free design audit.** No Claude Code adapter, live model call, or subscription integration is delivered. [ADR 0015](adr/0015-claude-code-worker-profile.md) proposes the interface; [issue #13](https://github.com/gsornsen/anastom/issues/13) requires owner review before implementation.
+Status: **partial, model-free design audit.** No Claude Code adapter, live model call, or subscription integration is delivered. [ADR 0015](adr/0015-claude-code-worker-profile.md) records the owner-accepted interface; [issue #13](https://github.com/gsornsen/anastom/issues/13) tracks implementation.
 
 ## Official interface and authentication findings
 
