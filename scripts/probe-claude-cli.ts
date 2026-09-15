@@ -3,13 +3,13 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { spawn } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { join } from "node:path";
 
 const RELEASE = "2.1.268";
-const executable = process.argv[2];
-if (!executable || !isAbsolute(executable)) {
-  throw new Error("Pass the exact Claude Code executable path as the only argument");
+if (process.argv.length !== 2) {
+  throw new Error("The offline probe takes no arguments; install Claude Code on PATH");
 }
+const executable = "claude";
 
 const fixtureRoot = await mkdtemp(join(tmpdir(), "anastom-claude-offline-"));
 const workspace = join(fixtureRoot, "workspace");
@@ -22,7 +22,7 @@ await writeFile(
   join(workspace, ".claude", "probe-claude-hook.mjs"),
   await readFile(join(import.meta.dirname, "probe-claude-hook.mjs")),
 );
-const hookMarker = join(fixtureRoot, "hook-ran");
+const hookMarker = join(workspace, ".claude", "fixture-hook-ran");
 await writeFile(
   join(workspace, ".claude", "settings.json"),
   JSON.stringify({
@@ -125,7 +125,6 @@ try {
     ANTHROPIC_BASE_URL: `http://127.0.0.1:${address.port}`,
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
     DISABLE_AUTOUPDATER: "1",
-    ANASTOM_FIXTURE_HOOK_MARKER: hookMarker,
   };
   const version = await new Promise<string>((done, reject) => {
     const child = spawn(executable, ["--version"], { cwd: workspace, env, shell: false });
