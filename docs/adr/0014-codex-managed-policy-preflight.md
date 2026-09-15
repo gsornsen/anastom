@@ -1,6 +1,6 @@
 # ADR 0014: Codex managed-policy preflight
 
-Status: Proposed for owner review before the M2 live Codex demonstration.
+Status: Accepted by the owner on 2026-09-15 before the M2 live Codex demonstration.
 
 ## Problem
 
@@ -8,7 +8,7 @@ The accepted bounded Codex profile suppresses ambient user/project discovery, bu
 
 An exact-release, synthetic business-plan fixture served a cloud requirement with `ANASTOM_MANAGED_SENTINEL`. The profile sent one schema-constrained Responses request containing that sentinel and returned a valid report with exit zero. This is a reproducible failure of the earlier assumption that native success implied bounded prompt contents. No owner credential or real provider call was involved.
 
-## Proposed decision
+## Decision
 
 Before starting each `codex exec`, start a short-lived, independently owned `codex app-server --stdio --strict-config` process with the same fresh `CODEX_HOME`, original-file auth symlink, workspace cwd, and adapter-owned `-c` profile. Use only the native `initialize`, `configRequirements/read`, and `config/read` requests with `includeLayers: true`. These read configuration; they do not create a model thread or call a model. The app-server process is a policy diagnostic, while the accepted model execution remains one fresh owned `codex exec --json` group per attempt.
 
@@ -26,4 +26,4 @@ The upstream signed cache is scoped to the authenticated account and valid for o
 
 ## Review boundary
 
-Owner review is required before using this refinement for the live Codex run, per the M2 build brief's feasibility-gate rule. The paired Pi/Codex demonstration remains blocked until the same normal-auth, model-free inspection succeeds on the owner's selected setup, all other gates pass, and this ADR is accepted.
+The owner accepted this refinement before the live Codex run, per the M2 build brief's feasibility-gate rule. The paired Pi/Codex demonstration still requires the same normal-auth, model-free inspection on the owner's selected setup and all other offline gates to pass.

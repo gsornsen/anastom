@@ -40,6 +40,12 @@ describe("bounded Codex execution profile", () => {
     const auth = join(root, "auth.json");
     await writeFile(auth, "PRIVATE_SENTINEL", { mode: 0o600 });
     expect(await resolveAuthFile(root)).toBe(await realpath(auth));
+    const linkedDirectory = join(root, "linked-store");
+    await mkdir(linkedDirectory);
+    await symlink(auth, join(linkedDirectory, "auth.json"));
+    await expect(resolveAuthFile(linkedDirectory)).rejects.toMatchObject({
+      category: "policy-violation",
+    });
     validateSelection("openai", "gpt-5.6-terra", "medium");
     expect(() => validateSelection("other", "gpt-5.6-terra")).toThrow();
   });

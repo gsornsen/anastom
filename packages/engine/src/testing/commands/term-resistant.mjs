@@ -1,5 +1,5 @@
 import { writeFileSync } from "node:fs";
 
 process.on("SIGTERM", () => {});
-writeFileSync(process.argv[2], "ready");
+writeFileSync("ready", "ready");
 setInterval(() => {}, 1000);

@@ -84,7 +84,7 @@ describe("control-plane commands", () => {
     const ready = join(target.path, "ready");
     const running = new LocalCommandExecutor(20).execute(
       command("term-resistant", {
-        argv: [process.execPath, testProgram("term-resistant"), ready],
+        argv: [process.execPath, testProgram("term-resistant")],
         maxDurationMs: 1_000_000,
       }),
       target,

@@ -140,12 +140,18 @@ export async function resolveCodexExecutable(): Promise<string> {
 
 /** Locate normal file-backed authentication using metadata only; never read or convert credentials. */
 export async function resolveAuthFile(authDirectory?: string): Promise<string> {
-  const directory = resolve(authDirectory ?? process.env.CODEX_HOME ?? join(homedir(), ".codex"));
+  const configuredDirectory = resolve(
+    authDirectory ?? process.env.CODEX_HOME ?? join(homedir(), ".codex"),
+  );
   try {
-    const file = await realpath(join(directory, "auth.json"));
+    const directory = await realpath(configuredDirectory);
+    const file = join(directory, "auth.json");
     const metadata = await lstat(file);
-    if (!metadata.isFile() || metadata.size === 0) {
+    if (metadata.isSymbolicLink() || !metadata.isFile() || metadata.size === 0) {
       throw new Error("Unsupported store");
+    }
+    if ((await realpath(file)) !== file) {
+      throw new Error("Authentication file escapes its configured directory");
     }
     await access(file, constants.R_OK | constants.W_OK);
     return file;
