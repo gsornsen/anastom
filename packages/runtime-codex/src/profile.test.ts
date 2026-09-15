@@ -1,4 +1,13 @@
-import { mkdtemp, mkdir, readFile, realpath, stat, writeFile, open } from "node:fs/promises";
+import {
+  mkdtemp,
+  mkdir,
+  readFile,
+  realpath,
+  stat,
+  writeFile,
+  open,
+  symlink,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -68,16 +77,25 @@ describe("bounded Codex execution profile", () => {
     ) as { models: Array<{ context_window: unknown; slug: string }> };
     expect(catalog.models).toMatchObject([{ slug: "gpt-5.6-terra", context_window: null }]);
   });
-  it("inventories canonical skill selectors without reading their bodies", async () => {
+  it("inventories ancestor and symlinked skill selectors without reading their bodies", async () => {
     const root = await mkdtemp(join(tmpdir(), "anastom-codex-skills-"));
     retained.push(async () => {
       await (await import("node:fs/promises")).rm(root, { recursive: true, force: true });
     });
     const skill = join(root, ".agents", "skills", "fixture");
+    const workspace = join(root, "nested", "workspace");
+    const aliasRoot = join(workspace, ".codex", "skills");
     await mkdir(skill, { recursive: true });
+    await mkdir(aliasRoot, { recursive: true });
     await writeFile(join(skill, "SKILL.md"), "PRIVATE_SENTINEL");
-    const selectors = await disabledSkillPaths(root);
-    expect(selectors).toContain(await realpath(join(skill, "SKILL.md")));
+    await symlink(skill, join(aliasRoot, "alias"), "dir");
+    const selectors = await disabledSkillPaths(workspace);
+    const canonical = await realpath(join(skill, "SKILL.md"));
+    expect(selectors.filter((path) => path === canonical)).toHaveLength(1);
     expect(JSON.stringify(selectors)).not.toContain("PRIVATE_SENTINEL");
+    await symlink(join(root, "missing-skill"), join(aliasRoot, "broken"), "dir");
+    await expect(disabledSkillPaths(workspace)).rejects.toMatchObject({
+      category: "policy-violation",
+    });
   });
 });

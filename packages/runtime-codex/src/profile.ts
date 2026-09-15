@@ -310,6 +310,7 @@ export async function createCodexProfile(options: {
     await writeFile(catalogFile, JSON.stringify(boundedCatalog(model)), { mode: 0o600 });
     const config: Record<string, unknown> = {
       approval_policy: "never",
+      "analytics.enabled": false,
       cli_auth_credentials_store: "file",
       model_provider: "anastom-openai",
       "model_providers.anastom-openai.name": "OpenAI bounded worker",

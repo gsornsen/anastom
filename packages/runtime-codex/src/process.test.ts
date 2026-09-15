@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { conformanceRequest, drainEvents } from "../../runtime-contract/src/testing/conformance.js";
 import { CodexRuntimeAdapter } from "./index.js";
@@ -37,6 +37,42 @@ async function descendantGone(root: string, requireSpawn = false): Promise<boole
 }
 
 describe("owned Codex process boundaries", () => {
+  it.each([
+    ["managed-requirements", "policy-violation"],
+    ["managed-config", "policy-violation"],
+    ["policy-unavailable", "runtime-unavailable"],
+  ] as const)("rejects %s before starting the model execution", async (scenario, category) => {
+    const fixture = await syntheticCodex(scenario);
+    try {
+      const runtime = adapter(fixture.executable, fixture.authDirectory);
+      await expect(runtime.start(conformanceRequest(fixture.workspace))).rejects.toMatchObject({
+        category,
+      });
+      expect(fixture.started()).toBe(0);
+      const policyFiles = (await readdir(fixture.root)).filter((name) =>
+        /^policy-\d+\.json$/.test(name),
+      );
+      expect(policyFiles).toHaveLength(1);
+      const policy = JSON.parse(await readFile(join(fixture.root, policyFiles[0]!), "utf8")) as {
+        codexHome: string;
+      };
+      await expect(stat(policy.codexHome)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await fixture.dispose();
+    }
+  });
+  it("classifies a policy-reader launch failure before model execution", async () => {
+    const fixture = await syntheticCodex("success");
+    try {
+      const runtime = adapter(join(fixture.root, "missing-native"), fixture.authDirectory);
+      await expect(runtime.start(conformanceRequest(fixture.workspace))).rejects.toMatchObject({
+        category: "runtime-unavailable",
+      });
+      expect(fixture.started()).toBe(0);
+    } finally {
+      await fixture.dispose();
+    }
+  });
   it("accepts split native frames and rejects oversized frames without retaining private bodies", async () => {
     const split = await syntheticCodex("split");
     try {

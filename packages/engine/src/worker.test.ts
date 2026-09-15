@@ -1,6 +1,7 @@
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { loadTask, type WorkflowDefinition } from "@anastom/core";
 import type { ExecutionHandle, ExecutionRequest, ExecutionResult } from "@anastom/runtime-contract";
+import { RuntimePreflightError } from "@anastom/runtime-contract";
 import { FakeRuntimeAdapter } from "@anastom/runtime-fake";
 import {
   WorkflowEngine,
@@ -188,6 +189,29 @@ describe("fresh explicit context", () => {
     expect(state.nodes.implement?.attempts).toHaveLength(1);
     expect(state.nodes.implement?.failure?.category).toBe("runtime-unavailable");
     expect(cancel).toHaveBeenCalledOnce();
+  });
+  it("persists a typed adapter policy rejection and does not retry it", async () => {
+    const runtime = new RecordingRuntime({ nodes: { implement: [{ output: report }] } });
+    const start = vi
+      .spyOn(runtime, "start")
+      .mockRejectedValue(
+        new RuntimePreflightError("policy-violation", "Bounded worker policy was rejected"),
+      );
+    const { engine } = fake(runtime);
+    await engine.createRun(await timedWorkflow(), { runId: "policy-rejection" });
+    const state = await engine.tick("policy-rejection");
+    expect(state.status).toBe("failed");
+    expect(state.nodes.implement?.attempts).toHaveLength(1);
+    expect(state.nodes.implement?.failure).toEqual({
+      category: "policy-violation",
+      message: "Bounded worker policy was rejected",
+    });
+    expect(start).toHaveBeenCalledOnce();
+    expect(
+      (await engine.events("policy-rejection")).some(
+        (event) => event.type === "AttemptFailed" && event.failure.category === "policy-violation",
+      ),
+    ).toBe(true);
   });
 });
 

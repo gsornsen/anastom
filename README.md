@@ -8,9 +8,9 @@ The goal is to make work that spans hours or days understandable, bounded, and r
 
 **Current stage: M1 is complete.** Anastom can delegate a bounded task to Pi in an isolated Git worktree, verify it independently, and preserve history for later inspection. The controlled live run with Anthropic `claude-opus-4-8` passed; see the [M1 completion evidence](docs/M1_EVIDENCE.md).
 
-**Next: M2's portable-worker design is approved.** Implementation will add Codex CLI execution, capability checks for the selected runtime, shared adapter conformance tests, and available token usage. See the [M2 build brief](docs/M2_BUILD_BRIEF.md); the Codex adapter is not implemented yet.
+**Next: M2's portable-worker implementation is in progress.** The feature branch adds selected-runtime capability checks, normalized identity and available-token observations, a pinned Codex CLI adapter, and shared deterministic conformance tests. The Codex adapter has passed offline provider/process fixtures; its owner-authenticated paired live demonstration and the full [M2 completion evidence](docs/M2_EVIDENCE.md) are still pending. M1 is the completed support baseline.
 
-The [offline CLI audit](docs/M2_FEASIBILITY.md) led to an [approved discovery/authentication profile](docs/adr/0012-codex-discovery-and-authentication-profile.md). An accumulated-context fixture then reproduced native compaction; [ADR 0013](docs/adr/0013-codex-client-compaction-profile.md) proposes a supported catalog control for review before live integration. Codex support remains under development.
+The [offline CLI audit](docs/M2_FEASIBILITY.md) led to an [approved discovery/authentication profile](docs/adr/0012-codex-discovery-and-authentication-profile.md). An accumulated-context fixture reproduced native compaction, leading to the [accepted catalog control](docs/adr/0013-codex-client-compaction-profile.md). A managed-policy fixture then found hidden instructions despite native success; [ADR 0014](docs/adr/0014-codex-managed-policy-preflight.md) proposes a model-free policy gate for review before live integration. Codex support remains under development.
 
 [Changelog](CHANGELOG.md) · [Roadmap](docs/MILESTONES.md) · [Design documents](#learn-more) · [Contributing](CONTRIBUTING.md)
 
@@ -144,6 +144,7 @@ See the [full milestones](docs/MILESTONES.md), [M1 build brief](docs/M1_BUILD_BR
 | What proves M1 works?                                   | [M1 completion evidence](docs/M1_EVIDENCE.md)                |
 | What did M1 teach us?                                   | [M1 retrospective](docs/M1_RETROSPECTIVE.md)                 |
 | What contract governs portable workers?                 | [M2 build brief](docs/M2_BUILD_BRIEF.md)                     |
+| What M2 evidence is available so far?                   | [M2 evidence](docs/M2_EVIDENCE.md)                           |
 | How does Mycelium carry forward?                        | [Migration strategy](docs/MYCELIUM_MIGRATION.md)             |
 | Which existing systems inform the design?               | [Runtimes and inspiration](docs/RUNTIMES_AND_INSPIRATION.md) |
 

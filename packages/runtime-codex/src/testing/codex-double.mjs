@@ -2,10 +2,56 @@
 import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const location = dirname(fileURLToPath(import.meta.url));
 const { scenario, report } = JSON.parse(readFileSync(join(location, "fixture.json"), "utf8"));
+if (process.argv.includes("app-server")) {
+  writeFileSync(
+    join(location, `policy-${process.pid}.json`),
+    JSON.stringify({ codexHome: process.env.CODEX_HOME }),
+    { mode: 0o600 },
+  );
+  if (scenario === "policy-unavailable") {
+    process.exit(1);
+  }
+  const line = (frame) => process.stdout.write(JSON.stringify(frame) + "\n");
+  for await (const text of createInterface({ input: process.stdin, crlfDelay: Infinity })) {
+    const frame = JSON.parse(text);
+    if (frame.method === "initialize") {
+      line({ id: frame.id, result: { userAgent: "synthetic" } });
+    } else if (frame.method === "configRequirements/read") {
+      line({
+        id: frame.id,
+        result: {
+          requirements:
+            scenario === "managed-requirements"
+              ? { additionalDeveloperInstructions: "PRIVATE_SENTINEL" }
+              : null,
+        },
+      });
+    } else if (frame.method === "config/read") {
+      line({
+        id: frame.id,
+        result: {
+          layers: [
+            { name: { type: "sessionFlags" }, config: {} },
+            ...(scenario === "managed-config"
+              ? [
+                  {
+                    name: { type: "enterpriseManaged" },
+                    config: { instructions: "PRIVATE_SENTINEL" },
+                  },
+                ]
+              : []),
+          ],
+        },
+      });
+    }
+  }
+  process.exit(0);
+}
 const chunks = [];
 let stdinBytes = 0;
 for await (const chunk of process.stdin) {

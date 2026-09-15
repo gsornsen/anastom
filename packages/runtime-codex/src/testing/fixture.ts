@@ -33,7 +33,15 @@ export interface SyntheticCodex {
 
 /** Build a fresh executable and fake file-backed store; provider credential bytes are synthetic. */
 export async function syntheticCodex(
-  scenario: ConformanceCase | "split" | "oversize" | "descendant" | "term-resistant",
+  scenario:
+    | ConformanceCase
+    | "split"
+    | "oversize"
+    | "descendant"
+    | "term-resistant"
+    | "managed-requirements"
+    | "managed-config"
+    | "policy-unavailable",
 ): Promise<SyntheticCodex> {
   const root = await mkdtemp(join(tmpdir(), "anastom-codex-double-"));
   const executable = join(root, "codex-double.mjs");

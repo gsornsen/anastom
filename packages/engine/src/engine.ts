@@ -20,6 +20,7 @@ import type {
 } from "@anastom/runtime-contract";
 import {
   probeRuntime,
+  RuntimePreflightError,
   assertRuntimeNegotiation,
   assertRuntimeEvent,
 } from "@anastom/runtime-contract";
@@ -589,10 +590,16 @@ export class WorkflowEngine {
           }
         }
         return await this.runtime.collect(handle);
-      } catch {
+      } catch (error) {
         runtimeErrored = true;
         if (!expired) {
           void cancel();
+        }
+        if (error instanceof RuntimePreflightError) {
+          return {
+            status: "failed",
+            failure: { category: error.category, message: error.message },
+          };
         }
         return {
           status: "failed",

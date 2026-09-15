@@ -8,7 +8,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
-- Accumulated-context Codex regression fixture and proposed owned-catalog compaction control in ADR 0013; accepted ADR 0012 status and the owner-selected Terra/medium live configuration are recorded. M2 implementation remains in progress.
+- M2 portable-worker implementation checkpoint with selected-runtime capability negotiation, normalized identity/usage events, Codex CLI process adapter, shared conformance doubles, and a proposed fail-closed managed-policy preflight in ADR 0014. The paired live demonstration and completion evidence remain pending.
+- Accumulated-context Codex regression fixture and accepted owned-catalog compaction control in ADR 0013; accepted ADR 0012 status and the owner-selected Terra/medium live configuration are recorded. M2 implementation remains in progress.
 
 - Reproducible offline Codex CLI feasibility probe and proposed profile refinement covering ambient discovery exclusion, original file-authentication ownership, bounded OpenAI transport, and native cache-write placeholders.
 - M1 retrospective and proposed M2 portable-worker build contract covering Codex integration, selected-runtime capability preflight, shared conformance, token observations, feasibility gates, and completion evidence.

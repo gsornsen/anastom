@@ -11,6 +11,7 @@ import type {
 import { assertRuntimeEvent, RuntimePreflightError } from "@anastom/runtime-contract";
 import { JsonlDecoder } from "./jsonl.js";
 import { NativeTurn } from "./native.js";
+import { inspectCodexPolicy } from "./policy.js";
 import { terminateOwnedGroup } from "./process.js";
 import {
   createCodexProfile,
@@ -107,6 +108,9 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
       throw new Error("Codex executes filesystem agent attempts only");
     }
     const snapshot = structuredClone(request);
+    if (snapshot.workspace.mode === "memory") {
+      throw new Error("Codex requires a filesystem agent request");
+    }
     const executable = this.options.executable ?? (await resolveCodexExecutable());
     const authFile = await resolveAuthFile(this.options.authDirectory);
     const profile = await createCodexProfile({
@@ -115,6 +119,16 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
       model: this.options.model,
       reasoningEffort: this.options.reasoningEffort,
     });
+    try {
+      await inspectCodexPolicy({
+        executable,
+        profile,
+        workspace: snapshot.workspace.path,
+      });
+    } catch (error) {
+      await profile.dispose();
+      throw error;
+    }
     const id = randomUUID();
     const pending: Pending = {
       queue: [],
