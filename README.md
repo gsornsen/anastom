@@ -108,25 +108,25 @@ The demo implements `GET /health`, runs the fixture's acceptance tests, and leav
 
 Each milestone must produce a useful, testable demonstration. Planned milestones have no promised release dates.
 
-| Milestone                        | Status   | Outcome                                                                                                                      |
-| -------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| **M0 — Skeleton**                | Complete | Validate workflows and execute deterministic fake runs.                                                                      |
-| **M1 — Single worker**           | Complete | One Pi worker, fresh context, isolated Git worktree, command verification, SQLite history, and durable `status` / `inspect`. |
-| **M2 — Portable worker**         | Complete | The same Task through Pi/Codex CLI, selected-runtime capability checks, shared conformance, and available token usage.       |
-| **M2.5 — Claude Code worker**    | Planned  | Claude Code CLI and/or SDK support, with supported subscription authentication investigated during design.                   |
-| **M3 — Durable execution**       | Planned  | Recover safely after interruption, with ownership, orphan detection, pause, and resume semantics.                            |
-| **M4 — Defined SDLC**            | Planned  | Plan, delegate parallel work, integrate, review, and verify a feature.                                                       |
-| **M5 — Circuit breakers**        | Planned  | Detect repeated failure, enforce budgets, stop mutation, and escalate with evidence.                                         |
-| **M6 — Hypothesis debugging**    | Planned  | Maintain competing explanations and run experiments that distinguish them.                                                   |
-| **M7 — Delegated TDD**           | Planned  | Separate planning and review from bounded implementation, with role-to-model configuration.                                  |
-| **M8 — Mycelium bridge**         | Planned  | Translate selected Mycelium agents, skills, and workflows into portable Anastom resources.                                   |
-| **M9–M12 — Further composition** | Planned  | Specialist councils, adversarial evaluation, nested methodologies, and adaptive routing.                                     |
+| Milestone                        | Status          | Outcome                                                                                                                                                        |
+| -------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **M0 — Skeleton**                | Complete        | Validate workflows and execute deterministic fake runs.                                                                                                        |
+| **M1 — Single worker**           | Complete        | One Pi worker, fresh context, isolated Git worktree, command verification, SQLite history, and durable `status` / `inspect`.                                   |
+| **M2 — Portable worker**         | Complete        | The same Task through Pi/Codex CLI, selected-runtime capability checks, shared conformance, and available token usage.                                         |
+| **M2.5 — Claude Code worker**    | Design proposed | Run the unchanged Task through a third harness, with explicit end-user subscription or API-key selection; native safety and terms boundaries are under review. |
+| **M3 — Durable execution**       | Planned         | Recover safely after interruption, with ownership, orphan detection, pause, and resume semantics.                                                              |
+| **M4 — Defined SDLC**            | Planned         | Plan, delegate parallel work, integrate, review, and verify a feature.                                                                                         |
+| **M5 — Circuit breakers**        | Planned         | Detect repeated failure, enforce budgets, stop mutation, and escalate with evidence.                                                                           |
+| **M6 — Hypothesis debugging**    | Planned         | Maintain competing explanations and run experiments that distinguish them.                                                                                     |
+| **M7 — Delegated TDD**           | Planned         | Separate planning and review from bounded implementation, with role-to-model configuration.                                                                    |
+| **M8 — Mycelium bridge**         | Planned         | Translate selected Mycelium agents, skills, and workflows into portable Anastom resources.                                                                     |
+| **M9–M12 — Further composition** | Planned         | Specialist councils, adversarial evaluation, nested methodologies, and adaptive routing.                                                                       |
 
 M1 persistence enables inspection from later processes. Recovery of an attempt that was running during a crash is explicitly M3 work.
 
-Claude Code support follows M2 as [M2.5](https://github.com/gsornsen/anastom/issues/13), before M3. The [Codex SDK backlog](https://github.com/gsornsen/anastom/issues/12) records the limitations that must be resolved or disproven before reconsidering that interface.
+Claude Code support follows M2 as [M2.5](https://github.com/gsornsen/anastom/issues/13), before M3. A [proposed worker profile](docs/adr/0015-claude-code-worker-profile.md) and [model-free feasibility audit](docs/M2_5_FEASIBILITY.md) compare the CLI and SDK and propose direct use of each end user's unmodified Claude Code installation with explicit subscription or API-key selection. Authentication-source verification, managed policy, and native safety remain unproved. No Claude Code adapter or live demonstration is available yet. The [Codex SDK backlog](https://github.com/gsornsen/anastom/issues/12) records the limitations that must be resolved or disproven before reconsidering that interface.
 
-See the [full milestones](docs/MILESTONES.md), [M1 build brief](docs/M1_BUILD_BRIEF.md), [M2 build brief](docs/M2_BUILD_BRIEF.md), and [changelog](CHANGELOG.md) for scope and progress.
+See the [full milestones](docs/MILESTONES.md), [M1 build brief](docs/M1_BUILD_BRIEF.md), [M2 build brief](docs/M2_BUILD_BRIEF.md), [proposed M2.5 build brief](docs/M2_5_BUILD_BRIEF.md), and [changelog](CHANGELOG.md) for scope and progress.
 
 ## Learn more
 
@@ -145,6 +145,7 @@ See the [full milestones](docs/MILESTONES.md), [M1 build brief](docs/M1_BUILD_BR
 | What did M1 teach us?                                   | [M1 retrospective](docs/M1_RETROSPECTIVE.md)                 |
 | What contract governs portable workers?                 | [M2 build brief](docs/M2_BUILD_BRIEF.md)                     |
 | What proves M2 works?                                   | [M2 completion evidence](docs/M2_EVIDENCE.md)                |
+| What is proposed and still unproved for M2.5?           | [Claude Code feasibility audit](docs/M2_5_FEASIBILITY.md)    |
 | How does Mycelium carry forward?                        | [Migration strategy](docs/MYCELIUM_MIGRATION.md)             |
 | Which existing systems inform the design?               | [Runtimes and inspiration](docs/RUNTIMES_AND_INSPIRATION.md) |
 
