@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preflight selected worker capabilities before durable creation; persist versioned negotiation, sanitized identity, and at most one partial/complete usage observation through append-only events and replay.
+- Render unavailable and partial counters explicitly while keeping verification and historical event histories independent of telemetry.
 - Add fresh frozen contexts, bounded independent verification, timeout diagnostics, and artifact observations.
 - Keep orchestration harness-independent and replay validated typed transitions.
 - Expose readable evidence rendering and named context construction options.

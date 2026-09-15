@@ -7,8 +7,11 @@ import type {
   RuntimeAdapter,
   RuntimeCapabilities,
   RuntimeEvent,
+  RuntimeUsage,
 } from "@anastom/runtime-contract";
+import { assertRuntimeEvent } from "@anastom/runtime-contract";
 import { observablePiEvent } from "./observable.js";
+import { PiUsageAccumulator } from "./usage.js";
 
 /**
  * The minimal Pi session facade used by the adapter; injectable to test lifecycle without model calls.
@@ -20,6 +23,8 @@ export interface PiSession {
   subscribe: (listener: (event: RuntimeEvent) => void) => () => void;
   /** Read the final SDK message for normalization and output validation. */
   finalMessage: () => unknown;
+  /** Read final attempt usage when available; SDK defaults do not establish provider-reported zero. */
+  finalUsage?: () => RuntimeUsage;
   /** Public provider/model identity, excluding credentials. */
   identity: { provider: string; model: string };
   /** Request execution termination and propagate failure to the adapter. */
@@ -174,17 +179,22 @@ async function createSession(
     throw new Error("No configured Pi model is available");
   }
   const identity = { provider: session.model.provider, model: session.model.id };
+  const usage = new PiUsageAccumulator();
   return {
     identity,
     prompt: (text) => session.prompt(text, { expandPromptTemplates: false }),
     subscribe: (listener) =>
       session.subscribe((event) => {
+        if (event.type === "message_end") {
+          usage.observe(event.message);
+        }
         const observable = observablePiEvent(event);
         if (observable) {
           listener(observable);
         }
       }),
     finalMessage: () => session.messages.findLast((message) => message.role === "assistant"),
+    finalUsage: () => usage.final(),
     abort: () => session.abort(),
     dispose: () => session.dispose(),
   };
@@ -197,6 +207,8 @@ interface Pending {
   wake?: () => void;
   result: Promise<ExecutionResult>;
   abort?: Promise<void>;
+  cancellation?: Promise<void>;
+  droppedLogs: number;
 }
 /**
  * Run each agent attempt in a fresh ephemeral Pi session and expose only normalized public events.
@@ -222,8 +234,9 @@ export class PiRuntimeAdapter implements RuntimeAdapter {
       debugger: false,
       browser: false,
       structuredOutput: "prompted",
-      usageReporting: "none",
+      usageReporting: "partial",
       sandboxing: [],
+      workspaceModes: ["readonly", "isolated"],
     };
   }
   /**
@@ -239,17 +252,31 @@ export class PiRuntimeAdapter implements RuntimeAdapter {
       controller: new AbortController(),
       queue: [],
       finished: false,
+      droppedLogs: 0,
       result: Promise.resolve({ status: "cancelled", reason: "Not started" }),
     };
     this.executions.set(id, pending);
-    pending.result = this.run(pending, request);
+    pending.result = this.run(pending, structuredClone(request));
     return { id };
   }
   private push(pending: Pending, event: RuntimeEvent): void {
-    if (pending.queue.length >= 256) {
-      pending.queue.shift();
+    if (pending.finished) {
+      return;
     }
-    pending.queue.push(event);
+    assertRuntimeEvent(event);
+    if (pending.queue.length >= 254) {
+      const index = pending.queue.findIndex((queued) => queued.type === "log");
+      if (index >= 0) {
+        pending.queue.splice(index, 1);
+        pending.droppedLogs++;
+      } else if (event.type === "log") {
+        pending.droppedLogs++;
+        return;
+      } else {
+        throw new Error("Pi exceeded its required observation bound");
+      }
+    }
+    pending.queue.push(structuredClone(event));
     pending.wake?.();
     pending.wake = undefined;
   }
@@ -265,8 +292,17 @@ export class PiRuntimeAdapter implements RuntimeAdapter {
         result = { status: "cancelled", reason: "Pi cancelled before prompting" };
       } else {
         this.push(pending, { type: "started" });
-        this.push(pending, { type: "metadata", ...pending.session.identity });
-        unsubscribe = pending.session.subscribe((event) => this.push(pending, event));
+        this.push(pending, {
+          type: "metadata",
+          ...pending.session.identity,
+          source: "configured",
+          runtimeVersion: "0.85.1",
+        });
+        unsubscribe = pending.session.subscribe((event) => {
+          if (event.type === "log") {
+            this.push(pending, event);
+          }
+        });
         await pending.session.prompt(renderPiPrompt(request));
         result = pending.controller.signal.aborted
           ? { status: "cancelled", reason: "Pi cancelled by control plane" }
@@ -284,18 +320,48 @@ export class PiRuntimeAdapter implements RuntimeAdapter {
             },
           };
     } finally {
+      let cleanupConfirmed = true;
       try {
         unsubscribe?.();
       } catch {
-        /* Disposal must not strand an event stream. */
+        cleanupConfirmed = false;
       }
       try {
         pending.session?.dispose();
       } catch {
-        /* Never expose private SDK state in cleanup errors. */
+        cleanupConfirmed = false;
+      }
+      if (!cleanupConfirmed) {
+        result = {
+          status: "failed",
+          failure: {
+            category: "runtime-unavailable",
+            message: "Pi session cleanup could not be confirmed; retry is unsafe",
+          },
+        };
       }
     }
-    this.push(pending, { type: "completed", status: result.status });
+    try {
+      if (pending.session?.finalUsage) {
+        this.push(pending, pending.session.finalUsage());
+      }
+    } catch {
+      result = {
+        status: "failed",
+        failure: {
+          category: "runtime-unavailable",
+          message: "Pi returned invalid public usage evidence",
+        },
+      };
+    }
+    if (pending.droppedLogs) {
+      pending.queue.push({
+        type: "log",
+        message: "Pi public logs dropped under queue pressure",
+        droppedLogs: pending.droppedLogs,
+      });
+    }
+    pending.queue.push({ type: "completed", status: result.status });
     pending.finished = true;
     pending.wake?.();
     return result;
@@ -327,6 +393,12 @@ export class PiRuntimeAdapter implements RuntimeAdapter {
    */
   async cancel(handle: ExecutionHandle): Promise<void> {
     const pending = this.require(handle);
+    if (pending.finished) {
+      return;
+    }
+    await (pending.cancellation ??= this.cancelPending(pending));
+  }
+  private async cancelPending(pending: Pending): Promise<void> {
     pending.controller.abort();
     if (pending.session) {
       await this.abortSession(pending);

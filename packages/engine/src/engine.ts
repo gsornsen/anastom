@@ -16,6 +16,12 @@ import type {
   RuntimeEvent,
   WorkspaceRef,
   WorkspaceCapture,
+  RuntimeNegotiation,
+} from "@anastom/runtime-contract";
+import {
+  probeRuntime,
+  assertRuntimeNegotiation,
+  assertRuntimeEvent,
 } from "@anastom/runtime-contract";
 import type { ArtifactStore } from "./artifacts.js";
 import { LocalCommandExecutor, type CommandExecutor } from "./command.js";
@@ -38,6 +44,8 @@ export interface CreateRunOptions {
   runId?: string;
   inputs?: Record<string, JsonValue>;
   workspace?: WorkspaceRef;
+  /** Reuse the CLI's single pre-workspace capability probe; direct callers may omit it. */
+  runtimeNegotiation?: RuntimeNegotiation;
 }
 
 /**
@@ -129,6 +137,27 @@ function blockedNodePayloads(
     .map((node) => ({ type: "NodeBlocked" as const, nodeId: node.id, reason }));
 }
 
+class RuntimeObservationFilter {
+  private readonly seen = new Set<string>();
+  private usageSeen = false;
+
+  accept(event: RuntimeEvent): boolean {
+    if (event.type !== "metadata" && event.type !== "usage") {
+      return true;
+    }
+    const key = canonicalJson(event);
+    if (this.seen.has(key)) {
+      return false;
+    }
+    if (event.type === "usage" && this.usageSeen) {
+      throw new Error("Runtime emitted conflicting final usage");
+    }
+    this.usageSeen ||= event.type === "usage";
+    this.seen.add(key);
+    return true;
+  }
+}
+
 /**
  * Sequential event-driven orchestration with schema validation, fresh contexts, and bounded attempts.
  */
@@ -152,6 +181,7 @@ export class WorkflowEngine {
    * Validate inputs and worker boundaries, then atomically persist the immutable definition and initial ready events.
    */
   async createRun(workflow: WorkflowDefinition, options: CreateRunOptions = {}): Promise<RunState> {
+    let negotiation: RuntimeNegotiation | undefined;
     if (this.options.executionMode === "worker") {
       if (!this.options.artifacts || !options.workspace || options.workspace.mode === "memory") {
         throw new Error("Worker runs require durable artifacts and a filesystem workspace");
@@ -167,6 +197,10 @@ export class WorkflowEngine {
           throw new Error("Workspace mode does not match mutation intent");
         }
       }
+      negotiation = structuredClone(
+        options.runtimeNegotiation ?? (await probeRuntime(this.runtime, options.workspace.mode)),
+      );
+      assertRuntimeNegotiation(negotiation, this.runtime.id, options.workspace.mode);
     }
     const inputs = structuredClone(options.inputs ?? {});
     validateInputs(workflow, inputs);
@@ -184,6 +218,7 @@ export class WorkflowEngine {
     ]);
     const readyIds = findExecutableNodes(workflow, created.state);
     const initialized = materializeEvents(created.state, runId, [
+      ...(negotiation ? [{ type: "RuntimeNegotiated" as const, negotiation }] : []),
       ...(options.workspace
         ? [{ type: "WorkspaceAssigned" as const, workspace: options.workspace }]
         : []),
@@ -523,6 +558,7 @@ export class WorkflowEngine {
     let expired = false;
     let runtimeErrored = false;
     let pendingObservation = Promise.resolve();
+    const observationFilter = new RuntimeObservationFilter();
     let cancellation: Promise<"succeeded" | "failed"> | undefined;
     const cancel = () => {
       if (!handle) {
@@ -544,6 +580,10 @@ export class WorkflowEngine {
         }
         for await (const event of this.runtime.events(handle)) {
           if (!expired) {
+            assertRuntimeEvent(event);
+            if (!observationFilter.accept(event)) {
+              continue;
+            }
             pendingObservation = observe(event);
             await pendingObservation;
           }

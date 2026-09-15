@@ -1,6 +1,7 @@
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import jsdoc from "eslint-plugin-jsdoc";
+import noInlineScripts from "./scripts/eslint-rules/no-inline-scripts.mjs";
 
 export default tseslint.config(
   {
@@ -59,6 +60,25 @@ export default tseslint.config(
         { definedTags: ["remarks", "example", "packageDocumentation"] },
       ],
       "jsdoc/no-types": "error",
+    },
+  },
+  {
+    files: ["packages/**/src/**/*.{ts,mjs}", "scripts/**/*.ts"],
+    plugins: { anastom: { rules: { "no-inline-scripts": noInlineScripts } } },
+    rules: { "anastom/no-inline-scripts": "error" },
+  },
+  {
+    files: ["packages/**/*.mjs", "scripts/eslint-rules/**/*.mjs"],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      parserOptions: { projectService: false },
+      globals: {
+        process: "readonly",
+        Buffer: "readonly",
+        console: "readonly",
+        setTimeout: "readonly",
+        setInterval: "readonly",
+      },
     },
   },
   {

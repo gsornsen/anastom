@@ -12,9 +12,11 @@ Public functions, classes, methods, interfaces, and type aliases need useful JSD
 
 ESLint requires a description on every JSDoc block, including classes, interfaces, type aliases, and constants. Reviewers assess whether that description is useful; the lint rule catches empty documentation.
 
-Every workspace package has a README and CHANGELOG. Package READMEs describe purpose, public entry point, supported behavior, boundaries, and development commands. Update them when their contract changes. Optional `pnpm docs:api <package>` generates HTML from exported TypeScript and JSDoc under `.generated/api/<package>/`; omit the package to generate all eight. Generated documentation stays untracked and is not published automatically. `pnpm docs:api core` is a useful API review check when changing core contracts.
+Every workspace package has a README and CHANGELOG. Package READMEs describe purpose, public entry point, supported behavior, boundaries, and development commands. Update them when their contract changes. Optional `pnpm docs:api <package>` generates HTML from exported TypeScript and JSDoc under `.generated/api/<package>/`; omit the package to generate all workspace packages. Generated documentation stays untracked and is not published automatically. `pnpm docs:api core` is a useful API review check when changing core contracts.
 
 Standard ESLint rules and the JSDoc plugin cover current readability needs. The repository-specific `pnpm hygiene` gate checks package metadata, documentation, and release plans. Add a custom ESLint rule only for a concrete recurring AST-level mistake that existing rules cannot express; include positive and negative cases. Avoid maintaining custom duplicates of standard checks.
+
+Executable process doubles live in checked-in files. The `anastom/no-inline-scripts` ESLint rule rejects script shebangs embedded in strings and source passed through interpreter evaluation flags. Its file-backed positive and negative AST fixtures run as part of `pnpm lint`; ordinary paths and messages remain allowed.
 
 ## Contributor-friendly tests
 
@@ -59,6 +61,6 @@ Run and Pi execution IDs use [`node:crypto.randomUUID()`](https://nodejs.org/doc
 | CodeQL              | Static security analysis; individually triage findings without disabling queries   | Security workflow  |
 | DCO                 | Contribution provenance on every commit                                            | PR workflow        |
 
-The required Linux display name remains `Test, types, lint, and demo` to preserve its branch protection identity. The redundant durable fake demo step was removed: durable CLI tests already execute that complete boundary. macOS repeats only behavior whose filesystem or process implementation differs by platform. No live model call or provider credential belongs in routine CI.
+The required Linux display name remains `Test, types, lint, and demo` to preserve its branch protection identity. The redundant durable fake demo step was removed: durable CLI tests already execute that complete boundary. macOS repeats only behavior whose filesystem or process implementation differs by platform; Codex's native-install/auth-link profile and process-group cleanup tests join that focused job. No live model call or provider credential belongs in routine CI.
 
 For each proposed CI check, identify its unique failure boundary, owner, platforms, cost, and relation to existing coverage. Consolidate duplicates and remove obsolete checks when capabilities or environments change. Reassess this inventory with every new runtime, storage backend, platform, package, or release process. New checks use capability names; milestone evidence remains in historical milestone documents.

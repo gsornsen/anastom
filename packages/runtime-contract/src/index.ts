@@ -21,6 +21,8 @@ export interface RuntimeCapabilities {
   structuredOutput: "native" | "prompted" | "none";
   usageReporting: "tokens" | "cost" | "partial" | "none";
   sandboxing: string[];
+  /** Supported workspace modes; absence means unknown rather than unsupported. */
+  workspaceModes?: WorkspaceRef["mode"][];
 }
 
 /**
@@ -123,9 +125,44 @@ export interface ExecutionHandle {
  */
 export type RuntimeEvent =
   | { type: "started" }
-  | { type: "log"; message: string }
-  | { type: "metadata"; provider: string; model: string }
+  | { type: "log"; message: string; droppedLogs?: number }
+  | {
+      type: "metadata";
+      provider: string;
+      model: string;
+      source?: "configured" | "reported";
+      runtimeVersion?: string;
+    }
+  | RuntimeUsage
   | { type: "completed"; status: ExecutionResult["status"] };
+
+/**
+ * One final attempt token observation. Unknown counters are absent; subsets must not be added twice.
+ * Input/output include cache/reasoning subsets only where the adapter establishes those semantics.
+ */
+export interface RuntimeUsage {
+  type: "usage";
+  scope: "attempt";
+  coverage: "complete" | "partial";
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  reasoningTokens?: number;
+  totalTokens?: number;
+}
+
+/** Validated selected-worker requirements and its immutable capability evidence. */
+export interface RuntimeNegotiation {
+  version: "anastom.dev/runtime-negotiation/v1alpha1";
+  runtimeId: string;
+  requirements: {
+    workspaceMode: "readonly" | "isolated";
+    cancellation: true;
+    structuredOutput: "validated";
+  };
+  capabilities: RuntimeCapabilities;
+}
 
 /** Stable failure categories shared by adapters, validation, and retry policy. */
 export const FAILURE_CATEGORIES = [
@@ -195,3 +232,11 @@ export interface RuntimeAdapter {
   /** Optionally recover a runtime-owned execution; return null when unsupported. */
   recover?(persisted: PersistedExecutionRef): Promise<RecoveredExecution | null>;
 }
+
+export {
+  RuntimePreflightError,
+  probeRuntime,
+  assertRuntimeNegotiation,
+  assertRuntimeCapabilities,
+  assertRuntimeEvent,
+} from "./validation.js";

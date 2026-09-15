@@ -78,4 +78,4 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Verify filesystem and process portability
-        run: pnpm test packages/workspaces packages/persistence packages/engine/src/command.test.ts packages/cli/src/durable.test.ts
+        run: pnpm test packages/workspaces packages/persistence packages/engine/src/command.test.ts packages/cli/src/durable.test.ts packages/runtime-codex/src/profile.test.ts packages/runtime-codex/src/process.test.ts

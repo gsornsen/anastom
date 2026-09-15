@@ -84,7 +84,13 @@ describe("Pi SDK boundary without model calls", () => {
       const observed = await events(adapter, handle);
       expect(observed).toEqual([
         { type: "started" },
-        { type: "metadata", provider: "fixture-provider", model: "fixture-model" },
+        {
+          type: "metadata",
+          provider: "fixture-provider",
+          model: "fixture-model",
+          source: "configured",
+          runtimeVersion: "0.85.1",
+        },
         { type: "log", message: "Pi tool finished: edit" },
         { type: "completed", status: "succeeded" },
       ]);
@@ -192,14 +198,18 @@ describe("Pi SDK boundary without model calls", () => {
     expect(await adapter.collect(handle)).toMatchObject({ status: "cancelled" });
     expect(sdk.value.dispose).toHaveBeenCalledOnce();
   });
-  it("finishes even when cleanup throws, and rejects nonagent or memory execution", async () => {
+  it("fails closed when cleanup throws, and rejects nonagent or memory execution", async () => {
     const sdk = session();
     sdk.value.dispose = () => {
       throw new Error("private SDK details");
     };
     const adapter = new PiRuntimeAdapter({ factory: async () => sdk.value });
     const handle = await adapter.start(request());
-    expect((await events(adapter, handle)).at(-1)?.type).toBe("completed");
+    expect((await events(adapter, handle)).at(-1)).toEqual({ type: "completed", status: "failed" });
+    expect(await adapter.collect(handle)).toMatchObject({
+      status: "failed",
+      failure: { category: "runtime-unavailable" },
+    });
     await expect(adapter.start({ ...request(), nodeKind: "command" })).rejects.toThrow("agent");
     await expect(
       adapter.start({ ...request(), workspace: { id: "memory", mode: "memory" } }),

@@ -54,9 +54,23 @@ export function renderRunInspection(
 ): string {
   const lines = [renderRunStatus(state, workflow), "Definition: " + digestJson(workflow)];
   lines.push(...renderWorkspace(state));
+  if (state.runtimeNegotiation) {
+    lines.push("Runtime capabilities: " + JSON.stringify(state.runtimeNegotiation));
+  }
   for (const node of Object.values(state.nodes)) {
     for (const attempt of node.attempts) {
       lines.push(renderAttempt(node.id, attempt));
+      for (const identity of attempt.identity ?? []) {
+        lines.push(
+          `Identity: ${identity.provider}/${identity.model} source=${identity.source ?? "unspecified"} runtimeVersion=${identity.runtimeVersion ?? "unavailable"}`,
+        );
+      }
+      const usage = attempt.usage;
+      lines.push(
+        usage
+          ? `Tokens (${usage.coverage} attempt coverage): input=${usage.inputTokens ?? "unavailable"} output=${usage.outputTokens ?? "unavailable"} cacheRead=${usage.cacheReadTokens ?? "unavailable"} cacheWrite=${usage.cacheWriteTokens ?? "unavailable"} reasoning=${usage.reasoningTokens ?? "unavailable"} total=${usage.totalTokens ?? "unavailable"}`
+          : "Tokens: unavailable",
+      );
     }
     if (node.command) {
       lines.push(...renderVerification(node.command));
