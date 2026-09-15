@@ -126,6 +126,7 @@ async function loadReferencedFile(root: string, source: string): Promise<string>
 interface PendingExecution {
   result: ExecutionResult;
   events: RuntimeEvent[];
+  finished?: boolean;
 }
 
 function normalizeAttempt(
@@ -181,7 +182,9 @@ export class FakeRuntimeAdapter implements RuntimeAdapter {
   /**
    * Bind explicit scripted results; unresolved file references must be materialized by loadFakeScenario.
    */
-  constructor(private readonly scenario: FakeScenario) {}
+  constructor(private readonly scenario: FakeScenario) {
+    this.scenario = structuredClone(scenario);
+  }
 
   /**
    * Describe deterministic fake execution and its supported observable contract features.
@@ -199,6 +202,7 @@ export class FakeRuntimeAdapter implements RuntimeAdapter {
       structuredOutput: "native",
       usageReporting: "none",
       sandboxing: ["memory"],
+      workspaceModes: ["memory", "readonly", "isolated"],
     };
   }
 
@@ -206,12 +210,16 @@ export class FakeRuntimeAdapter implements RuntimeAdapter {
    * Select the node's scripted attempt and apply only authorized isolated workspace changes.
    */
   async start(request: ExecutionRequest): Promise<ExecutionHandle> {
+    request = structuredClone(request);
     const id = `fake:${request.runId}:${request.nodeId}:${request.attempt}`;
     const definition = this.scenario.nodes[request.nodeId]?.[request.attempt - 1];
     if (definition && "files" in definition && definition.files) {
       await applyFileChanges(request, definition.files);
     }
-    this.executions.set(id, normalizeAttempt(request.nodeId, request.attempt, definition));
+    this.executions.set(
+      id,
+      structuredClone(normalizeAttempt(request.nodeId, request.attempt, definition)),
+    );
     return { id };
   }
 
@@ -224,6 +232,7 @@ export class FakeRuntimeAdapter implements RuntimeAdapter {
     for (const event of execution.events) {
       yield event;
     }
+    execution.finished = true;
     yield { type: "completed", status: execution.result.status };
   }
 
@@ -231,7 +240,9 @@ export class FakeRuntimeAdapter implements RuntimeAdapter {
    * Return a defensive copy of the selected terminal result.
    */
   async collect(handle: ExecutionHandle): Promise<ExecutionResult> {
-    return structuredClone(this.requireExecution(handle).result);
+    const execution = this.requireExecution(handle);
+    execution.finished = true;
+    return structuredClone(execution.result);
   }
 
   /**
@@ -239,6 +250,9 @@ export class FakeRuntimeAdapter implements RuntimeAdapter {
    */
   async cancel(handle: ExecutionHandle): Promise<void> {
     const execution = this.requireExecution(handle);
+    if (execution.finished) {
+      return;
+    }
     execution.result = { status: "cancelled", reason: "Cancelled by control plane" };
   }
 

@@ -36,6 +36,29 @@ describe("SQLite run store", () => {
     expect(await reopened.load("missing")).toBeNull();
     reopened.close();
   });
+  it("inspects a pre-negotiation SQLite history after reopening without rewriting event bytes", async () => {
+    const { path, store } = await setup();
+    const raw = new DatabaseSync(path);
+    const bytes = raw
+      .prepare("SELECT event_json FROM events WHERE run_id=? ORDER BY sequence")
+      .all("persisted") as Array<{ event_json: string }>;
+    store.close();
+    const reopened = new SqliteRunPersistence(path);
+    const inspector = new WorkflowEngine({
+      runtime: new FakeRuntimeAdapter({ nodes: {} }),
+      persistence: reopened,
+    });
+    const state = await inspector.inspect("persisted");
+    expect(state?.runtimeNegotiation).toBeUndefined();
+    expect(state?.sequence).toBe(bytes.length);
+    expect(
+      raw
+        .prepare("SELECT event_json FROM events WHERE run_id=? ORDER BY sequence")
+        .all("persisted"),
+    ).toEqual(bytes);
+    reopened.close();
+    raw.close();
+  });
   it("rejects sequence conflicts and rolls back invalid event batches", async () => {
     const { path, store, workflow } = await setup();
     const other = new SqliteRunPersistence(path);

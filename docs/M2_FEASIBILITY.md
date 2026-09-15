@@ -1,11 +1,11 @@
 # M2 Codex feasibility audit
 
-Status: offline research complete for the paths below; **M2 is not complete**. [ADR 0012](adr/0012-codex-discovery-and-authentication-profile.md) was approved in PR #15 and merged as `c5ba209`, closing [issue #14](https://github.com/gsornsen/anastom/issues/14). The accumulated-context profile in ADR 0013 remains proposed for review. The owner approved the original CLI direction in PR #11 at `ecd5ba5`, merged as `8659117`.
+Status: exact-release offline fixtures and the M2 adapter implementation are complete; paired live and CI proof is in [M2_EVIDENCE.md](M2_EVIDENCE.md). [ADR 0012](adr/0012-codex-discovery-and-authentication-profile.md) was approved in PR #15 and merged as `c5ba209`, closing [issue #14](https://github.com/gsornsen/anastom/issues/14). [ADR 0013](adr/0013-codex-client-compaction-profile.md) was approved in PR #18 and merged as `e9217e5`. The owner accepted [ADR 0014](adr/0014-codex-managed-policy-preflight.md)'s managed-policy gate before live integration. The owner approved the original CLI direction in PR #11 at `ecd5ba5`, merged as `8659117`.
 
 ## Inspected identities
 
 - Official npm package: `@openai/codex@0.154.0`, with its published platform package; native version `codex-cli 0.154.0`.
-- Package installation used a separate temporary directory; this proposal adds no repository dependency or lockfile change.
+- Initial package research used a separate temporary installation. The M2 implementation pins the same package in the repository dependency and lockfile.
 - Upstream source tag: `rust-v0.154.0`, annotated tag `36eab01061df3cde5f95ec20a526777b430091ba`, commit `6b9826e3aa83b1a5947db50f4332cb9c65f1b340`.
 - Inspected source paths include `codex-rs/config/src/config_toml.rs`, `codex-rs/config/src/skills_config.rs`, `codex-rs/codex-home/src/instructions/mod.rs`, `codex-rs/ext/skills/src/extension.rs`, `codex-rs/login/src/auth/storage.rs`, `codex-rs/model-provider-info/src/lib.rs`, and `codex-rs/exec/src/event_processor_with_jsonl_output.rs`.
 - Inspection material stayed in temporary storage. No upstream implementation was copied into Anastom.
@@ -45,22 +45,34 @@ The candidate links synthetic `auth.json` into a fresh Codex directory and uses 
 
 ## Gates still required
 
-These initial results do not close all M2 feasibility gates:
+These initial results did not close all M2 feasibility gates:
 
-- synthetic subscription refresh must update the original linked file without an additional credential copy; normal owner authentication must remain available;
+- synthetic subscription refresh must update the original linked file without an additional credential copy; the offline fixture and a model-free check of normal owner file-backed authentication now pass, while live proof remains;
 - keyring-only/missing authentication must fail before worktree/state creation;
-- bounded discovery must cover project/ancestor roots, symlinks, explicit mentions, bundled resources, and managed configuration conflicts;
+- bounded discovery must cover project/ancestor roots, symlinks, explicit mentions, bundled resources, and managed configuration conflicts; the managed gate is accepted in ADR 0014;
 - accumulated-context and SSE exhaustion must fail the bounded attempt without hidden compaction or retry;
 - the native/provider path must either accept the exact report schema or expose a classified unsupported-schema failure;
 - owned descendants must stop on normal completion, cancellation during startup/execution, and SIGTERM resistance within the accepted limits;
 - framing, event pressure, late results, output validation, public-data filtering, identity/usage mapping, replay, and paired live evidence require the actual adapter and shared conformance suite.
 
-No M2 live model call, production adapter, or M2.5 implementation has been performed. The approved [M2 brief](M2_BUILD_BRIEF.md) requires review of an unproven profile refinement before live integration; the subsequent accumulated-context control remains subject to owner review.
+The owner accepted ADR 0014 before M2's live calls. A production adapter and deterministic doubles are implemented on the M2 feature branch, but do not alone constitute completion evidence. The approved [M2 brief](M2_BUILD_BRIEF.md) still requires the paired demonstration and all completion evidence. No M2.5 implementation has been performed.
 
 ## Accumulated-context follow-up
 
-The immediate provider context error does not prove the native context-window threshold is disabled. The exact source clamps automatic compaction to model-window metadata and independently triggers compaction at the full usable window. An added synthetic tool turn with 500,000 input tokens reproduced three Responses requests, including a schema-free compaction request. An owned supported model catalog with unknown context-window metadata produced two schema-preserving requests instead. [ADR 0013](adr/0013-codex-client-compaction-profile.md) documents the concrete proposed control and its consequences; it requires owner review before live use. All other M2 gates remain required.
+The immediate provider context error does not prove the native context-window threshold is disabled. The exact source clamps automatic compaction to model-window metadata and independently triggers compaction at the full usable window. An added synthetic tool turn with 500,000 input tokens reproduced three Responses requests, including a schema-free compaction request. An owned supported model catalog with unknown context-window metadata produced two schema-preserving requests instead. [ADR 0013](adr/0013-codex-client-compaction-profile.md) documents the accepted control and its consequences. All other M2 gates remain required.
 
 The opt-in commands append `context` (reproduce the failure) or `catalog` (test the candidate) to the previously documented pinned-package invocation. No real provider authentication is consulted, and both provider endpoint configurations remain explicit loopback URLs.
 
-Finalized regression runs retained `anastom-codex-feasibility-J2tuXg` (three requests under ADR 0012) and `anastom-codex-feasibility-Io9q1T` (two schema-preserving requests with the proposed catalog). The original five cases passed again, retaining `nJsBrG`, `USGGju`, `Q2qT9X`, `dlswLW` and `IZ3TwW` summaries under the same system temporary root. These are synthetic local evidence, not provider billing or model-quality comparisons.
+Finalized early regression runs retained `anastom-codex-feasibility-J2tuXg` (three requests under ADR 0012) and `anastom-codex-feasibility-Io9q1T` (two schema-preserving requests with the accepted catalog). The original five cases passed again, retaining `nJsBrG`, `USGGju`, `Q2qT9X`, `dlswLW` and `IZ3TwW` summaries under the same system temporary root. These are synthetic local evidence, not provider billing or model-quality comparisons.
+
+## Exact adapter profile and managed-policy follow-up
+
+The opt-in `adapter-profile` mode now runs the project-resolved direct native executable with the actual adapter-owned profile. Six deterministic outcomes passed: a schema-valid report, missing provider usage, HTTP 503, immediate HTTP 400 context exhaustion, SSE `response.failed` context exhaustion, and a 500,000-token synthetic tool continuation. The first five outcomes made one Responses request each; the accumulated tool case made two schema-preserving requests. None inherited the planted ambient instruction. Local whitelisted summaries end `4hSrwo`, `Vp4Zyx`, `gmBi8W`, `OlI73O`, `aetGVD`, and `uplgfl`, respectively. The separate `debug prompt-input` command is offline discovery evidence only: it does not use the cloud loader and creates an ephemeral debug thread.
+
+The opt-in `adapter-refresh` mode used a synthetic stale ChatGPT Plus file-backed store. The direct native executable reached a loopback refresh endpoint, wrote a new synthetic access token through the profile symlink into the original fake `auth.json`, then made one schema-constrained model request with the unchanged bounded instructions. This proves the release's file-store refresh path with synthetic bytes; live owner-authenticated execution still requires the reviewed gates. The product profile also disables Codex analytics to avoid an extra native telemetry request observed during the fake subscription path.
+
+The explicit [owner policy probe](../scripts/probe-codex-owner-policy.ts) resolved the selected exact native package and normal file-backed Codex authentication using metadata only. The short-lived native policy reader reported no managed requirements/configuration and made zero model calls. Its whitelisted output was `{"runtime":"codex","nativeVersion":"0.154.0","authentication":"normal-file-backed","managedPolicy":"absent","modelCalls":0}`. This does not replace the later live demonstration or expose credential material.
+
+The `managed-conflict` mode exposed a critical counterexample: a synthetic ChatGPT business requirement added `ANASTOM_MANAGED_SENTINEL` to the model request while the native turn exited zero with a valid report. A model-free `app-server --stdio --strict-config` policy read exposed that requirement first. The actual adapter policy gate then rejected the same native profile as `policy-violation` before any model request. The `managed-config` mode exposed an `enterpriseManaged` layer without any model request, and the actual gate rejected it too. The `managed-unavailable` mode served five cloud 503 responses; the strict reader exited before complete evidence, which the adapter rejects. Current whitelisted summaries end `nlarNI`, `axXQ6z`, and `2ys6c3`. [ADR 0014](adr/0014-codex-managed-policy-preflight.md) states the accepted conservative policy decision and its limits. Deterministic process doubles verify rejection before starting `codex exec`.
+
+The `adapter-discovery` mode planted a skill in an ancestor `.agents/skills` directory, symlinked it into the workspace `.codex/skills` tree, and explicitly mentioned both that skill and a project skill in the Task objective. The direct native request retained the Task's selector text but excluded the planted skill bodies and AGENTS/config instruction sentinel. The actual profile inventoried the canonical ancestor skill path; local whitelisted summary ends `fmb1Zr`. A broken skill symlink yields a typed policy violation rather than an incomplete selector list.

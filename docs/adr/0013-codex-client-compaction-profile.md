@@ -1,6 +1,6 @@
 # ADR 0013: Codex client compaction profile
 
-Status: Proposed following the accumulated-context audit of the accepted M2 profile. No live call may use this refinement until the owner reviews it.
+Status: Accepted after the owner's approval of [PR #18](https://github.com/gsornsen/anastom/pull/18), merged as `e9217e5`. Other M2 feasibility gates still block a live call.
 
 ## Problem
 
@@ -8,7 +8,7 @@ The exact `@openai/codex@0.154.0` executable clamps `model_auto_compact_token_li
 
 The new offline fixture starts with a synthetic `gpt-5.5` tool turn reporting 500,000 input tokens, then returns the required report. With ADR 0012's discovery/authentication/provider profile, the CLI made **three** Responses requests: the tool turn, a compaction request lacking the report schema, and the continuation. Exit zero does not satisfy Anastom's bounded context contract when hidden compaction occurred.
 
-## Proposed decision
+## Decision
 
 Keep the executable pin, public OpenAI provider/model selection, original-file authentication symlink, retry limits, discovery suppression, sandbox and process ownership from ADR 0012. Add an adapter-owned model catalog using the supported `model_catalog_json` configuration. It contains only the explicitly selected model, Anastom's bounded instructions, a conservative text/tool profile, and **unknown** client context-window metadata (`context_window: null`, `max_context_window: null`). Continue setting the client compaction threshold to the maximum signed 64-bit integer. This removes the native model-window clamp and full-window compaction trigger for the physically bounded attempt; it does not enlarge the real provider's context window or claim the provider accepts unlimited input.
 
@@ -16,7 +16,7 @@ The catalog is an execution profile, not provider-reported model metadata. Do no
 
 The profile uses unified execution and the CLI's ordinary patch tool, bounded tool-output truncation, no apps/skills/plugins usage instructions, and no experimental model tools. Explicit reasoning effort is supplied outside the Task; the owner's live Codex selection is **`gpt-5.6-terra` at `medium`**. Selected identity remains `source: configured`; catalog membership is not evidence that a provider actually resolved the requested model.
 
-With the owned catalog, the same synthetic fixture made **two** Responses requests, both retaining the current report schema including `summary.minLength: 30`: the tool turn and its continuation. The CLI exited zero. This is evidence for the proposed control, not completion of M2's other gates.
+With the owned catalog, the same synthetic fixture made **two** Responses requests, both retaining the current report schema including `summary.minLength: 30`: the tool turn and its continuation. The CLI exited zero. This is evidence for the accepted control, not completion of M2's other gates.
 
 ## Alternatives and consequences
 

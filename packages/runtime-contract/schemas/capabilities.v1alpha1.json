@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "anastom.dev/runtime-capabilities/v1alpha1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "streaming",
+    "cancellation",
+    "resumableSession",
+    "nativeSubagents",
+    "mcp",
+    "lsp",
+    "debugger",
+    "browser",
+    "structuredOutput",
+    "usageReporting",
+    "sandboxing"
+  ],
+  "properties": {
+    "streaming": { "type": "boolean" },
+    "cancellation": { "type": "boolean" },
+    "resumableSession": { "type": "boolean" },
+    "nativeSubagents": { "type": "boolean" },
+    "mcp": { "type": "boolean" },
+    "lsp": { "type": "boolean" },
+    "debugger": { "type": "boolean" },
+    "browser": { "type": "boolean" },
+    "structuredOutput": { "enum": ["native", "prompted", "none"] },
+    "usageReporting": { "enum": ["tokens", "cost", "partial", "none"] },
+    "sandboxing": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 32,
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+    },
+    "workspaceModes": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 3,
+      "items": { "enum": ["memory", "readonly", "isolated"] }
+    }
+  }
+}

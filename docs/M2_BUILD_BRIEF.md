@@ -21,7 +21,7 @@ These decisions are accepted design intent, not delivered APIs. Source and feasi
 
 The owner accepted Codex CLI as the supported interface, placed SDK reconsideration in the [blocked backlog](https://github.com/gsornsen/anastom/issues/12), and added [M2.5 Claude Code CLI/SDK support](https://github.com/gsornsen/anastom/issues/13) after M2 and before M3. M2.5 must investigate supported subscription authentication during its separate design stage.
 
-The initial [offline feasibility audit](M2_FEASIBILITY.md) found discovery, reserved-provider tuning, and native telemetry limits. [ADR 0012](adr/0012-codex-discovery-and-authentication-profile.md) was approved in PR #15 and merged as `c5ba209`. It refines the internal OpenAI provider, file-backed authentication and discovery boundaries. The accumulated-context audit reproduced hidden client compaction; [ADR 0013](adr/0013-codex-client-compaction-profile.md) proposes a supported owned-catalog control for review. Other feasibility gates remain required.
+The initial [offline feasibility audit](M2_FEASIBILITY.md) found discovery, reserved-provider tuning, and native telemetry limits. [ADR 0012](adr/0012-codex-discovery-and-authentication-profile.md) was approved in PR #15 and merged as `c5ba209`. It refines the internal OpenAI provider, file-backed authentication and discovery boundaries. The accumulated-context audit reproduced hidden client compaction; [ADR 0013](adr/0013-codex-client-compaction-profile.md) was approved in PR #18 and merged as `e9217e5`, accepting an owned-catalog control. The managed-policy audit then found a hidden instruction conflict despite native success; the owner accepted [ADR 0014](adr/0014-codex-managed-policy-preflight.md)'s model-free, fail-closed preflight before the live call. Other feasibility gates remain required.
 
 ## Portability demonstration
 
@@ -36,7 +36,7 @@ Both demonstrations must independently pass the endpoint acceptance command, pre
 
 The owner has reported Pi authentication for Anthropic, Codex, and OpenRouter. These are provider options inside the Pi runtime. Codex runtime execution uses the separate executable's normal authentication; Pi login does not establish its readiness. A shared model can be selected for both harnesses if the owner prefers and both expose it, while the two runtime executions remain independent.
 
-The Task and normalized workflow digests must match within the paired demonstration. Run IDs, workspace paths, context bytes, implementation text, usage, duration, and artifact digests may differ. Compare verified behavior and event-contract compliance; byte-identical model output is not required.
+The Task-byte digest and normalized workflow contract digest must match within the paired demonstration. `WorkflowDefinition.sourcePath` records the absolute Task provenance in each clone, so the durable full-definition digest may differ by that path; compare a canonical projection omitting only `sourcePath`, and record both full digests. Run IDs, workspace paths, context bytes, implementation text, usage, duration, and artifact digests may differ. Compare verified behavior and event-contract compliance; byte-identical model output is not required.
 
 ## Capability preflight
 

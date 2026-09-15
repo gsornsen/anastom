@@ -1,0 +1,1 @@
+writeFile(path, "#!/bin/sh\necho fixture");

@@ -4,13 +4,13 @@ Adapt Pi's coding-agent SDK to explicit Anastom requests, using a fresh ephemera
 
 ## Public API
 
-`PiRuntimeAdapter` accepts an optional explicit provider/model pair and an injectable session factory for tests. `renderPiPrompt` expresses the explicit context and report contract. `PiSession` defines the small SDK facade used by deterministic lifecycle tests.
+`PiRuntimeAdapter` accepts an optional explicit provider/model pair and an injectable session factory for tests. `renderPiPrompt` expresses the explicit context and report contract. `PiSession` defines the small SDK facade used by deterministic lifecycle tests. Its capability snapshot declares filesystem modes, and completed assistant calls provide available attempt-scoped partial usage with provider/model provenance.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api runtime-pi`; output is in `.generated/api/runtime-pi/` and is not committed.
 
 ## Boundaries and invariants
 
-The exact SDK version is pinned in package.json. Sessions use no inherited project extensions, skills, prompt templates, conversations, automatic retries, or compaction. Public event normalization excludes private reasoning and raw tool bodies. Mutation tools follow the request policy. Execution IDs use Node's cryptographic UUIDv4; they are not credentials.
+The exact SDK version is pinned in package.json. Sessions use no inherited project extensions, skills, prompt templates, conversations, automatic retries, or compaction. Public event normalization excludes private reasoning and raw tool bodies. Positive provider usage is counted once per completed assistant call; missing or synthetic-zero counters remain unavailable. Bounded queues preserve lifecycle and final usage under log pressure. Mutation tools follow the request policy. Execution IDs use Node's cryptographic UUIDv4; they are not credentials.
 
 ## Development
 

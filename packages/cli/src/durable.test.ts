@@ -107,6 +107,11 @@ describe("Durable task execution", () => {
 
     const output = await runCliInNewProcess(fakeTaskArguments(repository));
 
+    if (!output.includes("Verification: passed=true exit=0")) {
+      const inspection = await inspectInNewProcess(createdRunId(output), repository);
+      const verifierOutput = evidence(inspection, "stdout");
+      throw new Error("Verifier failed: " + (await readFile(verifierOutput.uri, "utf8")));
+    }
     expect(output).toContain("[succeeded]");
     expect(output).toContain("Verification: passed=true exit=0");
   });
@@ -202,7 +207,26 @@ describe("Durable task execution", () => {
     ["missing runtime", []],
     ["missing fake scenario", ["--runtime", "fake"]],
     ["fake scenario with Pi", ["--runtime", "pi", "--fake-scenario", healthEndpointScenarioPath]],
-    ["unknown runtime", ["--runtime", "codex"]],
+    ["Codex without explicit model", ["--runtime", "codex"]],
+    ["unknown runtime", ["--runtime", "unregistered"]],
+    [
+      "Codex with unsupported provider",
+      ["--runtime", "codex", "--provider", "other", "--model", "fixture"],
+    ],
+    ["Codex with incomplete selection", ["--runtime", "codex", "--provider", "openai"]],
+    [
+      "fake with model flags",
+      [
+        "--runtime",
+        "fake",
+        "--fake-scenario",
+        healthEndpointScenarioPath,
+        "--provider",
+        "openai",
+        "--model",
+        "fixture",
+      ],
+    ],
     ["unknown flag", ["--runtime", "pi", "--unknown", "x"]],
   ])("rejects %s before execution", async (_reason, args) => {
     const output = captureCliOutput();

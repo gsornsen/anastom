@@ -1,6 +1,7 @@
 import { mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CommandDefinition } from "@anastom/core";
 import type { WorkspaceRef } from "@anastom/runtime-contract";
@@ -19,9 +20,12 @@ async function workspace(): Promise<WorkspaceRef> {
   roots.push(path);
   return { id: "command", mode: "readonly", path, repoRoot: path, baseCommit: "fixture" };
 }
-function command(script: string, extra: Partial<CommandDefinition> = {}): CommandDefinition {
+function testProgram(name: string): string {
+  return fileURLToPath(new URL(`./testing/commands/${name}.mjs`, import.meta.url));
+}
+function command(program: string, extra: Partial<CommandDefinition> = {}): CommandDefinition {
   return {
-    argv: [process.execPath, "-e", script],
+    argv: [process.execPath, testProgram(program)],
     cwd: ".",
     maxDurationMs: 2000,
     maxOutputBytes: 4096,
@@ -32,17 +36,9 @@ describe("control-plane commands", () => {
   it("passes exact arguments without a shell and omits provider credentials", async () => {
     vi.stubEnv("ANASTOM_TEST_SECRET", "fixture-secret");
     const run = await new LocalCommandExecutor().execute(
-      command(
-        "process.stdout.write(process.argv[1]); process.stderr.write(String(process.env.ANASTOM_TEST_SECRET))",
-        {
-          argv: [
-            process.execPath,
-            "-e",
-            "process.stdout.write(process.argv[1]); process.stderr.write(String(process.env.ANASTOM_TEST_SECRET))",
-            "$HOME; echo surprise",
-          ],
-        },
-      ),
+      command("arguments", {
+        argv: [process.execPath, testProgram("arguments"), "$HOME; echo surprise"],
+      }),
       await workspace(),
     );
     expect(run.output.passed).toBe(true);
@@ -53,24 +49,22 @@ describe("control-plane commands", () => {
   it("preserves output and reports a nonzero exit or unavailable executable", async () => {
     const target = await workspace();
     const executor = new LocalCommandExecutor();
-    const result = await executor.execute(
-      command("console.log('evidence'); console.error('failure'); process.exit(7)"),
-      target,
-    );
+    const result = await executor.execute(command("nonzero"), target);
     expect(result.failure?.category).toBe("tool");
     expect(result.output.exitCode).toBe(7);
     expect(result.stdout.toString()).toContain("evidence");
     expect(result.stderr.toString()).toContain("failure");
     expect(
-      (await executor.execute(command("", { argv: ["anastom-nonexistent-executable"] }), target))
-        .failure?.category,
+      (
+        await executor.execute(
+          command("noop", { argv: ["anastom-nonexistent-executable"] }),
+          target,
+        )
+      ).failure?.category,
     ).toBe("tool");
   });
   it("drains excess output while bounding retained bytes per stream", async () => {
-    const result = await new LocalCommandExecutor().execute(
-      command("process.stdout.write('x'.repeat(100000)); process.stderr.write('y'.repeat(50000))"),
-      await workspace(),
-    );
+    const result = await new LocalCommandExecutor().execute(command("pressure"), await workspace());
     expect(result.output).toMatchObject({
       passed: true,
       stdoutBytes: 100000,
@@ -89,12 +83,10 @@ describe("control-plane commands", () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const ready = join(target.path, "ready");
     const running = new LocalCommandExecutor(20).execute(
-      command(
-        "process.on('SIGTERM', () => {}); require('node:fs').writeFileSync(" +
-          JSON.stringify(ready) +
-          ", 'ready'); setInterval(() => {}, 1000)",
-        { maxDurationMs: 1_000_000 },
-      ),
+      command("term-resistant", {
+        argv: [process.execPath, testProgram("term-resistant")],
+        maxDurationMs: 1_000_000,
+      }),
       target,
     );
     await vi.waitFor(async () => {
@@ -114,10 +106,12 @@ describe("control-plane commands", () => {
     await symlink(tmpdir(), join(target.path, "escape"), "dir");
     const executor = new LocalCommandExecutor();
     for (const cwd of ["..", "/", "escape"]) {
-      await expect(executor.execute(command("void 0", { cwd }), target)).rejects.toThrow();
+      await expect(executor.execute(command("noop", { cwd }), target)).rejects.toThrow();
     }
-    await expect(executor.execute(command("", { argv: [] }), target)).rejects.toThrow("argument");
-    await expect(executor.execute(command("void 0", { maxDurationMs: 0 }), target)).rejects.toThrow(
+    await expect(executor.execute(command("noop", { argv: [] }), target)).rejects.toThrow(
+      "argument",
+    );
+    await expect(executor.execute(command("noop", { maxDurationMs: 0 }), target)).rejects.toThrow(
       "limits",
     );
   });

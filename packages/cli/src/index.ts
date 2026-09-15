@@ -16,6 +16,9 @@ import { FakeRuntimeAdapter, loadFakeScenario } from "@anastom/runtime-fake";
 import { SqliteRunPersistence, FileArtifactStore } from "@anastom/persistence";
 import { GitWorkspaceManager, resolveGitRepository, assertRunId } from "@anastom/workspaces";
 import { PiRuntimeAdapter } from "@anastom/runtime-pi";
+import { CodexRuntimeAdapter } from "@anastom/runtime-codex";
+import { probeRuntime, RuntimePreflightError } from "@anastom/runtime-contract";
+import type { RuntimeAdapter } from "@anastom/runtime-contract";
 
 /**
  * Injectable CLI output streams, allowing hosts and tests to capture diagnostics.
@@ -52,7 +55,7 @@ function usage(): string {
     "  anastom graph <workflow>",
     "  anastom run <workflow> --fake-scenario <file>",
     "  anastom inspect <run>",
-    "  anastom run <task.md> --runtime pi|fake [--repo <path>] [--fake-scenario <file>]",
+    "  anastom run <task.md> --runtime pi|codex|fake [--repo <path>] [--provider <id> --model <id>] [--reasoning-effort <level>] [--fake-scenario <file>]",
     "  anastom status <run> [--state-dir <path>]",
     "  anastom inspect <run> [--state-dir <path>] [--json]",
   ].join("\n");
@@ -85,7 +88,33 @@ function loadTarget(file: string) {
   return extname(file).toLowerCase() === ".md" ? loadTask(file) : loadWorkflow(file);
 }
 
-async function runTask(target: string, args: readonly string[], io: CliIo): Promise<number> {
+type TaskRuntimeId = "pi" | "fake" | "codex";
+const reasoningLevels = ["low", "medium", "high", "xhigh", "max"] as const;
+
+function checkedReasoningEffort(
+  value: string | undefined,
+  runtimeId: TaskRuntimeId,
+): (typeof reasoningLevels)[number] | undefined {
+  if (!value) {
+    return undefined;
+  }
+  if (runtimeId !== "codex") {
+    throw new Error("--reasoning-effort is valid for Codex only");
+  }
+  if (!reasoningLevels.includes(value as (typeof reasoningLevels)[number])) {
+    throw new Error("Unsupported Codex reasoning effort");
+  }
+  return value as (typeof reasoningLevels)[number];
+}
+
+function parseTaskOptions(args: readonly string[]): {
+  opts: Record<string, string | true>;
+  runtimeId: TaskRuntimeId;
+  scenario?: string;
+  provider?: string;
+  model?: string;
+  reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max";
+} {
   const opts = flags(args, [
     "--runtime",
     "--repo",
@@ -93,32 +122,71 @@ async function runTask(target: string, args: readonly string[], io: CliIo): Prom
     "--fake-scenario",
     "--provider",
     "--model",
+    "--reasoning-effort",
   ]);
   const runtimeId = stringFlag(opts, "--runtime");
-  if (runtimeId !== "pi" && runtimeId !== "fake") {
-    throw new Error("Task run requires --runtime pi or --runtime fake");
+  if (runtimeId !== "pi" && runtimeId !== "fake" && runtimeId !== "codex") {
+    throw new Error("Task run requires --runtime pi, codex or fake");
   }
   const scenario = stringFlag(opts, "--fake-scenario");
   if (runtimeId === "fake" && !scenario) {
     throw new Error("Fake task execution requires an explicit --fake-scenario <file>");
   }
-  if (runtimeId === "pi" && scenario) {
+  if (runtimeId !== "fake" && scenario) {
     throw new Error("--fake-scenario is only valid for fake execution");
   }
   const provider = stringFlag(opts, "--provider"),
     model = stringFlag(opts, "--model");
-  if (Boolean(provider) !== Boolean(model) || (runtimeId === "fake" && (provider || model))) {
-    throw new Error("--provider and --model must be specified together for Pi");
+  const reasoningEffort = checkedReasoningEffort(stringFlag(opts, "--reasoning-effort"), runtimeId);
+  if (
+    Boolean(provider) !== Boolean(model) ||
+    (runtimeId === "fake" && (provider || model || reasoningEffort))
+  ) {
+    throw new Error("--provider and --model must be specified together for real runtimes");
   }
+  if (runtimeId === "codex" && (!provider || !model)) {
+    throw new Error("Codex requires explicit --provider openai and --model selection");
+  }
+  return {
+    opts,
+    runtimeId,
+    scenario,
+    provider,
+    model,
+    ...(reasoningEffort ? { reasoningEffort } : {}),
+  };
+}
+
+async function selectedTaskRuntime(
+  selection: ReturnType<typeof parseTaskOptions>,
+): Promise<RuntimeAdapter> {
+  if (selection.runtimeId === "fake") {
+    return new FakeRuntimeAdapter(await loadFakeScenario(selection.scenario as string));
+  }
+  if (selection.runtimeId === "pi") {
+    return new PiRuntimeAdapter({ provider: selection.provider, model: selection.model });
+  }
+  return new CodexRuntimeAdapter({
+    provider: selection.provider as string,
+    model: selection.model as string,
+    ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
+  });
+}
+
+async function runTask(target: string, args: readonly string[], io: CliIo): Promise<number> {
+  const selection = parseTaskOptions(args);
+  const opts = selection.opts;
   const workflow = await loadTask(target);
-  const runtime =
-    runtimeId === "fake"
-      ? new FakeRuntimeAdapter(await loadFakeScenario(scenario as string))
-      : new PiRuntimeAdapter({ provider, model });
+  const runtime = await selectedTaskRuntime(selection);
   const { repoRoot } = await resolveGitRepository(stringFlag(opts, "--repo") ?? process.cwd());
   const stateDir = resolve(stringFlag(opts, "--state-dir") ?? resolve(repoRoot, ".anastom"));
   const manager = new GitWorkspaceManager(stateDir);
   const runId = randomUUID();
+  const mutation = workflow.nodes.implement?.mutation;
+  if (mutation !== "readonly" && mutation !== "isolated") {
+    throw new Error("Task requires a filesystem mutation mode");
+  }
+  const runtimeNegotiation = await probeRuntime(runtime, mutation);
   const workspace = await manager.create(repoRoot, runId, workflow.nodes.implement?.mutation);
   const persistence = new SqliteRunPersistence(resolve(stateDir, "anastom.sqlite"));
   try {
@@ -129,7 +197,7 @@ async function runTask(target: string, args: readonly string[], io: CliIo): Prom
       artifacts: new FileArtifactStore(stateDir),
       captureWorkspace: (ref) => manager.capture(ref),
     });
-    await engine.createRun(workflow, { runId, workspace });
+    await engine.createRun(workflow, { runId, workspace, runtimeNegotiation });
     io.stdout(
       "Run " +
         runId +
@@ -256,6 +324,10 @@ export async function runCli(args: readonly string[], options: CliOptions = {}):
     io.stderr(usage());
     return 2;
   } catch (error) {
+    if (error instanceof RuntimePreflightError) {
+      io.stderr(error.category + ": " + error.message);
+      return 1;
+    }
     io.stderr(error instanceof Error ? error.message : String(error));
     return 1;
   }

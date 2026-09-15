@@ -20,7 +20,7 @@
   },
   "scripts": {
     "anastom": "tsx packages/cli/src/bin.ts",
-    "lint": "eslint .",
+    "lint": "node scripts/eslint-rules/no-inline-scripts.test.mjs && eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "hygiene": "tsx scripts/check-hygiene.ts",

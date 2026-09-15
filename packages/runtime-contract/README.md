@@ -4,13 +4,13 @@ Define the harness-independent interface between Anastom's control plane and exe
 
 ## Public API
 
-`RuntimeAdapter` exposes `capabilities`, `start`, `events`, `collect`, and `cancel`, with optional `recover`. `ExecutionRequest`, `ExecutionResult`, `ContextEnvelope`, `WorkspaceRef`, and `ArtifactRef` describe explicit execution and evidence boundaries.
+`RuntimeAdapter` exposes `capabilities`, `start`, `events`, `collect`, and `cancel`, with optional `recover`. `ExecutionRequest`, `ExecutionResult`, `ContextEnvelope`, `WorkspaceRef`, and `ArtifactRef` describe explicit execution and evidence boundaries. `probeRuntime` checks a selected adapter before durable state exists; `RuntimeNegotiation` records the accepted workspace requirement and capability snapshot. Versioned schemas validate capability and public observation shapes.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api runtime-contract`; output is in `.generated/api/runtime-contract/` and is not committed.
 
 ## Boundaries and invariants
 
-Capabilities describe observable support. Adapter handles convey identity, not authorization. Context contains explicit task, inputs, dependency outputs, policy, and required output schema; no ambient conversation is assumed. Recovery types are optional contracts; durable interrupted-worker recovery is not delivered.
+Capabilities describe observable support, including supported filesystem modes. `RuntimeEvent` can report configured or native-reported provider/model identity and one partial or complete attempt-scoped token observation. Optional counters mean unavailable values stay absent rather than becoming invented zeroes; telemetry does not decide acceptance or price. Adapter handles convey identity, not authorization. Context contains explicit task, inputs, dependency outputs, policy, and required output schema; no ambient conversation is assumed. Recovery types are optional contracts; durable interrupted-worker recovery is not delivered.
 
 ## Development
 
@@ -18,7 +18,7 @@ Run from the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm test packages/runtime-fake packages/runtime-pi
+pnpm test packages/runtime-contract packages/runtime-fake packages/runtime-pi packages/runtime-codex
 pnpm typecheck
 pnpm lint
 ```

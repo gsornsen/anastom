@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add explicit Codex CLI provider/model/reasoning selection and selected-runtime capability preflight before worktree or durable state creation.
+- Reconstruct recorded negotiation, provider/model provenance, and available partial token usage in later-process status/inspection without provider authentication.
 - Add explicit runtime selection for Markdown tasks and durable cross-process status/inspection.
 - Preserve process-local YAML fake workflows and deterministic validation/graph commands.
 - Document CLI boundaries and contributor-readable durable execution tests.

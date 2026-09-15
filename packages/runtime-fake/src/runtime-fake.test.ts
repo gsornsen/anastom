@@ -34,7 +34,7 @@ async function adapterConformanceExample(adapter: RuntimeAdapter): Promise<void>
     output: { value: 1 },
   });
   await adapter.cancel(handle);
-  await expect(adapter.collect(handle)).resolves.toMatchObject({ status: "cancelled" });
+  await expect(adapter.collect(handle)).resolves.toMatchObject({ status: "succeeded" });
   await expect(
     adapter.recover?.({ adapterId: adapter.id, handleId: handle.id }),
   ).resolves.toBeNull();

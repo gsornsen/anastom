@@ -9,13 +9,18 @@ export function observablePiEvent(event: {
   toolName?: string;
   isError?: boolean;
 }): RuntimeEvent | null {
+  const tool = ["read", "write", "edit", "bash", "grep", "find", "ls"].includes(
+    event.toolName ?? "",
+  )
+    ? event.toolName
+    : "other";
   if (event.type === "tool_execution_start" && event.toolName) {
-    return { type: "log", message: "Pi tool started: " + event.toolName };
+    return { type: "log", message: "Pi tool started: " + tool };
   }
   if (event.type === "tool_execution_end" && event.toolName) {
     return {
       type: "log",
-      message: "Pi tool finished: " + event.toolName + (event.isError ? " (failed)" : ""),
+      message: "Pi tool finished: " + tool + (event.isError ? " (failed)" : ""),
     };
   }
   return null;

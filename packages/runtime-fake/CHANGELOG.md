@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Preserve M0 fake behavior while adding declared workspace-mode capabilities, defensive scenario/request/result ownership, immutable terminal outcomes, and shared adapter conformance coverage.
 - Support authorized deterministic workspace edits for worker task demonstrations.
 - Allow file references relative to the scenario directory alongside inline text.
 - Validate scenario assets with a versioned schema and reject unsafe source or target paths.

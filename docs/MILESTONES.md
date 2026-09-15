@@ -69,18 +69,18 @@ First useful end-to-end slice.
 
 ## M2 — Portable worker: "The same contract runs somewhere else"
 
-Status: design approved in [PR #11](https://github.com/gsornsen/anastom/pull/11); implementation in progress. The accepted contract and required evidence are in [M2_BUILD_BRIEF.md](M2_BUILD_BRIEF.md), informed by the [M1 retrospective](M1_RETROSPECTIVE.md). The Codex adapter has not been implemented.
+Status: complete after the owner's review of [PR #19](https://github.com/gsornsen/anastom/pull/19). The accepted contract is in [M2_BUILD_BRIEF.md](M2_BUILD_BRIEF.md), and the paired Pi/Codex demonstration, feasibility gates, CI, and durable replay are recorded in [M2_EVIDENCE.md](M2_EVIDENCE.md).
 
 ### Demo
 
-Execute the exact same workflow via:
+Execute the exact same Task via:
 
 ```bash
 --runtime pi
 --runtime codex
 ```
 
-and compare trace/results.
+and compare verified outcomes and public event evidence.
 
 Runtime and model selection remain external to the unchanged Task. The accepted Codex CLI slice requires paired explicit provider/model selections; the brief gives the complete demonstration commands and capability preflight. Normalized traces share an event contract, not necessarily identical observations or implementation text. SDK reconsideration is [blocked in the backlog](https://github.com/gsornsen/anastom/issues/12) until the inspected limitations are disproven, resolved upstream, or justify an upstream contribution workstream.
 

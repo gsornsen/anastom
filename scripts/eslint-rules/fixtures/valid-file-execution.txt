@@ -1,0 +1,5 @@
+spawn(process.execPath, ["./fixture.mjs"]);
+const scriptPath = "./fixture.mjs";
+const message = "Please type #! only when making an executable";
+const preview = `const result = ${value}`;
+spawn(tool, ["-c", "config.toml"]);

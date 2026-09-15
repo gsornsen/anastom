@@ -1,4 +1,6 @@
 import Ajv from "ajv";
+import capabilities from "../../runtime-contract/schemas/capabilities.v1alpha1.json" with { type: "json" };
+import observation from "../../runtime-contract/schemas/observation.v1alpha1.json" with { type: "json" };
 import type { RunEvent } from "./events.js";
 
 const str = { type: "string" },
@@ -54,17 +56,7 @@ const workspace = {
     }),
   ],
 };
-const runtimeEvent = {
-  oneOf: [
-    object({ type: { const: "started" } }),
-    object({ type: { const: "log" }, message: str }),
-    object({ type: { const: "metadata" }, provider: str, model: str }),
-    object({
-      type: { const: "completed" },
-      status: { enum: ["succeeded", "failed", "blocked", "cancelled"] },
-    }),
-  ],
-};
+const runtimeEvent = observation;
 const commandOutput = object({
   passed: { type: "boolean" },
   exitCode: { type: ["integer", "null"] },
@@ -79,6 +71,18 @@ const node = { nodeId: str },
   attempt = { ...node, attempt: positive },
   reason = { reason: str };
 const fields: Record<string, Record<string, unknown>> = {
+  RuntimeNegotiated: {
+    negotiation: object({
+      version: { const: "anastom.dev/runtime-negotiation/v1alpha1" },
+      runtimeId: str,
+      requirements: object({
+        workspaceMode: { enum: ["readonly", "isolated"] },
+        cancellation: { const: true },
+        structuredOutput: { const: "validated" },
+      }),
+      capabilities,
+    }),
+  },
   RunCreated: {
     workflowInstanceId: str,
     workflowId: str,

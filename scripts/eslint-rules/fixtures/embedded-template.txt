@@ -1,0 +1,2 @@
+const script = `#!${process.execPath}
+console.log("fixture")`;

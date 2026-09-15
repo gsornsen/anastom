@@ -1,10 +1,20 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { execFile, spawn } from "node:child_process";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { mkdir, mkdtemp, readFile, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { promisify } from "node:util";
 import { workerReportSchema } from "@anastom/core";
+import { RuntimePreflightError } from "@anastom/runtime-contract";
+import { conformanceRequest } from "../packages/runtime-contract/src/testing/conformance.js";
+import { JsonlDecoder } from "../packages/runtime-codex/src/jsonl.js";
+import { inspectCodexPolicy } from "../packages/runtime-codex/src/policy.js";
+import {
+  createCodexProfile,
+  resolveCodexExecutable,
+  WORKER_INSTRUCTIONS,
+} from "../packages/runtime-codex/src/profile.js";
 
 // Explicit offline research command. No real authentication is consulted.
 // Pass the exact npm package directory; there is no global executable fallback.
@@ -19,18 +29,26 @@ assert.equal(metadata.version, "0.154.0");
 assert.notEqual(process.platform, "win32", "This probe owns POSIX process groups");
 
 const sentinel = "ANASTOM_AMBIENT_SENTINEL";
+const managedSentinel = "ANASTOM_MANAGED_SENTINEL";
 const report = {
   summary: "Completed the deterministic bounded endpoint fixture successfully.",
   changedFiles: [],
   notes: [],
 };
 const instructions = "You are a bounded implementer. Follow only the explicit fixture envelope.";
+const execute = promisify(execFile);
 type Mode = "original" | "isolated";
 type Outcome =
-  "success" | "missing-usage" | "request-error" | "context-error" | "accumulated-context";
+  | "success"
+  | "missing-usage"
+  | "request-error"
+  | "context-error"
+  | "sse-context-error"
+  | "accumulated-context";
 interface Observation {
   path: string;
   ambientInherited: boolean;
+  managedInherited: boolean;
   boundedInstructions: boolean;
   summaryMinimum: unknown;
   providerCacheWritePresent: boolean;
@@ -40,6 +58,26 @@ interface NativeResult {
   eventTypes: string[];
   usage: Record<string, unknown> | null;
   timedOut: boolean;
+}
+interface PolicyResult {
+  exit: number | null;
+  timedOut: boolean;
+  requirementsPresent: boolean;
+  managedInstructionPresent: boolean;
+  layerTypes: string[];
+  nonemptyLayerTypes: string[];
+  errors: number;
+}
+interface PromptInputResult {
+  itemCount: number;
+  ambientInherited: boolean;
+  explicitContextPresent: boolean;
+  boundedInstructionsPresent: boolean;
+  developerInstructionsPresent: boolean;
+  roles: string[];
+  itemTypes: string[];
+  contentTypes: string[];
+  nativeKeys: string[];
 }
 interface Fixture {
   root: string;
@@ -51,15 +89,88 @@ interface Fixture {
   schemaFile: string;
   catalogFile: string;
 }
+interface ProbeFlags {
+  refresh: boolean;
+  adapterDiscovery: boolean;
+  managedConflict: boolean;
+  managedUnavailable: boolean;
+  managedConfig: boolean;
+  adapterProfile: boolean;
+}
+interface ProbeState {
+  observations: Observation[];
+  refreshCount: number;
+  cloudCount: number;
+  auxiliaryPaths: string[];
+}
 
-async function createFixture(): Promise<Fixture> {
+function flagsFor(variant: string | undefined): ProbeFlags {
+  const refresh = variant === "adapter-refresh";
+  const adapterDiscovery = variant === "adapter-discovery";
+  const managedConflict = variant === "managed-conflict";
+  const managedUnavailable = variant === "managed-unavailable";
+  const managedConfig = variant === "managed-config";
+  const adapterProfile =
+    variant === "adapter-profile" ||
+    refresh ||
+    adapterDiscovery ||
+    managedConflict ||
+    managedUnavailable ||
+    managedConfig;
+  return {
+    refresh,
+    adapterDiscovery,
+    managedConflict,
+    managedUnavailable,
+    managedConfig,
+    adapterProfile,
+  };
+}
+
+function planFor(flags: ProbeFlags): "plus" | "business" | undefined {
+  if (flags.refresh) {
+    return "plus";
+  }
+  if (flags.managedConflict || flags.managedUnavailable || flags.managedConfig) {
+    return "business";
+  }
+  return undefined;
+}
+
+function syntheticJwt(plan: string): string {
+  const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
+  const claims = Buffer.from(
+    JSON.stringify({
+      "https://api.openai.com/auth": {
+        chatgpt_plan_type: plan,
+        chatgpt_user_id: "synthetic-user",
+        chatgpt_account_id: "synthetic-account",
+      },
+    }),
+  ).toString("base64url");
+  return `${header}.${claims}.${Buffer.from("synthetic-signature").toString("base64url")}`;
+}
+function syntheticAccessJwt(expirationSeconds: number): string {
+  const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
+  const claims = Buffer.from(JSON.stringify({ exp: expirationSeconds })).toString("base64url");
+  return `${header}.${claims}.${Buffer.from("synthetic-signature").toString("base64url")}`;
+}
+const staleAccessToken = syntheticAccessJwt(Math.floor(Date.now() / 1000) - 3600);
+const refreshedAccessToken = syntheticAccessJwt(Math.floor(Date.now() / 1000) + 86400);
+
+async function createFixture(
+  chatgptPlan?: "plus" | "business",
+  staleAuth = false,
+): Promise<Fixture> {
   const root = await mkdtemp(join(tmpdir(), "anastom-codex-feasibility-"));
   const home = join(root, "user");
   const agentHome = join(home, ".codex");
   const workspace = join(root, "repository");
   const userSkill = join(home, ".agents", "skills", "ambient-user");
   const projectSkill = join(workspace, ".agents", "skills", "ambient-project");
-  for (const directory of [agentHome, join(workspace, ".codex"), userSkill, projectSkill]) {
+  const ancestorSkill = join(root, ".agents", "skills", "ambient-ancestor");
+  const aliasRoot = join(workspace, ".codex", "skills");
+  for (const directory of [agentHome, aliasRoot, userSkill, projectSkill, ancestorSkill]) {
     await mkdir(directory, { recursive: true });
   }
   for (const directory of [userSkill, projectSkill]) {
@@ -68,6 +179,11 @@ async function createFixture(): Promise<Fixture> {
       `---\nname: ambient-sentinel\ndescription: ${sentinel}\n---\n${sentinel}`,
     );
   }
+  await writeFile(
+    join(ancestorSkill, "SKILL.md"),
+    `---\nname: ambient-ancestor\ndescription: ${sentinel}\n---\n${sentinel}`,
+  );
+  await symlink(ancestorSkill, join(aliasRoot, "ambient-alias"), "dir");
   await writeFile(join(agentHome, "AGENTS.md"), `${sentinel} global instructions`);
   await writeFile(join(workspace, "AGENTS.md"), `${sentinel} project instructions`);
   await writeFile(
@@ -80,7 +196,21 @@ async function createFixture(): Promise<Fixture> {
   );
   await writeFile(
     join(agentHome, "auth.json"),
-    JSON.stringify({ auth_mode: "apikey", OPENAI_API_KEY: "synthetic-offline-fixture" }),
+    JSON.stringify(
+      chatgptPlan
+        ? {
+            auth_mode: "chatgpt",
+            OPENAI_API_KEY: null,
+            tokens: {
+              id_token: syntheticJwt(chatgptPlan),
+              access_token: staleAuth ? staleAccessToken : refreshedAccessToken,
+              refresh_token: "synthetic-stale-refresh",
+              account_id: "synthetic-account",
+            },
+            last_refresh: staleAuth ? "2020-01-01T00:00:00Z" : new Date().toISOString(),
+          }
+        : { auth_mode: "apikey", OPENAI_API_KEY: "synthetic-offline-fixture" },
+    ),
     { mode: 0o600 },
   );
   const systemFile = join(root, "instructions.md");
@@ -129,6 +259,23 @@ async function createFixture(): Promise<Fixture> {
 }
 
 function responseEvents(outcome: Outcome): Record<string, unknown>[] {
+  if (outcome === "sse-context-error") {
+    return [
+      {
+        type: "response.created",
+        response: { id: "resp_fixture", status: "in_progress", output: [] },
+      },
+      {
+        type: "response.failed",
+        response: {
+          id: "resp_fixture",
+          status: "failed",
+          output: [],
+          error: { code: "context_length_exceeded", message: "Synthetic fixture failure" },
+        },
+      },
+    ];
+  }
   const content = { type: "output_text", text: JSON.stringify(report), annotations: [] };
   const message =
     outcome === "accumulated-context"
@@ -217,8 +364,9 @@ async function serveFixture(options: {
   response: ServerResponse;
   outcome: Outcome;
   observations: Observation[];
+  expectedInstructions: string;
 }): Promise<void> {
-  const { request, response, outcome, observations } = options;
+  const { request, response, outcome, observations, expectedInstructions } = options;
   if (request.method !== "POST") {
     response.writeHead(200, { "Content-Type": "application/json" });
     response.end('{"data":[]}');
@@ -240,7 +388,8 @@ async function serveFixture(options: {
   observations.push({
     path: request.url ?? "",
     ambientInherited: body.includes(sentinel),
-    boundedInstructions: payload.instructions === instructions,
+    managedInherited: body.includes(managedSentinel),
+    boundedInstructions: payload.instructions === expectedInstructions,
     summaryMinimum: payload.text?.format?.schema?.properties.summary.minLength,
     providerCacheWritePresent: false,
   });
@@ -353,10 +502,15 @@ async function runNative(options: {
   fixture: Fixture;
   argumentsList: string[];
   environment: NodeJS.ProcessEnv;
+  prompt: string;
+  nativeExecutable?: string;
 }): Promise<NativeResult> {
   const child = spawn(
-    process.execPath,
-    [join(packageDirectory, "bin", "codex.js"), ...options.argumentsList],
+    options.nativeExecutable ?? process.execPath,
+    [
+      ...(options.nativeExecutable ? [] : [join(packageDirectory, "bin", "codex.js")]),
+      ...options.argumentsList,
+    ],
     {
       cwd: options.fixture.workspace,
       env: options.environment,
@@ -377,16 +531,13 @@ async function runNative(options: {
     }
     stdout += chunk.toString("utf8");
   });
-  // Native diagnostics are intentionally discarded; only public event types/counters are retained.
   child.stderr.resume();
   const timeout = setTimeout(() => {
     timedOut = true;
     stop();
   }, 20_000);
   child.stdin.on("error", () => {});
-  child.stdin.end(
-    "Perform only the explicit fixture task. Do not use $ambient-sentinel. Return the required report.",
-  );
+  child.stdin.end(options.prompt);
   const exit = await new Promise<number | null>((done, reject) => {
     child.once("error", reject);
     child.once("exit", done);
@@ -414,6 +565,206 @@ async function runNative(options: {
   };
 }
 
+async function inspectPolicy(options: {
+  fixture: Fixture;
+  argumentsList: string[];
+  environment: NodeJS.ProcessEnv;
+  nativeExecutable: string;
+}): Promise<PolicyResult> {
+  const configuration: string[] = [];
+  for (let index = 0; index < options.argumentsList.length - 1; index++) {
+    if (options.argumentsList[index] === "-c") {
+      configuration.push("-c", options.argumentsList[++index]!);
+    }
+  }
+  const child = spawn(
+    options.nativeExecutable,
+    [...configuration, "app-server", "--stdio", "--strict-config"],
+    {
+      cwd: options.fixture.workspace,
+      env: options.environment,
+      shell: false,
+      detached: true,
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
+  const decoder = new JsonlDecoder();
+  const responses = new Map<number, unknown>();
+  let bytes = 0;
+  let errors = 0;
+  let timedOut = false;
+  let requestedPolicy = false;
+  const send = (value: object): void => {
+    child.stdin.write(JSON.stringify(value) + "\n");
+  };
+  child.stdout.on("data", (chunk: Buffer) => {
+    bytes += chunk.length;
+    if (bytes > 1_048_576) {
+      signalGroup(child.pid, "SIGKILL");
+      return;
+    }
+    try {
+      for (const frame of decoder.push(chunk)) {
+        const record = frame as { id?: unknown; result?: unknown; error?: unknown };
+        if (record.error) {
+          errors++;
+        }
+        if (typeof record.id === "number") {
+          responses.set(record.id, record.result ?? null);
+        }
+      }
+    } catch {
+      signalGroup(child.pid, "SIGKILL");
+    }
+    if (responses.has(1) && !requestedPolicy) {
+      requestedPolicy = true;
+      send({ method: "initialized" });
+      send({ id: 2, method: "configRequirements/read" });
+      send({
+        id: 3,
+        method: "config/read",
+        params: { includeLayers: true, cwd: options.fixture.workspace },
+      });
+    }
+    if (responses.has(2) && responses.has(3)) {
+      signalGroup(child.pid, "SIGKILL");
+    }
+  });
+  child.stderr.resume();
+  child.stdin.on("error", () => {});
+  send({
+    id: 1,
+    method: "initialize",
+    params: {
+      clientInfo: { name: "anastom-feasibility", title: "Anastom feasibility", version: "0.1.0" },
+      capabilities: { experimentalApi: true },
+    },
+  });
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    signalGroup(child.pid, "SIGKILL");
+  }, 20_000);
+  const exit = await new Promise<number | null>((done, reject) => {
+    child.once("error", reject);
+    child.once("exit", done);
+  }).finally(() => {
+    clearTimeout(timeout);
+    signalGroup(child.pid, "SIGKILL");
+  });
+  const requirements = responses.get(2) as { requirements?: unknown } | undefined;
+  const config = responses.get(3) as
+    | {
+        layers?: { name?: { type?: unknown }; config?: unknown; disabledReason?: unknown }[];
+      }
+    | undefined;
+  const encoded = JSON.stringify(requirements ?? {});
+  return {
+    exit,
+    timedOut,
+    requirementsPresent: Boolean(requirements?.requirements),
+    managedInstructionPresent: encoded.includes(managedSentinel),
+    layerTypes: Array.isArray(config?.layers)
+      ? config.layers.map((layer) => String(layer.name?.type))
+      : [],
+    nonemptyLayerTypes: Array.isArray(config?.layers)
+      ? config.layers
+          .filter(
+            (layer) =>
+              !layer.disabledReason &&
+              layer.config &&
+              typeof layer.config === "object" &&
+              Object.keys(layer.config).length > 0,
+          )
+          .map((layer) => String(layer.name?.type))
+      : [],
+    errors,
+  };
+}
+
+async function inspectPromptInput(options: {
+  fixture: Fixture;
+  argumentsList: string[];
+  environment: NodeJS.ProcessEnv;
+  prompt: string;
+  nativeExecutable?: string;
+}): Promise<PromptInputResult> {
+  const configuration: string[] = [];
+  for (let index = 0; index < options.argumentsList.length - 1; index++) {
+    if (options.argumentsList[index] === "-c") {
+      configuration.push("-c", options.argumentsList[++index]!);
+    }
+  }
+  const command = [
+    ...(options.nativeExecutable ? [] : [join(packageDirectory, "bin", "codex.js")]),
+    "--model",
+    "gpt-5.6-terra",
+    "--sandbox",
+    "workspace-write",
+    "--cd",
+    options.fixture.workspace,
+    ...configuration,
+    "debug",
+    "prompt-input",
+    options.prompt,
+  ];
+  const child = spawn(options.nativeExecutable ?? process.execPath, command, {
+    cwd: options.fixture.workspace,
+    env: options.environment,
+    shell: false,
+    detached: true,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let stdout = "";
+  let bytes = 0;
+  child.stdout.on("data", (chunk: Buffer) => {
+    bytes += chunk.length;
+    if (bytes > 1024 * 1024) {
+      signalGroup(child.pid, "SIGKILL");
+    } else {
+      stdout += chunk.toString("utf8");
+    }
+  });
+  child.stderr.resume();
+  const timeout = setTimeout(() => signalGroup(child.pid, "SIGKILL"), 20_000);
+  const exit = await new Promise<number | null>((done, reject) => {
+    child.once("error", reject);
+    child.once("exit", done);
+  }).finally(() => {
+    clearTimeout(timeout);
+    signalGroup(child.pid, "SIGKILL");
+  });
+  assert.equal(exit, 0, "Native prompt-input diagnostic failed");
+  assert(bytes <= 1024 * 1024, "Native prompt-input diagnostic exceeded probe limit");
+  const parsed = JSON.parse(stdout) as unknown;
+  const encoded = JSON.stringify(parsed);
+  const items: unknown[] = Array.isArray(parsed) ? (parsed as unknown[]) : [];
+  const itemRecords = items.map((item) =>
+    item && typeof item === "object" && !Array.isArray(item)
+      ? (item as Record<string, unknown>)
+      : {},
+  );
+  const contents = itemRecords.flatMap((item) =>
+    Array.isArray(item.content) ? (item.content as unknown[]) : [],
+  );
+  return {
+    itemCount: Array.isArray(parsed) ? items.length : -1,
+    ambientInherited: encoded.includes(sentinel),
+    explicitContextPresent: encoded.includes(
+      "Perform the bounded task in this immutable context envelope",
+    ),
+    boundedInstructionsPresent: encoded.includes(WORKER_INSTRUCTIONS),
+    developerInstructionsPresent: encoded.includes("Follow the bounded worker envelope"),
+    roles: itemRecords.map((item) => String(item.role)),
+    itemTypes: itemRecords.map((item) => String(item.type)),
+    contentTypes: contents.map((content) =>
+      content && typeof content === "object" && !Array.isArray(content)
+        ? String((content as Record<string, unknown>).type)
+        : "undefined",
+    ),
+    nativeKeys: Object.keys(itemRecords[0] ?? {}).sort(),
+  };
+}
+
 function assertProbeEvidence(options: {
   mode: Mode;
   outcome: Outcome;
@@ -434,8 +785,9 @@ function assertProbeEvidence(options: {
   }
   if (outcome === "accumulated-context") {
     assert.equal(result.exit, 0);
-    assert.equal(observations.length, process.argv[3] === "catalog" ? 2 : 3);
-    if (process.argv[3] === "catalog") {
+    const boundedCatalog = process.argv[3] === "catalog" || process.argv[3] === "adapter-profile";
+    assert.equal(observations.length, boundedCatalog ? 2 : 3);
+    if (boundedCatalog) {
       assert(
         observations.every((observation) => observation.summaryMinimum === 30),
         "Continuation lost required report schema",
@@ -466,78 +818,366 @@ function assertProbeEvidence(options: {
   }
 }
 
-async function probe(mode: Mode, outcome: Outcome): Promise<void> {
-  const fixture = await createFixture();
+async function startProbeServer(options: {
+  flags: ProbeFlags;
+  outcome: Outcome;
+  state: ProbeState;
+}): Promise<Server> {
+  const { flags, outcome, state } = options;
+  const server = createServer((request, response) => {
+    if (
+      (flags.managedConflict || flags.managedUnavailable || flags.managedConfig) &&
+      request.url === "/backend-api/wham/config/bundle"
+    ) {
+      state.cloudCount++;
+      if (flags.managedUnavailable) {
+        response.writeHead(503, { "Content-Type": "application/json" });
+        response.end('{"error":"synthetic unavailability"}');
+        return;
+      }
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(
+        JSON.stringify({
+          [flags.managedConfig ? "config_toml" : "requirements_toml"]: {
+            enterprise_managed: [
+              {
+                id: "synthetic-managed",
+                name: "Synthetic managed profile",
+                contents: flags.managedConfig
+                  ? `instructions = ${JSON.stringify(managedSentinel)}`
+                  : `additional_developer_instructions = ${JSON.stringify(managedSentinel)}`,
+              },
+            ],
+          },
+        }),
+      );
+      return;
+    }
+    if (
+      request.url !== "/v1/responses" &&
+      request.url !== "/refresh" &&
+      state.auxiliaryPaths.length < 40
+    ) {
+      state.auxiliaryPaths.push(`${request.method} ${request.url}`);
+    }
+    if (flags.refresh && request.url === "/refresh") {
+      state.refreshCount++;
+      request.resume();
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(
+        JSON.stringify({
+          id_token: syntheticJwt("plus"),
+          access_token: refreshedAccessToken,
+          refresh_token: "synthetic-refreshed-refresh",
+        }),
+      );
+      return;
+    }
+    if (request.url !== "/v1/responses" && request.method === "POST") {
+      request.resume();
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end("{}");
+      return;
+    }
+    void serveFixture({
+      request,
+      response,
+      outcome,
+      observations: state.observations,
+      expectedInstructions: flags.adapterProfile ? WORKER_INSTRUCTIONS : instructions,
+    }).catch(() => response.destroy());
+  });
+  await new Promise<void>((done, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => done());
+  });
+  return server;
+}
+
+interface PreparedProbe {
+  argumentsList: string[];
+  environment: NodeJS.ProcessEnv;
+  prompt: string;
+  nativeExecutable?: string;
+  profile?: Awaited<ReturnType<typeof createCodexProfile>>;
+}
+
+async function prepareNativeProbe(options: {
+  fixture: Fixture;
+  flags: ProbeFlags;
+  mode: Mode;
+  outcome: Outcome;
+  baseUrl: string;
+}): Promise<PreparedProbe> {
+  const { fixture, flags, mode, outcome, baseUrl } = options;
+  if (flags.adapterProfile) {
+    await execute("git", ["init", "-q", fixture.workspace]);
+  }
   let childHome = fixture.home;
   let childAgentHome = fixture.agentHome;
-  if (mode === "isolated") {
+  if (mode === "isolated" && !flags.adapterProfile) {
     childHome = join(fixture.root, "isolated-user");
     childAgentHome = join(fixture.root, "isolated-agent");
     await mkdir(childHome);
     await mkdir(childAgentHome);
     await symlink(join(fixture.agentHome, "auth.json"), join(childAgentHome, "auth.json"));
   }
-  const observations: Observation[] = [];
-  const server = createServer((request, response) => {
-    void serveFixture({ request, response, outcome, observations }).catch(() => response.destroy());
-  });
-  await new Promise<void>((done, reject) => {
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => done());
-  });
+  let argumentsList = [
+    "exec",
+    "--json",
+    "--ephemeral",
+    "--ignore-user-config",
+    "--ignore-rules",
+    "--skip-git-repo-check",
+    "--model",
+    outcome === "accumulated-context" ? "gpt-5.5" : "m2-fixture",
+    "--sandbox",
+    "workspace-write",
+    "--cd",
+    fixture.workspace,
+    "--output-schema",
+    fixture.schemaFile,
+    "--color",
+    "never",
+    ...configFor({ fixture, baseUrl, mode }),
+    ...(process.argv[3] === "catalog"
+      ? ["-c", `model_catalog_json=${JSON.stringify(fixture.catalogFile)}`]
+      : []),
+    "-",
+  ];
+  let environment: NodeJS.ProcessEnv = {
+    PATH: process.env.PATH,
+    HOME: childHome,
+    CODEX_HOME: childAgentHome,
+    TMPDIR: fixture.root,
+  };
+  let prompt =
+    "Perform only the explicit fixture task. Do not use $ambient-sentinel. Return the required report.";
+  let nativeExecutable: string | undefined;
+  let profile: Awaited<ReturnType<typeof createCodexProfile>> | undefined;
+  try {
+    if (flags.adapterProfile) {
+      nativeExecutable = await resolveCodexExecutable();
+      const executionRequest = conformanceRequest(fixture.workspace);
+      if (flags.adapterDiscovery) {
+        assert(executionRequest.context.task);
+        executionRequest.context.task.objective =
+          "Implement the bounded endpoint. An explicit mention of $ambient-sentinel or $ambient-ancestor must not import an unavailable skill.";
+      }
+      profile = await createCodexProfile({
+        request: executionRequest,
+        authFile: join(fixture.agentHome, "auth.json"),
+        model: "gpt-5.6-terra",
+        reasoningEffort: "medium",
+      });
+      assert.equal(profile.args.at(-1), "-");
+      argumentsList = [...profile.args.slice(0, -1), "-"];
+      argumentsList.splice(
+        -1,
+        0,
+        "-c",
+        `model_providers.anastom-openai.base_url=${JSON.stringify(`${baseUrl}/v1`)}`,
+      );
+      environment = profile.env;
+      prompt = profile.prompt;
+      if (flags.adapterDiscovery) {
+        assert(
+          profile.args
+            .join(" ")
+            .includes(join(fixture.root, ".agents", "skills", "ambient-ancestor", "SKILL.md")),
+        );
+      }
+      if (
+        flags.refresh ||
+        flags.managedConflict ||
+        flags.managedUnavailable ||
+        flags.managedConfig
+      ) {
+        argumentsList.splice(
+          -1,
+          0,
+          "-c",
+          `chatgpt_base_url=${JSON.stringify(`${baseUrl}/backend-api`)}`,
+        );
+        if (flags.refresh) {
+          environment.CODEX_REFRESH_TOKEN_URL_OVERRIDE = `${baseUrl}/refresh`;
+          const status = await execute(nativeExecutable, ["login", "status"], {
+            env: environment,
+            cwd: fixture.workspace,
+          });
+          assert.match(
+            status.stdout + status.stderr,
+            /ChatGPT/,
+            "Synthetic file-backed subscription was not loaded",
+          );
+        }
+      }
+    }
+    return { argumentsList, environment, prompt, nativeExecutable, profile };
+  } catch (error) {
+    await profile?.dispose();
+    throw error;
+  }
+}
+
+async function verifyNativeProbe(options: {
+  flags: ProbeFlags;
+  fixture: Fixture;
+  mode: Mode;
+  outcome: Outcome;
+  state: ProbeState;
+  prompt: string;
+  policy?: PolicyResult;
+  result: NativeResult;
+}): Promise<void> {
+  const { flags, fixture, mode, outcome, state, prompt, policy, result } = options;
+  if (flags.managedConflict) {
+    assert(policy && !policy.timedOut, "Policy inspection timed out");
+    assert.equal(state.cloudCount, 1, "Synthetic managed cloud bundle was not loaded");
+    assert.equal(state.observations.length, 1, "Managed fixture made unexpected model requests");
+    assert.equal(
+      state.observations[0]?.managedInherited,
+      true,
+      "Managed instructions were not inherited",
+    );
+  } else {
+    assertProbeEvidence({ mode, outcome, observations: state.observations, result });
+    if (flags.adapterDiscovery) {
+      assert(prompt.includes("$ambient-sentinel") && prompt.includes("$ambient-ancestor"));
+      assert.equal(
+        state.observations.some((observation) => observation.ambientInherited),
+        false,
+      );
+    }
+    if (policy) {
+      assert.equal(policy.requirementsPresent, false, "Unexpected managed requirements");
+      assert.equal(policy.errors, 0, "Policy inspection failed");
+    }
+  }
+  if (flags.refresh) {
+    assert(state.refreshCount > 0, "Synthetic token refresh was not attempted");
+    const original = JSON.parse(await readFile(join(fixture.agentHome, "auth.json"), "utf8")) as {
+      tokens?: { access_token?: unknown };
+    };
+    assert.equal(original.tokens?.access_token, refreshedAccessToken);
+  }
+}
+
+async function probe(mode: Mode, outcome: Outcome): Promise<void> {
+  const flags = flagsFor(process.argv[3]);
+  const fixture = await createFixture(planFor(flags), flags.refresh);
+  const state: ProbeState = {
+    observations: [],
+    refreshCount: 0,
+    cloudCount: 0,
+    auxiliaryPaths: [],
+  };
+  const server = await startProbeServer({ flags, outcome, state });
+  let prepared: PreparedProbe | undefined;
   try {
     const address = server.address();
     assert(address && typeof address !== "string");
-    const argumentsList = [
-      "exec",
-      "--json",
-      "--ephemeral",
-      "--ignore-user-config",
-      "--ignore-rules",
-      "--skip-git-repo-check",
-      "--model",
-      outcome === "accumulated-context" ? "gpt-5.5" : "m2-fixture",
-      "--sandbox",
-      "workspace-write",
-      "--cd",
-      fixture.workspace,
-      "--output-schema",
-      fixture.schemaFile,
-      "--color",
-      "never",
-      ...configFor({ fixture, baseUrl: `http://127.0.0.1:${address.port}`, mode }),
-      ...(process.argv[3] === "catalog"
-        ? ["-c", `model_catalog_json=${JSON.stringify(fixture.catalogFile)}`]
-        : []),
-      "-",
-    ];
+    prepared = await prepareNativeProbe({
+      fixture,
+      flags,
+      mode,
+      outcome,
+      baseUrl: `http://127.0.0.1:${address.port}`,
+    });
+    const { argumentsList, environment, prompt, nativeExecutable } = prepared;
+    const promptInput =
+      flags.adapterProfile && !flags.refresh && !flags.managedConflict
+        ? await inspectPromptInput({
+            fixture,
+            argumentsList,
+            environment,
+            prompt,
+            nativeExecutable,
+          })
+        : undefined;
+    if (promptInput) {
+      assert.equal(promptInput.ambientInherited, false);
+      assert.equal(promptInput.explicitContextPresent, true);
+      assert.equal(promptInput.developerInstructionsPresent, true, JSON.stringify(promptInput));
+    }
+    const policy =
+      flags.managedConflict ||
+      flags.managedUnavailable ||
+      flags.managedConfig ||
+      (flags.adapterProfile && outcome === "success" && !flags.refresh)
+        ? await inspectPolicy({
+            fixture,
+            argumentsList,
+            environment,
+            nativeExecutable: nativeExecutable!,
+          })
+        : undefined;
+    if (flags.managedConflict || flags.managedConfig) {
+      assert(prepared.profile && nativeExecutable);
+      await assert.rejects(
+        inspectCodexPolicy({
+          executable: nativeExecutable,
+          profile: { ...prepared.profile, args: argumentsList },
+          workspace: fixture.workspace,
+        }),
+        (error: unknown) =>
+          error instanceof RuntimePreflightError && error.category === "policy-violation",
+      );
+      assert.equal(state.observations.length, 0, "Product gate unexpectedly called a model");
+    }
+    if (flags.managedUnavailable || flags.managedConfig) {
+      assert(policy, "Policy inspection did not complete");
+      assert.equal(state.observations.length, 0, "Policy inspection unexpectedly called a model");
+      await writeFile(
+        join(fixture.root, "probe-summary.json"),
+        JSON.stringify({ policy, cloudCount: state.cloudCount }, null, 2),
+      );
+      console.log(
+        JSON.stringify({ mode, outcome, root: fixture.root, policy, cloudCount: state.cloudCount }),
+      );
+      return;
+    }
     const result = await runNative({
       fixture,
       argumentsList,
-      environment: {
-        PATH: process.env.PATH,
-        HOME: childHome,
-        CODEX_HOME: childAgentHome,
-        TMPDIR: fixture.root,
-      },
+      environment,
+      prompt,
+      nativeExecutable,
     });
-    assertProbeEvidence({ mode, outcome, observations, result });
+    await verifyNativeProbe({ flags, fixture, mode, outcome, state, prompt, policy, result });
     await writeFile(
       join(fixture.root, "probe-summary.json"),
-      JSON.stringify({ mode, outcome, observations, result }, null, 2),
+      JSON.stringify(
+        {
+          mode,
+          outcome,
+          observations: state.observations,
+          promptInput,
+          policy,
+          result,
+          refreshCount: state.refreshCount,
+          cloudCount: state.cloudCount,
+        },
+        null,
+        2,
+      ),
     );
     console.log(
       JSON.stringify({
         mode,
         outcome,
         root: fixture.root,
-        requestCount: observations.length,
-        ambientInherited: observations.some((observation) => observation.ambientInherited),
+        requestCount: state.observations.length,
+        ambientInherited: state.observations.some((observation) => observation.ambientInherited),
         exit: result.exit,
         nativeCacheWrite: result.usage?.cache_write_input_tokens,
+        managedInherited: state.observations.some((observation) => observation.managedInherited),
+        cloudCount: state.cloudCount,
+        policy,
       }),
     );
   } finally {
+    await prepared?.profile?.dispose();
     server.closeAllConnections();
     await new Promise<void>((done) => server.close(() => done()));
   }
@@ -545,6 +1185,23 @@ async function probe(mode: Mode, outcome: Outcome): Promise<void> {
 
 if (process.argv[3] === "context" || process.argv[3] === "catalog") {
   await probe("isolated", "accumulated-context");
+} else if (process.argv[3] === "adapter-profile") {
+  await probe("isolated", "success");
+  await probe("isolated", "missing-usage");
+  await probe("isolated", "request-error");
+  await probe("isolated", "context-error");
+  await probe("isolated", "sse-context-error");
+  await probe("isolated", "accumulated-context");
+} else if (process.argv[3] === "adapter-discovery") {
+  await probe("isolated", "success");
+} else if (process.argv[3] === "adapter-refresh") {
+  await probe("isolated", "success");
+} else if (process.argv[3] === "managed-conflict") {
+  await probe("isolated", "success");
+} else if (process.argv[3] === "managed-unavailable") {
+  await probe("isolated", "success");
+} else if (process.argv[3] === "managed-config") {
+  await probe("isolated", "success");
 } else {
   await probe("original", "success");
   await probe("isolated", "success");

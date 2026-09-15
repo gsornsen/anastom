@@ -4,6 +4,8 @@ import type {
   ExecutionFailure,
   RuntimeEvent,
   WorkspaceRef,
+  RuntimeNegotiation,
+  RuntimeUsage,
 } from "@anastom/runtime-contract";
 import type { CommandReport } from "./command.js";
 import { assertRunEvent } from "./event-validation.js";
@@ -26,6 +28,10 @@ export interface AttemptState {
   runtimeId: string;
   status: AttemptStatus;
   failure?: ExecutionFailure;
+  /** Ordered identity evidence; absent source in old histories remains unspecified. */
+  identity?: Extract<RuntimeEvent, { type: "metadata" }>[];
+  /** Final token observation, never an acceptance or billing decision. */
+  usage?: RuntimeUsage;
   timeout?: {
     cancellation?: "succeeded" | "failed" | "unavailable";
     lateStatus?: "succeeded" | "failed" | "blocked" | "cancelled";
@@ -58,6 +64,7 @@ export interface RunState {
   inputs: Record<string, JsonValue>;
   nodes: Record<string, NodeRunState>;
   workspace?: WorkspaceRef;
+  runtimeNegotiation?: RuntimeNegotiation;
   artifacts?: ArtifactRef[];
   workspaceObservation?: { headCommit: string; changedFiles: string[]; diffArtifactId: string };
 }
@@ -66,6 +73,7 @@ export interface RunState {
  * Typed transitions and evidence observations before run identity and sequence are attached.
  */
 export type RunEventPayload =
+  | { type: "RuntimeNegotiated"; negotiation: RuntimeNegotiation }
   | { type: "WorkspaceAssigned"; workspace: WorkspaceRef }
   | { type: "ArtifactProduced"; nodeId: string; attempt: number; artifact: ArtifactRef }
   | {
@@ -212,6 +220,15 @@ export function applyRunEvent(current: RunState | undefined, event: RunEvent): R
   state.sequence = event.sequence;
 
   switch (event.type) {
+    case "RuntimeNegotiated":
+      if (
+        state.runtimeNegotiation ||
+        Object.values(state.nodes).some((node) => node.attempts.length)
+      ) {
+        throw new InvalidTransitionError("Runtime negotiation must occur once before attempts");
+      }
+      state.runtimeNegotiation = structuredClone(event.negotiation);
+      break;
     case "WorkspaceAssigned":
     case "ArtifactProduced":
     case "WorkspaceObserved":
@@ -427,7 +444,16 @@ function applyAttemptEvent(state: RunState, event: AttemptEvent): void {
     case "RuntimeEventObserved": {
       const node = requireNode(state, event.nodeId);
       requireNodeStatus(node, event.type, ["running"]);
-      requireCurrentAttempt(node, event.attempt, "running");
+      const attempt = requireCurrentAttempt(node, event.attempt, "running");
+      if (event.event.type === "usage") {
+        if (attempt.usage) {
+          throw new InvalidTransitionError("An attempt may have only one final usage observation");
+        }
+        attempt.usage = structuredClone(event.event);
+      }
+      if (event.event.type === "metadata") {
+        (attempt.identity ??= []).push(structuredClone(event.event));
+      }
       break;
     }
     case "AttemptSucceeded": {
