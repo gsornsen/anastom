@@ -26,7 +26,8 @@ const report = {
 };
 const instructions = "You are a bounded implementer. Follow only the explicit fixture envelope.";
 type Mode = "original" | "isolated";
-type Outcome = "success" | "missing-usage" | "request-error" | "context-error";
+type Outcome =
+  "success" | "missing-usage" | "request-error" | "context-error" | "accumulated-context";
 interface Observation {
   path: string;
   ambientInherited: boolean;
@@ -48,6 +49,7 @@ interface Fixture {
   skill: string;
   systemFile: string;
   schemaFile: string;
+  catalogFile: string;
 }
 
 async function createFixture(): Promise<Fixture> {
@@ -85,6 +87,35 @@ async function createFixture(): Promise<Fixture> {
   const schemaFile = join(root, "report-schema.json");
   await writeFile(systemFile, instructions);
   await writeFile(schemaFile, JSON.stringify(workerReportSchema));
+  const catalogFile = join(root, "bounded-model-catalog.json");
+  await writeFile(
+    catalogFile,
+    JSON.stringify({
+      models: [
+        {
+          slug: "gpt-5.5",
+          display_name: "Configured model",
+          description: null,
+          base_instructions: instructions,
+          supported_reasoning_levels: [],
+          shell_type: "unified_exec",
+          visibility: "list",
+          supported_in_api: true,
+          priority: 1,
+          support_verbosity: false,
+          default_verbosity: null,
+          truncation_policy: { mode: "bytes", limit: 10000 },
+          experimental_supported_tools: [],
+          context_window: null,
+          max_context_window: null,
+          auto_compact_token_limit: null,
+          include_apps_usage_instructions: false,
+          include_skills_usage_instructions: false,
+          include_plugin_usage_instructions: false,
+        },
+      ],
+    }),
+  );
   return {
     root,
     home,
@@ -93,18 +124,29 @@ async function createFixture(): Promise<Fixture> {
     skill: join(projectSkill, "SKILL.md"),
     systemFile,
     schemaFile,
+    catalogFile,
   };
 }
 
 function responseEvents(outcome: Outcome): Record<string, unknown>[] {
   const content = { type: "output_text", text: JSON.stringify(report), annotations: [] };
-  const message = {
-    id: "msg_fixture",
-    type: "message",
-    role: "assistant",
-    status: "completed",
-    content: [content],
-  };
+  const message =
+    outcome === "accumulated-context"
+      ? {
+          id: "fc_fixture",
+          type: "function_call",
+          call_id: "call_fixture",
+          name: "exec_command",
+          arguments: JSON.stringify({ cmd: "true", yield_time_ms: 1000, max_output_tokens: 64 }),
+          status: "completed",
+        }
+      : {
+          id: "msg_fixture",
+          type: "message",
+          role: "assistant",
+          status: "completed",
+          content: [content],
+        };
   return [
     {
       type: "response.created",
@@ -115,34 +157,38 @@ function responseEvents(outcome: Outcome): Record<string, unknown>[] {
       output_index: 0,
       item: { ...message, status: "in_progress", content: [] },
     },
-    {
-      type: "response.content_part.added",
-      item_id: "msg_fixture",
-      output_index: 0,
-      content_index: 0,
-      part: { ...content, text: "" },
-    },
-    {
-      type: "response.output_text.delta",
-      item_id: "msg_fixture",
-      output_index: 0,
-      content_index: 0,
-      delta: content.text,
-    },
-    {
-      type: "response.output_text.done",
-      item_id: "msg_fixture",
-      output_index: 0,
-      content_index: 0,
-      text: content.text,
-    },
-    {
-      type: "response.content_part.done",
-      item_id: "msg_fixture",
-      output_index: 0,
-      content_index: 0,
-      part: content,
-    },
+    ...(outcome === "accumulated-context"
+      ? []
+      : [
+          {
+            type: "response.content_part.added",
+            item_id: "msg_fixture",
+            output_index: 0,
+            content_index: 0,
+            part: { ...content, text: "" },
+          },
+          {
+            type: "response.output_text.delta",
+            item_id: "msg_fixture",
+            output_index: 0,
+            content_index: 0,
+            delta: content.text,
+          },
+          {
+            type: "response.output_text.done",
+            item_id: "msg_fixture",
+            output_index: 0,
+            content_index: 0,
+            text: content.text,
+          },
+          {
+            type: "response.content_part.done",
+            item_id: "msg_fixture",
+            output_index: 0,
+            content_index: 0,
+            part: content,
+          },
+        ]),
     { type: "response.output_item.done", output_index: 0, item: message },
     {
       type: "response.completed",
@@ -154,11 +200,11 @@ function responseEvents(outcome: Outcome): Record<string, unknown>[] {
           ? {}
           : {
               usage: {
-                input_tokens: 100,
+                input_tokens: outcome === "accumulated-context" ? 500000 : 100,
                 input_tokens_details: { cached_tokens: 20 },
                 output_tokens: 30,
                 output_tokens_details: { reasoning_tokens: 10 },
-                total_tokens: 130,
+                total_tokens: outcome === "accumulated-context" ? 500030 : 130,
               },
             }),
       },
@@ -214,7 +260,9 @@ async function serveFixture(options: {
     return;
   }
   response.writeHead(200, { "Content-Type": "text/event-stream" });
-  for (const event of responseEvents(outcome)) {
+  for (const event of responseEvents(
+    outcome === "accumulated-context" && observations.length > 1 ? "success" : outcome,
+  )) {
     response.write(`event: ${String(event.type)}\ndata: ${JSON.stringify(event)}\n\n`);
   }
   response.end();
@@ -366,6 +414,58 @@ async function runNative(options: {
   };
 }
 
+function assertProbeEvidence(options: {
+  mode: Mode;
+  outcome: Outcome;
+  observations: Observation[];
+  result: NativeResult;
+}): void {
+  const { mode, outcome, observations, result } = options;
+  assert(!result.timedOut, "Native fixture timed out");
+  assert(observations.length > 0, "No synthetic request observed");
+  assert(observations[0]?.boundedInstructions);
+  assert(observations[0]?.summaryMinimum === 30);
+  assert.equal(
+    observations.some((observation) => observation.ambientInherited),
+    mode === "original",
+  );
+  if (mode === "isolated" && outcome !== "accumulated-context") {
+    assert.equal(observations.length, 1, "Unexpected retry/compaction request");
+  }
+  if (outcome === "accumulated-context") {
+    assert.equal(result.exit, 0);
+    assert.equal(observations.length, process.argv[3] === "catalog" ? 2 : 3);
+    if (process.argv[3] === "catalog") {
+      assert(
+        observations.every((observation) => observation.summaryMinimum === 30),
+        "Continuation lost required report schema",
+      );
+    } else {
+      assert.equal(
+        observations[1]?.summaryMinimum,
+        undefined,
+        "Expected compaction request without report schema",
+      );
+    }
+  }
+  if (outcome !== "accumulated-context") {
+    assert(observations.every((observation) => observation.boundedInstructions));
+    assert(observations.every((observation) => observation.summaryMinimum === 30));
+    assert.equal(result.exit, outcome === "success" || outcome === "missing-usage" ? 0 : 1);
+  }
+  if (outcome === "success") {
+    assert.equal(result.usage?.cache_write_input_tokens, 0, "Expected native placeholder zero");
+  }
+  if (outcome === "missing-usage") {
+    const counters = Object.values(result.usage ?? {});
+    assert(counters.length > 0, "Expected synthesized native usage");
+    assert(
+      counters.every((counter) => counter === 0),
+      "Expected missing usage to become native zeros",
+    );
+  }
+}
+
 async function probe(mode: Mode, outcome: Outcome): Promise<void> {
   const fixture = await createFixture();
   let childHome = fixture.home;
@@ -396,7 +496,7 @@ async function probe(mode: Mode, outcome: Outcome): Promise<void> {
       "--ignore-rules",
       "--skip-git-repo-check",
       "--model",
-      "m2-fixture",
+      outcome === "accumulated-context" ? "gpt-5.5" : "m2-fixture",
       "--sandbox",
       "workspace-write",
       "--cd",
@@ -406,6 +506,9 @@ async function probe(mode: Mode, outcome: Outcome): Promise<void> {
       "--color",
       "never",
       ...configFor({ fixture, baseUrl: `http://127.0.0.1:${address.port}`, mode }),
+      ...(process.argv[3] === "catalog"
+        ? ["-c", `model_catalog_json=${JSON.stringify(fixture.catalogFile)}`]
+        : []),
       "-",
     ];
     const result = await runNative({
@@ -418,29 +521,7 @@ async function probe(mode: Mode, outcome: Outcome): Promise<void> {
         TMPDIR: fixture.root,
       },
     });
-    assert(!result.timedOut, "Native fixture timed out");
-    assert(observations.length > 0, "No synthetic request observed");
-    assert(observations.every((observation) => observation.boundedInstructions));
-    assert(observations.every((observation) => observation.summaryMinimum === 30));
-    assert.equal(
-      observations.some((observation) => observation.ambientInherited),
-      mode === "original",
-    );
-    if (mode === "isolated") {
-      assert.equal(observations.length, 1, "Unexpected retry/compaction request");
-    }
-    assert.equal(result.exit, outcome === "success" || outcome === "missing-usage" ? 0 : 1);
-    if (outcome === "success") {
-      assert.equal(result.usage?.cache_write_input_tokens, 0, "Expected native placeholder zero");
-    }
-    if (outcome === "missing-usage") {
-      const counters = Object.values(result.usage ?? {});
-      assert(counters.length > 0, "Expected synthesized native usage");
-      assert(
-        counters.every((counter) => counter === 0),
-        "Expected missing usage to become native zeros",
-      );
-    }
+    assertProbeEvidence({ mode, outcome, observations, result });
     await writeFile(
       join(fixture.root, "probe-summary.json"),
       JSON.stringify({ mode, outcome, observations, result }, null, 2),
@@ -462,8 +543,12 @@ async function probe(mode: Mode, outcome: Outcome): Promise<void> {
   }
 }
 
-await probe("original", "success");
-await probe("isolated", "success");
-await probe("isolated", "missing-usage");
-await probe("isolated", "request-error");
-await probe("isolated", "context-error");
+if (process.argv[3] === "context" || process.argv[3] === "catalog") {
+  await probe("isolated", "accumulated-context");
+} else {
+  await probe("original", "success");
+  await probe("isolated", "success");
+  await probe("isolated", "missing-usage");
+  await probe("isolated", "request-error");
+  await probe("isolated", "context-error");
+}

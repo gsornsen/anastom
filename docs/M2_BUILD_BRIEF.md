@@ -8,20 +8,20 @@ Build M2 only: execute the same strict Markdown Task through Pi or Codex, negoti
 
 ## Scope decisions to review
 
-| Ambiguity                             | Proposed boundary                                                                                                                                                                                            |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Capability negotiation versus routing | Validate the explicitly selected adapter against the fixed worker requirements below. Automatic selection and fallback remain M12.                                                                           |
-| Codex integration                     | One owned `codex exec --json` process group per attempt, using exact-pinned `@openai/codex@0.154.0`. ADR 0011 compares SDK and app-server alternatives.                                                      |
-| Model defaults and identity           | Codex uses its built-in OpenAI provider with paired explicit provider/model flags. Distinguish configured identity from provider-reported identity; Pi keeps its current defaults and optional paired flags. |
-| Unknown telemetry                     | Omit unavailable counters; identify partial coverage and documented inclusion semantics. Token-only observations are not prices or billing records.                                                          |
-| Abort versus stopped execution        | Cancellation resolves only after owned execution has stopped. Termination uncertainty prevents retry.                                                                                                        |
-| Ambient harness context               | Prove discovery suppression before live integration; inability to do so requires a reviewed contract/interface revision.                                                                                     |
+| Ambiguity                             | Proposed boundary                                                                                                                                                                                                                            |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Capability negotiation versus routing | Validate the explicitly selected adapter against the fixed worker requirements below. Automatic selection and fallback remain M12.                                                                                                           |
+| Codex integration                     | One owned `codex exec --json` process group per attempt, using exact-pinned `@openai/codex@0.154.0`. ADR 0011 compares SDK and app-server alternatives.                                                                                      |
+| Model defaults and identity           | Codex exposes OpenAI through the adapter-owned bounded provider profile with paired explicit provider/model flags. Distinguish configured identity from provider-reported identity; Pi keeps its current defaults and optional paired flags. |
+| Unknown telemetry                     | Omit unavailable counters; identify partial coverage and documented inclusion semantics. Token-only observations are not prices or billing records.                                                                                          |
+| Abort versus stopped execution        | Cancellation resolves only after owned execution has stopped. Termination uncertainty prevents retry.                                                                                                                                        |
+| Ambient harness context               | Prove discovery suppression before live integration; inability to do so requires a reviewed contract/interface revision.                                                                                                                     |
 
 These decisions are accepted design intent, not delivered APIs. Source and feasibility evidence appear in ADR 0011. The implementation must use the reviewed pin, or submit a justified pin update with equivalent evidence.
 
 The owner accepted Codex CLI as the supported interface, placed SDK reconsideration in the [blocked backlog](https://github.com/gsornsen/anastom/issues/12), and added [M2.5 Claude Code CLI/SDK support](https://github.com/gsornsen/anastom/issues/13) after M2 and before M3. M2.5 must investigate supported subscription authentication during its separate design stage.
 
-The initial [offline feasibility audit](M2_FEASIBILITY.md) found discovery, reserved-provider tuning, and native telemetry limits. [ADR 0012](adr/0012-codex-discovery-and-authentication-profile.md) proposes a narrower profile for review. It does not silently replace the accepted provider/authentication boundary or mark the original feasibility gates complete.
+The initial [offline feasibility audit](M2_FEASIBILITY.md) found discovery, reserved-provider tuning, and native telemetry limits. [ADR 0012](adr/0012-codex-discovery-and-authentication-profile.md) was approved in PR #15 and merged as `c5ba209`. It refines the internal OpenAI provider, file-backed authentication and discovery boundaries. The accumulated-context audit reproduced hidden client compaction; [ADR 0013](adr/0013-codex-client-compaction-profile.md) proposes a supported owned-catalog control for review. Other feasibility gates remain required.
 
 ## Portability demonstration
 
@@ -60,7 +60,7 @@ Persist the accepted requirements and capability snapshot as a typed `RuntimeNeg
 
 Create `packages/runtime-codex` implementing the existing `RuntimeAdapter` lifecycle. Credentials remain in normal Codex authentication. Resolve the exact project dependency, verify its version, and reject an unsupported platform or missing executable with a typed diagnostic. Do not silently use a global installation.
 
-This Codex slice supports the built-in OpenAI provider with explicit model selection. Reject other provider IDs before state creation; custom Codex provider configuration is deferred. Pi retains its configured provider support.
+This Codex slice exposes OpenAI with explicit model selection through the accepted ADR 0012 internal provider profile. Reject other provider IDs before state creation; custom Codex provider configuration is deferred. Pi retains its configured provider support.
 
 Use a filesystem agent request and one fresh ephemeral execution per attempt. Set the owned worktree as cwd, use `shell: false`, provide the canonical context-derived prompt on stdin, and supply the exact required output schema through an adapter-owned file. Do not reconstruct a shell command, invoke a runtime-managed worktree, resume a thread, or continue an earlier attempt.
 
@@ -164,3 +164,5 @@ M2 is complete only when `M2_EVIDENCE.md` records:
 M2 has one selected worker and one command verifier. Do not implement automatic routing/fallback, crash recovery, leases, snapshots, pause/resume, multiple workers, nested methodologies, human orchestration gates, generalized evidence graphs, cost budgets, UI/server/cloud surfaces, another real adapter, or automatic publication/versioning.
 
 Stop the design stage after this reviewable contract PR. Stop implementation after every listed M2 evidence item is recorded and the owner reviews the implementation PR. Recovery is the subsequent M3 milestone.
+
+The owner selected `gpt-5.6-terra` with `medium` reasoning effort for the Codex live run. Pi remains Anthropic / `claude-opus-4-8`. Model selection does not waive feasibility or independent verification requirements.

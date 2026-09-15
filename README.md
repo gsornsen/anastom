@@ -10,7 +10,7 @@ The goal is to make work that spans hours or days understandable, bounded, and r
 
 **Next: M2's portable-worker design is approved.** Implementation will add Codex CLI execution, capability checks for the selected runtime, shared adapter conformance tests, and available token usage. See the [M2 build brief](docs/M2_BUILD_BRIEF.md); the Codex adapter is not implemented yet.
 
-The initial [offline CLI audit](docs/M2_FEASIBILITY.md) found configuration/discovery limits and a native usage placeholder. A narrower execution profile is [proposed for review](docs/adr/0012-codex-discovery-and-authentication-profile.md) before adapter implementation proceeds.
+The [offline CLI audit](docs/M2_FEASIBILITY.md) led to an [approved discovery/authentication profile](docs/adr/0012-codex-discovery-and-authentication-profile.md). An accumulated-context fixture then reproduced native compaction; [ADR 0013](docs/adr/0013-codex-client-compaction-profile.md) proposes a supported catalog control for review before live integration. Codex support remains under development.
 
 [Changelog](CHANGELOG.md) · [Roadmap](docs/MILESTONES.md) · [Design documents](#learn-more) · [Contributing](CONTRIBUTING.md)
 
