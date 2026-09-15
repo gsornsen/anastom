@@ -41,7 +41,7 @@
     "semver": "7.8.5",
     "typedoc": "0.28.20",
     "tsx": "^4.20.5",
-    "typescript": "^5.9.2",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.42.0",
     "vitest": "^4.1.11",
     "yaml": "2.9.1"
