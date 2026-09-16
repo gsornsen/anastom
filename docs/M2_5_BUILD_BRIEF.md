@@ -2,7 +2,7 @@
 
 ## Status and mission
 
-**Accepted for implementation by the owner on 2026-09-15 under [issue #13](https://github.com/gsornsen/anastom/issues/13); implementation and live evidence are ready for final evidence review.** M2 remains the compatibility baseline. [ADR 0015](adr/0015-claude-code-worker-profile.md) records the reviewed CLI decision, [feasibility](M2_5_FEASIBILITY.md) records official sources and native gates, and [M2.5 evidence](M2_5_EVIDENCE.md) records the provider-backed result. The owner approved this brief, ADR, live-call gate, implementation code, and contribution rights.
+**Completed and accepted by the owner on 2026-09-15 under [issue #13](https://github.com/gsornsen/anastom/issues/13).** M2 remains the compatibility baseline. [ADR 0015](adr/0015-claude-code-worker-profile.md) records the reviewed CLI decision, [feasibility](M2_5_FEASIBILITY.md) records official sources and native gates, and [M2.5 evidence](M2_5_EVIDENCE.md) records the provider-backed result. The owner approved this brief, ADR, live-call gate, implementation code, evidence, and contribution rights.
 
 Execute the same strict Markdown Task through one explicitly selected Claude Code worker. Preserve Anastom's capability preflight, immutable context, bounded lifecycle, engine-validated report, independent command verifier, durable event/artifact history, and later-process inspection. The third adapter is also the evidence base for any shared path-policy API; extract only rules that survive comparison across concrete path uses.
 

@@ -1,6 +1,6 @@
 # M2.5 Claude Code worker evidence
 
-Status: **completion evidence ready for owner review.** The implementation, native gates, provider-backed unchanged Task, durable replay and artifact checks, path-policy decision, and final-code CI are complete. The owner approved the code in [PR #21](https://github.com/gsornsen/anastom/pull/21) and permanently confirmed contribution rights. Review of this completed evidence record is the remaining milestone gate.
+Status: **complete and owner-accepted.** The implementation, native gates, provider-backed unchanged Task, durable replay and artifact checks, path-policy decision, final-code CI, and evidence review are complete. The owner approved the code and evidence in [PR #21](https://github.com/gsornsen/anastom/pull/21) and permanently confirmed contribution rights.
 
 ## Identities and environment
 
@@ -54,4 +54,4 @@ All four row-digest pairs were unchanged. The new adapter adds no SQLite table, 
 
 [ADR 0016](adr/0016-path-policy-after-third-adapter.md) compares operator sources, scenario file children, verifier `cwd`, run artifacts, Codex auth linking, both executable-provenance profiles, managed-policy inventory, and Claude Code's private native tool inputs. The narrow `@anastom/path-policy` existing-child resolver serves Fake `fromFile`, verifier `cwd`, and scoped core Task/Workflow/schema loaders where canonical-root, containment, internal-symlink, and existing-type rules match. The CLI treats its current directory as the authored source root; its breaking SemVer plan is explicit. Artifact later reads separately reject symlinked run-owned parents. Installed executables, native model file tools, auth stores, managed-policy inventory, and artifact creation retain their distinct policies.
 
-The owner reviewed and approved the code after the CodeQL remediation and deterministic cleanup fix. Contribution rights are permanently confirmed for owner-authored Anastom work. Final owner review of this evidence record remains before M2.5 is marked complete and PR #21 is merged.
+The owner reviewed and approved the code after the CodeQL remediation and deterministic cleanup fix, then reviewed and accepted every item in this evidence record. Contribution rights are permanently confirmed for owner-authored Anastom work. M2.5 is complete.
