@@ -2,7 +2,7 @@
 
 ## Status
 
-Process-ownership phase implemented and passing on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24) on 2026-09-16. The production-shaped supervisor-protocol phase also passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked [PR #25](https://github.com/gsornsen/anastom/pull/25). The SQLite lease, fencing, idempotency, and control-inbox contention phase passes on the same local/CI platforms in stacked [PR #26](https://github.com/gsornsen/anastom/pull/26), and the exact workspace-checkpoint phase passes there in stacked [PR #27](https://github.com/gsornsen/anastom/pull/27). The snapshot-plus-tail and corrupt-snapshot fallback phase passes locally on the owner macOS host; Linux and clean macOS CI are pending on its stacked change. Public M3 APIs remain unfrozen.
+All five model-free feasibility phases pass on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI. [PR #24](https://github.com/gsornsen/anastom/pull/24) establishes process ownership; stacked [PR #25](https://github.com/gsornsen/anastom/pull/25) proves the production-shaped supervisor protocol; stacked [PR #26](https://github.com/gsornsen/anastom/pull/26) proves SQLite lease, fencing, idempotency, and control contention; stacked [PR #27](https://github.com/gsornsen/anastom/pull/27) proves exact workspace checkpoints; and stacked [PR #28](https://github.com/gsornsen/anastom/pull/28) proves snapshot-plus-tail equality and corrupt-snapshot fallback. Feasibility is complete; public M3 schemas and package APIs remain unfrozen for the required separate contract review.
 
 The accepted [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) require evidence before choosing an execution-recovery interface. This document records that evidence. The process probe makes no provider request, reads no real authentication store, and changes no production runtime contract.
 
@@ -254,7 +254,7 @@ The production-shaped protocol confirms this candidate boundary on the observed 
 - Recovery trusts neither a launcher PID nor an unverified manifest. It checks host/boot identity, a production-grade process identity, process group, supervisor-issued execution capability, execution ID, lease generation, run-owned path, and manifest schema before requesting cleanup.
 - If both supervisor and authenticated execution leader are absent but a group may remain, recovery reports `unknown` and pauses. It never signals a bare numeric group.
 
-No public signature is fixed by this phase. Bounded public event/result relay and cancel/parent-death behavior now pass for Pi, Codex, Claude Code, and commands in the temporary run-owned boundary. Workspace identity has cross-platform evidence and snapshot fallback has local evidence, but snapshot cross-platform CI, final state-layout placement, and remaining production concerns remain gates before `RuntimeAdapter.recover()` is removed or replaced.
+No public signature is fixed by this phase. Bounded public event/result relay and cancel/parent-death behavior pass for Pi, Codex, Claude Code, and commands in the temporary run-owned boundary. Workspace identity and snapshot fallback also have cross-platform evidence. Final state-layout placement, rolling event integrity, and the remaining production concerns still require contract review before `RuntimeAdapter.recover()` is removed or replaced.
 
 ## Security and evidence limits
 
@@ -262,13 +262,12 @@ No public signature is fixed by this phase. Bounded public event/result relay an
 - A SHA-256 boot-identity digest is emitted to demonstrate same-boot binding without printing the source boot identifier. It is temporary console evidence and is not checked into the repository.
 - The probe's `ps` start token distinguishes ordinary PID reuse on the same identified host boot, but macOS exposes that value only to one-second precision. It is evidence for this experiment, not sufficient production authority. The production protocol must combine the strongest portable process identity available with a supervisor-issued random execution capability and host/boot binding, and it must fail closed when those cannot authenticate the intended process. Cross-host recovery remains rejected by ADR 0017.
 - The local run used synthetic adapter/session doubles and a generic supervisor worker. It proves lifecycle mechanics, not provider-session behavior or model quality.
-- The process, supervisor, SQLite, and workspace boundaries passed on Ubuntu 24.04 and macOS 15 in stacked PRs #24–#27.
+- The process, supervisor, SQLite, workspace, and snapshot boundaries passed on Ubuntu 24.04 and macOS 15 in stacked PRs #24–#28.
 - The workspace probe hashes ignored content in bounded feasibility memory; the production implementation must stream bounded reads and retain the same fail-closed outcomes.
 - Snapshot code is a repository-level candidate with a temporary state schema and no production migration. Runtime-descriptor reconstruction, production integration, and complete pause/cancel/resume semantics remain unproved.
 
-## Next feasibility gates
+## Next contract gates
 
-1. Confirm the snapshot matrix on Ubuntu 24.04 and clean macOS 15 CI.
-2. Resolve production process identity, socket placement/path length, bounded operational-record loading, and rolling event-prefix integrity before promoting the prototypes into package contracts.
-3. Propose exact schemas and package APIs in a separate review step; do not combine that contract review with production implementation.
-4. Revise ADR 0017 and the M3 build brief if any later evidence contradicts the accepted boundaries.
+1. Resolve production process identity, socket placement/path length, bounded operational-record loading, and rolling event-prefix integrity before promoting the prototypes into package contracts.
+2. Propose exact schemas and package APIs in a separate review step; do not combine that contract review with production implementation.
+3. Revise ADR 0017 and the M3 build brief if implementation evidence contradicts the accepted boundaries.

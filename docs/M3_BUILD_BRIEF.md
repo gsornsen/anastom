@@ -2,7 +2,7 @@
 
 ## Status and mission
 
-**Accepted by the owner on 2026-09-16 under [issue #22](https://github.com/gsornsen/anastom/issues/22) and [PR #23](https://github.com/gsornsen/anastom/pull/23).** [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) records the accepted boundary. The recovery semantics are approved; exact runtime and persistence API shapes remain gated on the feasibility evidence below and must revise this brief if that evidence contradicts it.
+**Accepted by the owner on 2026-09-16 under [issue #22](https://github.com/gsornsen/anastom/issues/22) and [PR #23](https://github.com/gsornsen/anastom/pull/23).** [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) records the accepted boundary. All model-free feasibility phases pass on Linux and macOS in stacked PRs #24–#28. The recovery semantics are approved; exact runtime and persistence API shapes remain gated on a separate contract review and must revise this brief if implementation evidence contradicts it.
 
 Make a durable Task run survive abrupt coordinator termination. A later Anastom process must reconstruct the run, reject stale ownership, account for the interrupted attempt, preserve its evidence, and either continue as a fresh bounded attempt or stop with a precise reason why continuation is unsafe.
 
@@ -117,7 +117,7 @@ The execution loader may use the newest compatible valid snapshot and replay lat
 
 Compatibility tests open an M1, M2, and M2.5 fixture database, replay it without a snapshot, build one, reopen it, and obtain the same projection and definition digest.
 
-The model-free snapshot phase tests this candidate without a production migration or exported type. Locally on the owner macOS host, reopened M1/M2/M2.5-shaped histories and a pause/resume/cancel history produce snapshot-plus-tail state equal to full replay. Absent, unknown, malformed, oversized, digest-mismatched, identity-mismatched, prefix-mismatched, and tail-contradicting snapshots fall back. Invalid event envelopes and semantically corrupt authoritative history still fail. Linux and clean macOS CI remain required. The checked-in feasibility state schema and 4 MiB limit are inputs to contract review, not approved public constants.
+The model-free snapshot phase tests this candidate without a production migration or exported type. On the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #28, reopened M1/M2/M2.5-shaped histories and a pause/resume/cancel history produce snapshot-plus-tail state equal to full replay. Absent, unknown, malformed, oversized, digest-mismatched, identity-mismatched, prefix-mismatched, and tail-contradicting snapshots fall back. Invalid event envelopes and semantically corrupt authoritative history still fail. The checked-in feasibility state schema and 4 MiB limit are inputs to contract review, not approved public constants.
 
 ### Control request rules
 
@@ -129,7 +129,7 @@ The current owner notices the request while an adapter or command is active, app
 
 The model-free SQLite contention phase implements these rules in a temporary checked-in schema without changing the production migration or package contract. Across the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #26, pairs of real processes under `BEGIN IMMEDIATE` produced exactly one initial owner, one expired takeover winner, and one post-release generation-three owner. Current renewal succeeded while stale renewal and release failed. Concurrent identical mutation IDs returned one physical append and the same sequence range; a changed digest conflicted; wrong expected sequence left no partial event; and both pre-takeover and post-release generations were fenced from later appends. Duplicate control ID/action pairs returned one SQLite-assigned timestamp and row, while competing actions for one ID produced one winner and one conflict.
 
-The probe confirms that process liveness remains an input to takeover rather than a fact inferred from SQLite. After an external `absent` conclusion, the transaction still compares the observed owner, generation, expiry, and release state. Fence validation occurs before idempotent mutation replay, so an earlier generation cannot reuse a successful operation ID. The exact schema, error classes, and TypeScript signatures remain gated on snapshot evidence and final production integration review.
+The probe confirms that process liveness remains an input to takeover rather than a fact inferred from SQLite. After an external `absent` conclusion, the transaction still compares the observed owner, generation, expiry, and release state. Fence validation occurs before idempotent mutation replay, so an earlier generation cannot reuse a successful operation ID. The exact schema, error classes, and TypeScript signatures remain gated on a separate contract review and final production integration evidence.
 
 ## Runtime and process-ownership contract
 

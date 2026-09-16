@@ -1,6 +1,6 @@
 # 0017 — Durable execution ownership and recovery
 
-- Status: Accepted by the owner on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23); exact runtime ownership APIs remain gated on feasibility evidence
+- Status: Accepted by the owner on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23); feasibility passes in stacked PRs #24–#28, and exact APIs remain gated on separate contract review
 - Date: 2026-09-15
 
 ## Context
@@ -19,7 +19,7 @@ M3 needs a local durability contract that is stronger than replay and narrower t
 
 M3 recovery creates a new coordinator and, when safe, a newly numbered attempt with a fresh context. It does not promise to reconnect to an interrupted model conversation or continue under the same attempt identity.
 
-The existing optional `recover()` contract will be removed during M3 unless feasibility evidence establishes a concrete adopter with semantics stronger than session convenience. Runtime-specific session reattachment can return through a later reviewed capability. M3 instead needs an execution-ownership operation that can answer whether a previously recorded execution is active, absent, or unknown and can confirm termination when it is active. Exact method names remain gated on the process-ownership feasibility probe in the [M3 build brief](../M3_BUILD_BRIEF.md).
+The existing optional `recover()` contract will be removed during M3 unless a later concrete adopter establishes semantics stronger than session convenience. Runtime-specific session reattachment can return through a later reviewed capability. M3 instead needs an execution-ownership operation that can answer whether a previously recorded execution is active, absent, or unknown and can confirm termination when it is active. Exact method names remain gated on the separate contract review informed by the completed probes in the [M3 build brief](../M3_BUILD_BRIEF.md).
 
 An engine-generated execution ID is recorded before an adapter may cause model, command, or tool side effects. Adapter-owned process metadata may live in a run-owned operational record keyed by that ID, but credentials, private messages, reasoning, and tool bodies may not enter that record.
 
@@ -177,4 +177,4 @@ The fifth [M3 feasibility probe](../M3_FEASIBILITY.md) folds reopened M1/M2/M2.5
 
 The probe exposed one missing integrity field in the original decision: a state digest does not bind that state to the authoritative events it replaces. The refined candidate records the immutable workflow-definition digest and SHA-256 of the exact canonical event prefix alongside its schema/reducer version, sequence, canonical state, and state digest. A changed valid prefix therefore triggers full replay and produces the changed authoritative state. Invalid event shapes and gaps fail before snapshot selection; a semantic event contradiction behind a snapshot triggers prefix mismatch and remains rejected by fallback replay.
 
-Absent, malformed, unknown-version, oversized, digest-mismatched, schema-invalid, identity-mismatched, and tail-contradicting snapshots all fall back locally on Darwin arm64. Linux and clean macOS CI remain pending on the stacked change. No production table or package interface changes in this phase. A later contract proposal must settle rolling prefix integrity, bounded SQLite reads, stable write boundaries, fenced cache replacement, state-schema evolution, and exact error names before implementation.
+Absent, malformed, unknown-version, oversized, digest-mismatched, schema-invalid, identity-mismatched, and tail-contradicting snapshots all fall back on the owner Darwin arm64 host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #28. No production table or package interface changes in this phase. A later contract proposal must settle rolling prefix integrity, bounded SQLite reads, stable write boundaries, fenced cache replacement, state-schema evolution, and exact error names before implementation.
