@@ -2,7 +2,7 @@
 
 ## Status and objective
 
-This document describes the implemented control plane through M2.5. The accepted M3 durability design and model-free feasibility prototypes are labeled explicitly; M3 product behavior and exact API shapes are not implemented yet.
+This document describes the implemented control plane through M2.5. The accepted M3 durability design, model-free feasibility prototypes, and separately proposed [production contract](M3_PRODUCTION_CONTRACT.md) are labeled explicitly; M3 product behavior and exact API shapes are not implemented yet.
 
 Anastom keeps engineering policy independent from agent runtime implementation. The control plane owns authoritative state and verification; a runtime adapter owns one bounded agent loop.
 
@@ -225,7 +225,9 @@ A separate SQLite contention probe passes on the owner macOS host and Ubuntu/mac
 
 The workspace-checkpoint probe passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #27. It preserves the real staging index while identifying complete content relative to the run base, fingerprints bounded ignored files/directories and symlink targets, and binds the result to canonical repository/worktree ownership. Content or `HEAD` changes mismatch; branch, manifest, symlink-boundary, and registration changes reject capture; a clone with identical Git content has a different identity. The probe does not change the workspace package.
 
-The snapshot probe passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #28. For reopened M1/M2/M2.5-shaped and pause/resume/cancel histories, validated snapshot-plus-tail state equals full replay. Snapshot state is bound to the immutable workflow digest and exact event-prefix digest; invalid snapshots fall back, while corrupt authoritative events still fail. The probe does not add a migration or package API. All feasibility phases are now cross-platform; a separate contract review still gates production persistence and runtime changes.
+The snapshot probe passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #28. For reopened M1/M2/M2.5-shaped and pause/resume/cancel histories, validated snapshot-plus-tail state equals full replay. Snapshot state is bound to the immutable workflow digest and exact event-prefix digest; invalid snapshots fall back, while corrupt authoritative events still fail. The probe does not add a migration or package API. All feasibility phases are now cross-platform.
+
+The proposed [M3 production contract](M3_PRODUCTION_CONTRACT.md) turns that evidence into an exact review gate: a shared `@anastom/execution-host` owns POSIX supervision; engine-owned interfaces separate policy from SQLite and process infrastructure; adapter-owned descriptors use exact Allow Listed fields; event preparation precedes supervisor preparation and start authorization; and a distinct private-state-root path capability centralizes bounded run-owned records without generalizing unrelated executable or authentication paths. [ADR 0018](adr/0018-m3-production-contract-and-package-boundaries.md) remains proposed until owner review, and none of these shapes are implemented yet.
 
 Provider-session reattachment, automatic worktree reset, exactly-once external effects, force takeover, distributed scheduling, human gates, nested workflows, fan-out, shared integration, automatic capability routing, cost routing, circuit breakers beyond current attempt/duration limits, and a general evidence graph remain deferred.
 
