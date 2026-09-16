@@ -6,10 +6,10 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-async function macGroupHasLiveMembers(pid: number, deadline: number): Promise<boolean> {
-  // Darwin's group-wide kill(0) can return EPERM if any member cannot be signalled.
-  // Inspect the group instead of treating that error as proof of either state.
-  const { stdout } = await execFileAsync("/bin/ps", ["-axo", "pgid=,stat="], {
+async function groupHasLiveMembers(pid: number, deadline: number): Promise<boolean> {
+  // A successful group-wide kill(0) may identify only zombies. Inspect live status.
+  const executable = process.platform === "darwin" ? "/bin/ps" : "/usr/bin/ps";
+  const { stdout } = await execFileAsync(executable, ["-axo", "pgid=,stat="], {
     timeout: Math.max(1, Math.min(100, deadline - performance.now())),
     maxBuffer: 1_048_576,
   });
@@ -25,19 +25,19 @@ async function macGroupHasLiveMembers(pid: number, deadline: number): Promise<bo
 async function groupExists(pid: number, deadline: number): Promise<boolean> {
   try {
     process.kill(-pid, 0);
-    return true;
+    return await groupHasLiveMembers(pid, deadline);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ESRCH") {
       return false;
     }
-    if (process.platform === "darwin" && (error as NodeJS.ErrnoException).code === "EPERM") {
+    if ((error as NodeJS.ErrnoException).code === "EPERM") {
       try {
         if (performance.now() >= deadline) {
           throw new Error("Owned process group inspection exceeded its deadline", {
             cause: error,
           });
         }
-        return await macGroupHasLiveMembers(pid, deadline);
+        return await groupHasLiveMembers(pid, deadline);
       } catch (inspectionError) {
         throw new Error("Owned process group termination cannot be inspected", {
           cause: inspectionError,
@@ -48,13 +48,15 @@ async function groupExists(pid: number, deadline: number): Promise<boolean> {
   }
 }
 
-function signalGroup(pid: number, signal: NodeJS.Signals): void {
+async function signalGroup(pid: number, signal: NodeJS.Signals, deadline: number): Promise<void> {
   try {
     process.kill(-pid, signal);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
-      throw new Error("Owned process group could not be signalled", { cause: error });
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ESRCH" || (code === "EPERM" && !(await groupHasLiveMembers(pid, deadline)))) {
+      return;
     }
+    throw new Error("Owned process group could not be signalled", { cause: error });
   }
 }
 
@@ -71,19 +73,21 @@ export async function terminateOwnedGroup(
     return;
   }
   const started = performance.now();
-  const deadline = started + 300;
-  signalGroup(pid, "SIGTERM");
+  const deadline = started + 1000;
+  if (await groupExists(pid, deadline)) {
+    await signalGroup(pid, "SIGTERM", deadline);
+  }
   while ((await groupExists(pid, deadline)) && performance.now() - started < 100) {
     await delay(5);
   }
   if (await groupExists(pid, deadline)) {
-    signalGroup(pid, "SIGKILL");
+    await signalGroup(pid, "SIGKILL", deadline);
   }
   while ((await groupExists(pid, deadline)) && performance.now() < deadline) {
     await delay(5);
   }
   if (await groupExists(pid, deadline)) {
-    throw new Error("Owned process group termination was not confirmed within 300 ms");
+    throw new Error("Owned process group termination was not confirmed within 1000 ms");
   }
   if (waitForLeaderExit) {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -92,8 +96,8 @@ export async function terminateOwnedGroup(
         waitForLeaderExit,
         new Promise<never>((_done, reject) => {
           timer = setTimeout(
-            () => reject(new Error("Owned leader termination was not confirmed within 300 ms")),
-            Math.max(1, 300 - (performance.now() - started)),
+            () => reject(new Error("Owned leader termination was not confirmed within 1000 ms")),
+            Math.max(1, 1000 - (performance.now() - started)),
           );
         }),
       ]);
