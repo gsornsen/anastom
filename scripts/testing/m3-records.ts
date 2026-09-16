@@ -3,7 +3,17 @@ import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 export type M3RecordName =
+  | "attempt-plan.json"
+  | "execution-control.json"
+  | "execution-manifest.json"
+  | "execution-probe.json"
+  | "execution-terminal.json"
+  | "protocol-coordinator.json"
+  | "protocol-terminal.json"
   | "record.json"
+  | "side-effect.json"
+  | "start-authority.json"
+  | "start-release.json"
   | "worker.json"
   | "supervisor-owner.json"
   | "supervisor-ready.json"
