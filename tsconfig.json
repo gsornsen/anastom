@@ -18,6 +18,7 @@
       "@anastom/workspaces": ["packages/workspaces/src/index.ts"],
       "@anastom/runtime-pi": ["packages/runtime-pi/src/index.ts"],
       "@anastom/runtime-codex": ["packages/runtime-codex/src/index.ts"],
+      "@anastom/runtime-claude-code": ["packages/runtime-claude-code/src/index.ts"],
       "@anastom/runtime-contract": ["packages/runtime-contract/src/index.ts"],
       "@anastom/runtime-fake": ["packages/runtime-fake/src/index.ts"]
     },

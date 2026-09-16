@@ -215,6 +215,37 @@ describe("Durable task execution", () => {
     ],
     ["Codex with incomplete selection", ["--runtime", "codex", "--provider", "openai"]],
     [
+      "Claude Code without auth source",
+      ["--runtime", "claude-code", "--provider", "anthropic", "--model", "claude-opus-4-8"],
+    ],
+    [
+      "Claude Code with invalid auth source",
+      [
+        "--runtime",
+        "claude-code",
+        "--provider",
+        "anthropic",
+        "--model",
+        "claude-opus-4-8",
+        "--auth-source",
+        "automatic",
+      ],
+    ],
+    [
+      "Claude Code with unsupported provider",
+      [
+        "--runtime",
+        "claude-code",
+        "--provider",
+        "other",
+        "--model",
+        "claude-opus-4-8",
+        "--auth-source",
+        "subscription",
+      ],
+    ],
+    ["Pi with Claude auth source", ["--runtime", "pi", "--auth-source", "subscription"]],
+    [
       "fake with model flags",
       [
         "--runtime",

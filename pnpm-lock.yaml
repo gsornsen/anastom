@@ -62,6 +62,9 @@ importers:
       '@anastom/persistence':
         specifier: workspace:*
         version: link:../persistence
+      '@anastom/runtime-claude-code':
+        specifier: workspace:*
+        version: link:../runtime-claude-code
       '@anastom/runtime-codex':
         specifier: workspace:*
         version: link:../runtime-codex
@@ -118,6 +121,15 @@ importers:
       '@anastom/runtime-fake':
         specifier: workspace:*
         version: link:../runtime-fake
+
+  packages/runtime-claude-code:
+    dependencies:
+      '@anastom/core':
+        specifier: workspace:*
+        version: link:../core
+      '@anastom/runtime-contract':
+        specifier: workspace:*
+        version: link:../runtime-contract
 
   packages/runtime-codex:
     dependencies:
