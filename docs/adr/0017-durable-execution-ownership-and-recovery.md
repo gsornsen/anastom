@@ -138,3 +138,9 @@ Remote ownership, consensus clocks, queues, and cross-host process control would
 ## Review triggers
 
 Revisit this decision if feasibility cannot establish safe local process identity, an adapter cannot expose a durable execution identity before side effects, exact workspace comparison is insufficient on supported Git repositories, or snapshot loading cannot fail back to full replay without changing observable state.
+
+## Feasibility refinement — process ownership
+
+The first [M3 feasibility probe](../M3_FEASIBILITY.md) on 2026-09-16 found that Pi, Codex, Claude Code, and command descendants can all survive coordinator `SIGKILL`; current product handles are not durable. It also disproved direct-leader PID as a complete boundary by retaining a descendant after its verified group leader exited. The former identity could no longer authorize group signalling safely.
+
+A shared parent-death supervisor prototype observed the coordinator identity, terminated a TERM-resistant worker group and descendant, confirmed absence, and exited. The probe's `ps` start time is low-resolution on macOS, so it is not production authority by itself. M3 will evaluate this shared supervisor with a two-phase persisted start handshake, supervisor-issued random execution capability, and same-host/boot binding before defining adapter-specific recovery operations. Pi requires an out-of-process attempt host for equivalent descendant ownership. Linux/macOS CI, durable manifests, fenced start authorization, framed runtime IPC, and supervisor-failure cases remain gates; this refinement does not yet approve a public API.

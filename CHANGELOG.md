@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
+- Add a model-free M3 process-ownership probe across Pi, Codex, Claude Code, and command execution. It reproduces surviving descendants after coordinator death, disproves direct leader PID as a complete recovery identity, and establishes a shared parent-death supervisor as the next cross-platform feasibility candidate.
 - Owner-accepted M3 durable-execution contract with single-host fenced ownership, idempotent transitions, rebuildable snapshots, sanitized runtime reconstruction, orphan and workspace reconciliation, and explicit pause/cancel/resume semantics. Exact APIs remain gated on model-free process-ownership feasibility.
 - Complete a source-level Claude Code CLI worker with explicit subscription/API-key selection, signed-release native-byte attestation, model-free authentication and managed-policy preflight, bounded JSONL/public evidence, structured reports, and confirmed POSIX process cleanup. The owner accepted the subscription-backed unchanged M2 Task, independent verifier, and 9/9 durable artifact checks.
 - Add later-process historical M1/M2 store replay evidence and a proposed third-adapter path-policy decision before extracting a shared resolver.

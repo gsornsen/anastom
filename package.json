@@ -25,6 +25,7 @@
     "format:check": "prettier --check .",
     "hygiene": "tsx scripts/check-hygiene.ts",
     "docs:api": "tsx scripts/generate-api-docs.ts",
+    "probe:m3:process": "tsx scripts/probe-m3-process-ownership.ts",
     "changeset": "changeset",
     "version:packages": "changeset version",
     "test": "vitest run",

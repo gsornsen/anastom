@@ -136,16 +136,19 @@ Before public TypeScript signatures are frozen, a feasibility probe must exercis
 - how a later process distinguishes active, absent, and unknown without PID-reuse mistakes;
 - whether termination confirmation covers descendants and how long bounded cleanup takes.
 
-The likely contract replaces optional session `recover()` with adapter operations shaped around `inspectExecution(executionId)` and `terminateExecution(executionId)`. The probe may justify different names or a shared supervisor, but it may not weaken these outcomes:
+The first process-ownership probe is recorded in [M3 feasibility](M3_FEASIBILITY.md). It rejects persisting the current adapter handle or direct native leader PID as the complete recovery boundary: every current owner left a descendant after coordinator `SIGKILL`, and a separate leader-exit case retained a live group that its former leader identity could no longer authorize. A shared parent-death supervisor prototype cleaned a TERM-resistant leader and descendant on the observed macOS host. Linux and clean macOS CI remain gates.
+
+The next prototype therefore evaluates a shared Anastom attempt supervisor for agent and command attempts rather than cementing vendor-specific `inspectExecution()` methods. It must use an engine-generated execution ID, a run-owned atomic manifest, a two-phase start handshake, verified coordinator identity, and bounded framed IPC. Pi moves behind an out-of-process runtime host for this mode. The probe may still revise exact names or reject this candidate, but it may not weaken these outcomes:
 
 - the execution ID is known and persisted before side effects;
+- a supervisor identity is recorded under the current fence before worker launch is authorized;
 - inspection is model-free and does not read credential values;
 - `absent` is affirmative evidence, not a missing in-memory map entry;
 - `terminate` resolves only after the owned execution tree is gone;
 - `unknown` prevents retry;
 - a runtime advertises recovery support only after its concrete lifecycle passes the probe.
 
-Pi's in-process SDK and the two external CLIs may need different internal mechanisms. That difference stays behind the common outcome contract. The engine must not learn vendor process layouts.
+Pi's SDK and the two external CLIs may need different runtime-host protocol code, but OS ownership stays in the shared supervisor. Vendor process layouts do not enter the engine. A bare numeric PID, process-group ID, or low-resolution `ps` start time is never enough: authority combines same-host/boot identity, the strongest portable process identity available, a supervisor-issued random execution capability, execution ID, fence, and run-owned manifest. Recovery fails closed if that evidence cannot authenticate the intended process.
 
 Command execution follows the same ownership rule. A verifier that survived its coordinator is an external effect boundary and must be stopped or classified unknown before it can be run again.
 
