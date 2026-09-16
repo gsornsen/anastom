@@ -6,7 +6,7 @@ Anastom is building a local-first, vendor-neutral control plane for software-eng
 
 The goal is to make work that spans hours or days understandable, bounded, and recoverable, even as models and coding tools change.
 
-**Current stage: M2.5 is complete, and M3 durable execution is in design review.** Anastom can run the same strict Markdown Task through Pi, an exact-pinned Codex CLI worker, or an attested Claude Code CLI worker; check the selected runtime's capabilities before work starts; independently verify the result; and replay public identity and available token observations from durable history. The unchanged endpoint Task passed through all three owner-authenticated harnesses. See the [M2 completion evidence](docs/M2_EVIDENCE.md), [M2.5 completion evidence](docs/M2_5_EVIDENCE.md), and [M1 compatibility baseline](docs/M1_EVIDENCE.md).
+**Current stage: M2.5 is complete, and M3 durable-execution feasibility is beginning under an accepted design.** Anastom can run the same strict Markdown Task through Pi, an exact-pinned Codex CLI worker, or an attested Claude Code CLI worker; check the selected runtime's capabilities before work starts; independently verify the result; and replay public identity and available token observations from durable history. The unchanged endpoint Task passed through all three owner-authenticated harnesses. See the [M2 completion evidence](docs/M2_EVIDENCE.md), [M2.5 completion evidence](docs/M2_5_EVIDENCE.md), and [M1 compatibility baseline](docs/M1_EVIDENCE.md).
 
 The [offline CLI audit](docs/M2_FEASIBILITY.md) led to an [approved discovery/authentication profile](docs/adr/0012-codex-discovery-and-authentication-profile.md). An accumulated-context fixture reproduced native compaction, leading to the [accepted catalog control](docs/adr/0013-codex-client-compaction-profile.md). A managed-policy fixture then found hidden instructions despite native success; [accepted ADR 0014](docs/adr/0014-codex-managed-policy-preflight.md) adds a model-free policy gate before Codex execution. M2.5 added the separately installed Claude Code CLI with explicit subscription/API-key selection and fail-closed native, authentication, and managed-policy checks. This release supports one selected worker and one verifier. The proposed [M3 durability contract](docs/M3_BUILD_BRIEF.md) now defines the ownership, orphan, workspace, snapshot, pause, cancel, and resume questions that must be settled before crash recovery is implemented.
 
@@ -109,19 +109,19 @@ The demo implements `GET /health`, runs the fixture's acceptance tests, and leav
 
 Each milestone must produce a useful, testable demonstration. Planned milestones have no promised release dates.
 
-| Milestone                        | Status   | Outcome                                                                                                                                                |
-| -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **M0 — Skeleton**                | Complete | Validate workflows and execute deterministic fake runs.                                                                                                |
-| **M1 — Single worker**           | Complete | One Pi worker, fresh context, isolated Git worktree, command verification, SQLite history, and durable `status` / `inspect`.                           |
-| **M2 — Portable worker**         | Complete | The same Task through Pi/Codex CLI, selected-runtime capability checks, shared conformance, and available token usage.                                 |
-| **M2.5 — Claude Code worker**    | Complete | A third source adapter selects an end-user-installed CLI and explicit subscription/API-key mode; the unchanged Task passed live with durable evidence. |
-| **M3 — Durable execution**       | Design   | Define and prove safe recovery after interruption, with fenced ownership, orphan detection, snapshots, pause, cancel, and resume semantics.            |
-| **M4 — Defined SDLC**            | Planned  | Plan, delegate parallel work, integrate, review, and verify a feature.                                                                                 |
-| **M5 — Circuit breakers**        | Planned  | Detect repeated failure, enforce budgets, stop mutation, and escalate with evidence.                                                                   |
-| **M6 — Hypothesis debugging**    | Planned  | Maintain competing explanations and run experiments that distinguish them.                                                                             |
-| **M7 — Delegated TDD**           | Planned  | Separate planning and review from bounded implementation, with role-to-model configuration.                                                            |
-| **M8 — Mycelium bridge**         | Planned  | Translate selected Mycelium agents, skills, and workflows into portable Anastom resources.                                                             |
-| **M9–M12 — Further composition** | Planned  | Specialist councils, adversarial evaluation, nested methodologies, and adaptive routing.                                                               |
+| Milestone                        | Status      | Outcome                                                                                                                                                |
+| -------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **M0 — Skeleton**                | Complete    | Validate workflows and execute deterministic fake runs.                                                                                                |
+| **M1 — Single worker**           | Complete    | One Pi worker, fresh context, isolated Git worktree, command verification, SQLite history, and durable `status` / `inspect`.                           |
+| **M2 — Portable worker**         | Complete    | The same Task through Pi/Codex CLI, selected-runtime capability checks, shared conformance, and available token usage.                                 |
+| **M2.5 — Claude Code worker**    | Complete    | A third source adapter selects an end-user-installed CLI and explicit subscription/API-key mode; the unchanged Task passed live with durable evidence. |
+| **M3 — Durable execution**       | Feasibility | Prove the accepted safe-recovery design across process ownership, fenced state, workspace checkpoints, snapshots, pause, cancel, and resume.           |
+| **M4 — Defined SDLC**            | Planned     | Plan, delegate parallel work, integrate, review, and verify a feature.                                                                                 |
+| **M5 — Circuit breakers**        | Planned     | Detect repeated failure, enforce budgets, stop mutation, and escalate with evidence.                                                                   |
+| **M6 — Hypothesis debugging**    | Planned     | Maintain competing explanations and run experiments that distinguish them.                                                                             |
+| **M7 — Delegated TDD**           | Planned     | Separate planning and review from bounded implementation, with role-to-model configuration.                                                            |
+| **M8 — Mycelium bridge**         | Planned     | Translate selected Mycelium agents, skills, and workflows into portable Anastom resources.                                                             |
+| **M9–M12 — Further composition** | Planned     | Specialist councils, adversarial evaluation, nested methodologies, and adaptive routing.                                                               |
 
 M1 persistence enables inspection from later processes. Recovery of an attempt that was running during a crash is explicitly M3 work.
 

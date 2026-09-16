@@ -1,6 +1,6 @@
 # 0017 — Durable execution ownership and recovery
 
-- Status: Proposed for owner review in [issue #22](https://github.com/gsornsen/anastom/issues/22)
+- Status: Accepted by the owner on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23); exact runtime ownership APIs remain gated on feasibility evidence
 - Date: 2026-09-15
 
 ## Context

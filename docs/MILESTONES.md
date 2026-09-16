@@ -118,7 +118,7 @@ The source adapter invokes an end user's separately installed, unmodified Claude
 
 ## M3 — Durable execution: "Kill it and it comes back"
 
-Status: design proposed for owner review in [issue #22](https://github.com/gsornsen/anastom/issues/22). The [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) challenge the meanings of ownership, retry, workspace safety, snapshots, runtime reconstruction, and control idempotency before implementation begins.
+Status: design accepted by the owner on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23). The [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) settle the recovery semantics while gating exact APIs on process-ownership, workspace, and SQLite feasibility evidence.
 
 ### Demo
 

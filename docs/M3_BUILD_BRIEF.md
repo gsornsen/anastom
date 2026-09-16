@@ -2,7 +2,7 @@
 
 ## Status and mission
 
-**Proposed for owner review under [issue #22](https://github.com/gsornsen/anastom/issues/22). No M3 runtime or persistence API is approved by this draft.** [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) records the proposed boundary. Implementation starts only after the owner accepts the recovery semantics and the feasibility gates below either pass or cause this brief to be revised.
+**Accepted by the owner on 2026-09-16 under [issue #22](https://github.com/gsornsen/anastom/issues/22) and [PR #23](https://github.com/gsornsen/anastom/pull/23).** [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) records the accepted boundary. The recovery semantics are approved; exact runtime and persistence API shapes remain gated on the feasibility evidence below and must revise this brief if that evidence contradicts it.
 
 Make a durable Task run survive abrupt coordinator termination. A later Anastom process must reconstruct the run, reject stale ownership, account for the interrupted attempt, preserve its evidence, and either continue as a fresh bounded attempt or stop with a precise reason why continuation is unsafe.
 

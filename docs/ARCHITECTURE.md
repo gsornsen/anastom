@@ -2,7 +2,7 @@
 
 ## Status and objective
 
-This document describes the implemented control plane through M2.5. The proposed M3 durability extension is labeled explicitly and remains subject to owner review.
+This document describes the implemented control plane through M2.5. The accepted M3 durability design is labeled explicitly; its exact API shapes remain gated on feasibility evidence and are not implemented yet.
 
 Anastom keeps engineering policy independent from agent runtime implementation. The control plane owns authoritative state and verification; a runtime adapter owns one bounded agent loop.
 
@@ -111,7 +111,7 @@ type ExecutionRequest = {
 
 Runtime and model configuration resolve outside the workflow role. M2 added capability negotiation and made portability across Pi and Codex observable; M2.5 applied the same boundary to Claude Code.
 
-`recover` is optional contract space that no live adapter implements. SQLite durability supports cross-process `status` and `inspect`, but an attempt running during coordinator loss cannot yet continue. Proposed [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) removes session adoption from the M3 baseline and replaces it with fenced ownership plus evidence-backed execution reconciliation before a fresh attempt.
+`recover` is optional contract space that no live adapter implements. SQLite durability supports cross-process `status` and `inspect`, but an attempt running during coordinator loss cannot yet continue. Accepted [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) removes session adoption from the M3 baseline and replaces it with fenced ownership plus evidence-backed execution reconciliation before a fresh attempt.
 
 ## Runtime capabilities
 
@@ -207,7 +207,7 @@ events(run_id, sequence, event_type, event_json, recorded_at)
 
 `workflow_json` contains the normalized immutable definition. `workflow_digest` covers a canonical serialization of that definition. Database timestamps support operator inspection; event sequence remains the only transition ordering authority.
 
-Artifact bodies live below a per-run filesystem directory. Their digest and metadata enter the event stream. M0-M2.5 do not add mutable node, attempt, lease, snapshot, evidence, usage, or projection tables. Proposed M3 adds operational lease, idempotency, control-request, and snapshot records while preserving events as the workflow authority. The [M3 build brief](M3_BUILD_BRIEF.md) defines their different trust and lifecycle rules.
+Artifact bodies live below a per-run filesystem directory. Their digest and metadata enter the event stream. M0-M2.5 do not add mutable node, attempt, lease, snapshot, evidence, usage, or projection tables. Accepted M3 design adds operational lease, idempotency, control-request, and snapshot records while preserving events as the workflow authority. The [M3 build brief](M3_BUILD_BRIEF.md) defines their different trust and lifecycle rules.
 
 ## Failure semantics
 
@@ -215,9 +215,9 @@ Failures retain typed categories: runtime unavailable, model/provider, tool, sch
 
 Retry policy reacts to the category and budget. Exhaustion is fail-fast in M1. Repeating a failed instruction without a new recorded reason is not a recovery policy.
 
-## Proposed M3 durability boundary
+## Accepted M3 durability boundary
 
-M3 adds local single-host recovery after coordinator loss. It proposes an expiring run lease with a monotonically increasing fencing generation, durable sanitized runtime reconstruction, pre-attempt workspace checkpoints, typed orphan attempts, rebuildable state snapshots, and explicit pause/cancel/resume operations. A replacement attempt starts only after the former owner is absent, the old execution is stopped, the workspace still matches its checkpoint, and authored attempt budget remains. See the proposed [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md).
+M3 adds local single-host recovery after coordinator loss. Its accepted design uses an expiring run lease with a monotonically increasing fencing generation, durable sanitized runtime reconstruction, pre-attempt workspace checkpoints, typed orphan attempts, rebuildable state snapshots, and explicit pause/cancel/resume operations. A replacement attempt starts only after the former owner is absent, the old execution is stopped, the workspace still matches its checkpoint, and authored attempt budget remains. See the [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md).
 
 Provider-session reattachment, automatic worktree reset, exactly-once external effects, force takeover, distributed scheduling, human gates, nested workflows, fan-out, shared integration, automatic capability routing, cost routing, circuit breakers beyond current attempt/duration limits, and a general evidence graph remain deferred.
 
