@@ -2,7 +2,7 @@
 
 ## Status
 
-Process-ownership phase implemented and passing on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24) on 2026-09-16. The production-shaped supervisor-protocol phase also passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked [PR #25](https://github.com/gsornsen/anastom/pull/25). SQLite lease/idempotency contention, exact workspace checkpoints, and snapshot fallback remain later feasibility phases before public M3 APIs are frozen.
+Process-ownership phase implemented and passing on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24) on 2026-09-16. The production-shaped supervisor-protocol phase also passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked [PR #25](https://github.com/gsornsen/anastom/pull/25). The SQLite lease, fencing, idempotency, and control-inbox contention phase passes locally on the owner macOS host and awaits its stacked Linux/macOS CI result. Exact workspace checkpoints and snapshot fallback remain later feasibility phases before public M3 APIs are frozen.
 
 The accepted [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) require evidence before choosing an execution-recovery interface. This document records that evidence. The process probe makes no provider request, reads no real authentication store, and changes no production runtime contract.
 
@@ -30,6 +30,15 @@ pnpm test scripts/probe-m3-supervisor-protocol.test.ts
 ```
 
 It uses the same model-free adapter seams and no authentication store. The command runs four owners through successful result relay, explicit cancellation, and coordinator death, then kills the command supervisor to prove the uncertain-recovery boundary. Its Vitest boundary has a 120-second outer limit; the local matrix currently completes in about 13 seconds.
+
+The SQLite contention phase is independently reproducible with:
+
+```bash
+pnpm probe:m3:sqlite
+pnpm test scripts/probe-m3-sqlite-contention.test.ts
+```
+
+It creates a temporary database from a checked-in feasibility schema, releases pairs of real worker processes through explicit round barriers, uses injected logical time for lease expiry, and removes the database afterward. Its Vitest boundary has a 60-second outer limit; every internal readiness and completion wait is bounded, and the local 12-round matrix currently completes in about 3.2 seconds.
 
 The test has a 45-second outer limit. Every internal wait is bounded and driven by a file or process-state condition. No assertion infers readiness from a fixed sleep. Fixture programs are checked-in files; none is embedded in a string. Child fixtures accept only fixed behavior names, use their inherited canonical working directory as the authorized record root, and publish readiness JSON by atomic rename so readers cannot observe partial records.
 
@@ -130,6 +139,34 @@ The protocol phase establishes that one shared OS-ownership boundary can serve a
 
 Exact package types remain deliberately unfrozen. The temporary protocol uses POSIX local sockets and a fixture `ps` start token; socket path-length strategy, a stronger production process identity, placement beneath the final state layout, SQLite fencing integration, and bounded operational-record reads still need resolution before this becomes product code.
 
+## SQLite contention protocol
+
+The third probe isolates SQLite transaction behavior before the production migration and persistence API are chosen. A checked-in schema represents four distinct concerns: one mutable lease row, immutable append-only events, immutable mutation receipts, and immutable deduplicated control requests. Every lease or mutation operation opens the same WAL database from another process, sets a five-second busy timeout, and runs under `BEGIN IMMEDIATE`.
+
+Twelve two-process rounds established the following on Darwin arm64 with Node.js `v26.4.0`:
+
+| Boundary                                  | Observed result                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| initial acquire                           | exactly one generation-one owner                                                                  |
+| renew                                     | current owner extended expiry; wrong owner rejected                                               |
+| expired takeover                          | `alive` and `unknown` refused; two absent-owner contenders produced one generation-two owner      |
+| concurrent identical mutation             | both calls returned sequence 1–2; one append and one replay produced one physical mutation        |
+| changed payload / wrong expected sequence | both rejected without partial events                                                              |
+| stale fenced append                       | generation one rejected after takeover; generation two rejected after release and reacquisition   |
+| duplicate control request                 | same ID/action returned one SQLite timestamp and one row                                          |
+| conflicting control request               | same ID with `pause` versus `cancel` produced one accepted row and one idempotency conflict       |
+| release and reacquire                     | current generation released; stale release rejected; two contenders produced generation three     |
+| final immutable history                   | sequences 1–4 contiguous with generations `2,2,2,3`; three mutation receipts and two control rows |
+
+The experiment refines the persistence contract in four ways:
+
+1. Process liveness is established outside SQLite. An absent-owner takeover transaction must still compare the exact observed owner, generation, released flag, and expiry; another takeover or renewal that wins first invalidates the observation.
+2. Fence validation precedes mutation-ID replay. A stale generation cannot recover an old successful range by resubmitting the same operation ID.
+3. A current token cannot renew or append after its expiry. It may release while it remains the exact current row; a simultaneous takeover serializes first and makes that release stale.
+4. Control submission needs no lease. SQLite owns its recorded time, and `(run_id, operation_id)` deduplicates the inbox; the same action replays the original row while another action conflicts.
+
+The probe also rejects unsafe integer overflow in clock arithmetic, generations, and event sequences, validates exact worker request/response shapes, and caps append batch size. Its schema is feasibility support, not a migration proposal: it does not yet integrate existing run/event validation, snapshots, schema compatibility, or final error names. Those remain part of the reviewed persistence implementation after all evidence phases complete.
+
 ## Contract refinement from this phase
 
 The evidence rejects two narrower designs:
@@ -161,8 +198,8 @@ No public signature is fixed by this phase. Bounded public event/result relay an
 
 ## Next feasibility gates
 
-1. Prove SQLite lease acquisition, fencing, idempotent mutation keys, and control-request contention across real processes.
+1. Confirm SQLite lease acquisition, fencing, idempotent mutation keys, and control-request contention on both Linux and macOS CI.
 2. Prove exact workspace checkpoints across tracked, untracked, staged, committed, binary, and symlink changes.
 3. Prove snapshot-plus-tail equality and corrupt/unknown snapshot fallback to full event replay.
-4. Resolve production process identity, socket placement/path length, and bounded operational-record loading before promoting the prototype into package contracts.
-5. Revise ADR 0017 and the M3 build brief if any later evidence contradicts the shared-supervisor candidate.
+4. Resolve production process identity, socket placement/path length, and bounded operational-record loading before promoting the prototypes into package contracts.
+5. Revise ADR 0017 and the M3 build brief if any later evidence contradicts the accepted boundaries.

@@ -125,6 +125,10 @@ The current owner notices the request while an adapter or command is active, app
 
 `resume` is an ownership operation rather than a message to an active owner. It rejects a live owner, acquires a resumable paused/released/expired run, and uses an operation ID for its transition batches.
 
+The model-free SQLite contention phase implements these rules in a temporary checked-in schema without changing the production migration or package contract. On the owner macOS host, pairs of real processes under `BEGIN IMMEDIATE` produced exactly one initial owner, one expired takeover winner, and one post-release generation-three owner. Current renewal succeeded while stale renewal and release failed. Concurrent identical mutation IDs returned one physical append and the same sequence range; a changed digest conflicted; wrong expected sequence left no partial event; and both pre-takeover and post-release generations were fenced from later appends. Duplicate control ID/action pairs returned one SQLite-assigned timestamp and row, while competing actions for one ID produced one winner and one conflict. Linux and clean macOS CI remain required for this phase.
+
+The probe confirms that process liveness remains an input to takeover rather than a fact inferred from SQLite. After an external `absent` conclusion, the transaction still compares the observed owner, generation, expiry, and release state. Fence validation occurs before idempotent mutation replay, so an earlier generation cannot reuse a successful operation ID. The exact schema, error classes, and TypeScript signatures remain gated on workspace and snapshot evidence.
+
 ## Runtime and process-ownership contract
 
 Before public TypeScript signatures are frozen, a feasibility probe must exercise Pi, Codex, Claude Code, and command execution with model-free doubles. For each adapter it records:

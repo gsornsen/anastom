@@ -21,7 +21,7 @@ pnpm anastom validate examples/workflows/demo-feature.yaml
 pnpm anastom run examples/workflows/demo-feature.yaml --fake-scenario examples/fake/success.yaml
 ```
 
-Automated M1/M2/M2.5 tests use temporary Git repositories, deterministic Pi sessions, and Codex/Claude Code native-process doubles. M3 feasibility also kills deterministic coordinators, supervisors, and their owned fixture process groups to prove recovery boundaries. `pnpm probe:m3:process` exercises the initial ownership findings; `pnpm probe:m3:supervisor` exercises the production-shaped protocol. These tests must not call real models or require provider credentials. The [M1 demo guide](docs/M1_DEMO.md), [M2 completion evidence](docs/M2_EVIDENCE.md), [M2.5 evidence](docs/M2_5_EVIDENCE.md), and [M3 feasibility evidence](docs/M3_FEASIBILITY.md) document the separate integration and process-level checks.
+Automated M1/M2/M2.5 tests use temporary Git repositories, deterministic Pi sessions, and Codex/Claude Code native-process doubles. M3 feasibility also kills deterministic coordinators, supervisors, and their owned fixture process groups to prove recovery boundaries. `pnpm probe:m3:process` exercises the initial ownership findings; `pnpm probe:m3:supervisor` exercises the production-shaped protocol; and `pnpm probe:m3:sqlite` exercises real multi-process database contention with an isolated temporary schema. These tests must not call real models or require provider credentials. The [M1 demo guide](docs/M1_DEMO.md), [M2 completion evidence](docs/M2_EVIDENCE.md), [M2.5 evidence](docs/M2_5_EVIDENCE.md), and [M3 feasibility evidence](docs/M3_FEASIBILITY.md) document the separate integration and process-level checks.
 
 ## Engineering expectations
 
