@@ -2,7 +2,7 @@
 
 ## Status and objective
 
-This document describes the implemented M0 boundary and the accepted M1 extension. Later milestone ideas are labeled explicitly.
+This document describes the implemented control plane through M2.5. The proposed M3 durability extension is labeled explicitly and remains subject to owner review.
 
 Anastom keeps engineering policy independent from agent runtime implementation. The control plane owns authoritative state and verification; a runtime adapter owns one bounded agent loop.
 
@@ -26,9 +26,9 @@ Anastom keeps engineering policy independent from agent runtime implementation. 
                                 |
 +-------------------------------v-----------------------------+
 | Runtime adapter contract                                     |
-+-------------+---------------+-------------------------------+
-| Fake (M0)   | Pi (M1)       | Codex and others (later)      |
-+-------------+---------------+-------------------------------+
++-------------+---------------+-------------+-----------------+
+| Fake (M0)   | Pi (M1)       | Codex (M2)  | Claude (M2.5)   |
++-------------+---------------+-------------+-----------------+
                                 |
 +-------------------------------v-----------------------------+
 | Execution capabilities                                       |
@@ -45,7 +45,7 @@ Anastom keeps engineering policy independent from agent runtime implementation. 
 - **Attempt:** one execution attempt of a node.
 - **Role:** a semantic capability profile requested by an agent node.
 - **Runtime:** the harness used for one agent attempt.
-- **Model:** the LLM selected for an attempt; model selection remains adapter configuration in M1.
+- **Model:** the LLM selected for an attempt; model selection remains explicit adapter configuration outside the authored workflow.
 - **Context envelope:** the explicit immutable input to an attempt.
 - **Artifact:** a durable output such as a worker report, diff, log, or command result.
 - **Evidence:** an artifact or observation supporting a later decision; a general evidence graph is deferred.
@@ -63,20 +63,20 @@ The control plane must not delegate scheduling, retry policy, acceptance decisio
 
 ## Execution ownership
 
-M0 deliberately sends all four node kinds through the fake adapter so the scheduler and transition model can be tested without side effects. M1 replaces that test convenience with separate execution paths:
+M0 deliberately sends all four node kinds through the fake adapter so the scheduler and transition model can be tested without side effects. Durable Task execution uses separate execution paths:
 
-| Node kind  | M1 owner                       | M1 behavior                                                                                  |
-| ---------- | ------------------------------ | -------------------------------------------------------------------------------------------- |
-| `agent`    | `RuntimeAdapter`               | Pi executes one fresh bounded session in the assigned workspace.                             |
-| `command`  | control-plane command executor | Spawn an exact argument vector, capture bounded output, and decide success from exit status. |
-| `verifier` | fake adapter only              | General verifier plugins remain deferred; the M1 demo verifies with a `command` node.        |
-| `gate`     | fake adapter only              | Human approval, machine conditions, audit, and resume remain deferred.                       |
+| Node kind  | Current owner                  | Current behavior                                                                                         |
+| ---------- | ------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `agent`    | selected `RuntimeAdapter`      | Pi, Codex, or Claude Code executes one fresh bounded attempt in the assigned workspace.                  |
+| `command`  | control-plane command executor | Spawn an exact argument vector, capture bounded output, and decide success from exit status.             |
+| `verifier` | fake adapter only              | General verifier plugins remain deferred; delivered Task demonstrations verify with a `command` node.    |
+| `gate`     | fake adapter only              | Human approval, machine conditions, and audit remain deferred; M3 proposes operational pause and resume. |
 
-Unsupported executable node kinds must fail before an attempt starts. They must not fall back to Pi.
+Unsupported executable node kinds must fail before an attempt starts. They must not fall back to another adapter.
 
 ## Runtime adapter contract
 
-The implemented lifecycle is:
+The implemented lifecycle through M2.5 is:
 
 ```ts
 export interface RuntimeAdapter {
@@ -109,15 +109,15 @@ type ExecutionRequest = {
 };
 ```
 
-M1 does not add model selection to this request. Runtime and model configuration resolve outside the workflow role. M2 adds capability negotiation and makes portability across Pi and Codex observable.
+Runtime and model configuration resolve outside the workflow role. M2 added capability negotiation and made portability across Pi and Codex observable; M2.5 applied the same boundary to Claude Code.
 
-`recover` is optional contract space and is not implemented for live Pi attempts in M1. SQLite durability in M1 supports cross-process `status` and `inspect`; M3 defines ownership leases, orphan detection, and safe execution recovery.
+`recover` is optional contract space that no live adapter implements. SQLite durability supports cross-process `status` and `inspect`, but an attempt running during coordinator loss cannot yet continue. Proposed [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) removes session adoption from the M3 baseline and replaces it with fenced ownership plus evidence-backed execution reconciliation before a fresh attempt.
 
 ## Runtime capabilities
 
-Adapters declare observable capabilities such as streaming, cancellation, structured output, usage reporting, tool integrations, and sandboxing. M1's Pi adapter declares its enabled capabilities; the engine does not yet negotiate or persist a snapshot.
+Adapters declare observable capabilities such as streaming, cancellation, structured output, usage reporting, tool integrations, and sandboxing. The engine validates the explicitly selected adapter against the Task's requirements and persists the accepted capability snapshot before creating an attempt.
 
-The [proposed M2 contract](M2_BUILD_BRIEF.md) validates the explicitly selected adapter against a Task's fixed worker requirements and records the accepted snapshot before execution. It proposes shared adapter conformance and available token observations. These are not implemented yet. Automatic runtime/model routing and fallback remain M12.
+The completed [M2 contract](M2_BUILD_BRIEF.md) also provides shared adapter conformance and normalized available token observations. M2.5 demonstrates that a third source adapter can preserve the same control-plane boundary. Automatic runtime/model routing and fallback remain M12.
 
 ## Workspace contract
 
@@ -196,7 +196,7 @@ A result observed after the timeout may be retained as diagnostic evidence but c
 
 The append-only event stream remains the authoritative transition history. Run state is reconstructed by replaying events in sequence; projections and snapshots are derived data.
 
-M1 uses SQLite for two authoritative records:
+The current durable store uses SQLite for two authoritative records:
 
 ```text
 runs(run_id, workflow_digest, workflow_json, created_at)
@@ -207,7 +207,7 @@ events(run_id, sequence, event_type, event_json, recorded_at)
 
 `workflow_json` contains the normalized immutable definition. `workflow_digest` covers a canonical serialization of that definition. Database timestamps support operator inspection; event sequence remains the only transition ordering authority.
 
-Artifact bodies live below a per-run filesystem directory. Their digest and metadata enter the event stream. M1 does not add mutable node, attempt, lease, snapshot, evidence, usage, or projection tables. Those tables require a milestone that uses them.
+Artifact bodies live below a per-run filesystem directory. Their digest and metadata enter the event stream. M0-M2.5 do not add mutable node, attempt, lease, snapshot, evidence, usage, or projection tables. Proposed M3 adds operational lease, idempotency, control-request, and snapshot records while preserving events as the workflow authority. The [M3 build brief](M3_BUILD_BRIEF.md) defines their different trust and lifecycle rules.
 
 ## Failure semantics
 
@@ -215,8 +215,10 @@ Failures retain typed categories: runtime unavailable, model/provider, tool, sch
 
 Retry policy reacts to the category and budget. Exhaustion is fail-fast in M1. Repeating a failed instruction without a new recorded reason is not a recovery policy.
 
-## Deferred architecture
+## Proposed M3 durability boundary
 
-M1 does not implement Codex, human gates, nested workflows, fan-out, shared integration, capability routing, snapshots, execution leases, crash recovery, pause/resume, cost routing, circuit breakers beyond attempt and duration limits, or a general evidence graph.
+M3 adds local single-host recovery after coordinator loss. It proposes an expiring run lease with a monotonically increasing fencing generation, durable sanitized runtime reconstruction, pre-attempt workspace checkpoints, typed orphan attempts, rebuildable state snapshots, and explicit pause/cancel/resume operations. A replacement attempt starts only after the former owner is absent, the old execution is stopped, the workspace still matches its checkpoint, and authored attempt budget remains. See the proposed [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md).
+
+Provider-session reattachment, automatic worktree reset, exactly-once external effects, force takeover, distributed scheduling, human gates, nested workflows, fan-out, shared integration, automatic capability routing, cost routing, circuit breakers beyond current attempt/duration limits, and a general evidence graph remain deferred.
 
 The controlling decisions are recorded in `docs/adr/`. A later milestone may supersede an ADR with another ADR; it must not silently edit away the reason for the earlier choice.
