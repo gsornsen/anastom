@@ -104,7 +104,7 @@ This is the architectural proof that Anastom is not another harness.
 
 ## M2.5 — Claude Code worker: "Another supported harness"
 
-Status: native implementation in review after the owner accepted the design on 2026-09-15, following the owner's [design review](https://github.com/gsornsen/anastom/pull/11#discussion_r4002124447). Track completion in [issue #13](https://github.com/gsornsen/anastom/issues/13). [ADR 0015](adr/0015-claude-code-worker-profile.md) and the [M2.5 build brief](M2_5_BUILD_BRIEF.md) set the reviewed design; [partial native feasibility evidence](M2_5_FEASIBILITY.md) establishes model-free and synthetic checks, while the unchanged provider-backed Task and owner implementation review remain open.
+Status: complete and owner-accepted on 2026-09-15. [Issue #13](https://github.com/gsornsen/anastom/issues/13) is closed. [ADR 0015](adr/0015-claude-code-worker-profile.md) and the [M2.5 build brief](M2_5_BUILD_BRIEF.md) set the reviewed design; [native feasibility evidence](M2_5_FEASIBILITY.md) records model-free and synthetic checks; and [M2.5 completion evidence](M2_5_EVIDENCE.md) records the unchanged provider-backed Task, independent verifier, durable artifacts, clean source clone, and owner acceptance.
 
 ### Demo and deliverables
 
@@ -112,11 +112,13 @@ Run the unchanged Task through a Claude Code CLI and/or SDK adapter with the sam
 
 ### Boundary
 
-The source adapter invokes an end user's separately installed, unmodified Claude Code CLI with explicit subscription/API-key selection, without Anastom login, credential intermediation, request proxying, or resale. The remaining interpretation of Anthropic's third-party restrictions and the conservative managed-policy boundary need owner implementation review. Subscription mode has Read/Glob/Grep/Write/Edit under the tested native profile; bare API-key mode exposed Read/Edit only, so new-file creation is unavailable there. The exact native installation, selected subscription form, ordinary customization exclusion, file confinement, and process ownership have model-free or synthetic evidence; provider-backed acceptance still awaits the unchanged Task demonstration. [ADR 0016](adr/0016-path-policy-after-third-adapter.md) records the narrow shared existing-child resolver added after comparing the third worker's distinct path rules and the PR's operator-file CodeQL findings.
+The source adapter invokes an end user's separately installed, unmodified Claude Code CLI with explicit subscription/API-key selection, without Anastom login, credential intermediation, request proxying, or resale. Subscription mode has Read/Glob/Grep/Write/Edit under the tested native profile; bare API-key mode exposed Read/Edit only, so new-file creation is unavailable there. The exact native installation, selected subscription form, ordinary customization exclusion, file confinement, and process ownership have model-free or synthetic evidence. The owner-approved subscription-backed run completed the unchanged Task and independent verifier. [ADR 0016](adr/0016-path-policy-after-third-adapter.md) records the narrow shared existing-child resolver added after comparing the third worker's distinct path rules and the PR's operator-file CodeQL findings.
 
 ---
 
 ## M3 — Durable execution: "Kill it and it comes back"
+
+Status: design accepted by the owner on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23). The [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) settle the recovery semantics while gating exact APIs on process-ownership, workspace, and SQLite feasibility evidence.
 
 ### Demo
 
@@ -126,7 +128,7 @@ Start a run, terminate the Anastom process during worker execution, restart, the
 anastom resume <run>
 ```
 
-The workflow reconstructs state and continues safely.
+The workflow reconstructs state and continues as a newly numbered attempt only after the old owner, execution, workspace, and remaining budget are reconciled. Ambiguity pauses with evidence instead of starting a second worker.
 
 ### Deliverables
 

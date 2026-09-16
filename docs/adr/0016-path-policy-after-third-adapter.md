@@ -1,6 +1,6 @@
 # 0016 — Path-policy scope after a third worker
 
-- Status: Narrow API implemented in PR #21 after CodeQL findings; owner review of the changed CLI source scope remains required
+- Status: Accepted and implemented in PR #21 after CodeQL findings and owner review
 - Date: 2026-09-15
 
 ## Problem
@@ -31,4 +31,4 @@ Fake `fromFile` and engine verifier `cwd` share an existing child of a canonical
 
 CodeQL on PR #21 flagged existing operator-selected workflow/schema reads. The local CLI had treated every argument path as a trusted file, so an automated caller could make it read outside the intended authored source tree. The new scoped core loaders resolve the Task/Workflow and every schema through the same caller-authorized source root; the CLI chooses its current directory as that root. This tightens CLI file selection: users with an external source file run Anastom from its containing tree, while `--repo` continues to select the unrelated target checkout. Direct core loaders preserve trusted-caller behavior; remote hosts must use a scoped loader or enforce an equivalent file policy. The CLI change has an explicit breaking SemVer plan in the Changeset.
 
-The operation does not authorize the root itself or promise atomicity against a concurrent path replacement between resolution and file use. It is not used for creation, artifacts, auth stores, installed executables, managed-policy discovery, or private model tool paths. CodeQL's [path-injection guidance](https://codeql.github.com/codeql-query-help/javascript/js-path-injection/) recommends physical normalization and containment beneath a trusted root for complex child paths. The implementation uses that boundary rather than per-alert string filters; final CodeQL PR results and owner review determine acceptance.
+The operation does not authorize the root itself or promise atomicity against a concurrent path replacement between resolution and file use. It is not used for creation, artifacts, auth stores, installed executables, managed-policy discovery, or private model tool paths. CodeQL's [path-injection guidance](https://codeql.github.com/codeql-query-help/javascript/js-path-injection/) recommends physical normalization and containment beneath a trusted root for complex child paths. The accepted implementation uses that boundary rather than per-alert string filters; the PR's final CodeQL result and owner review passed.
