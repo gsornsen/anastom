@@ -16,6 +16,10 @@ describe("existing child of a trusted canonical root", () => {
       await symlink(join(root, "child", "inside.txt"), join(root, "internal.txt"));
       await symlink(outside, join(root, "escape.txt"));
       const canonical = await canonicalExistingRoot(root);
+      expect(await resolveExistingChild(canonical, ".", "directory")).toBe(canonical);
+      await expect(resolveExistingChild(canonical, ".", "file")).rejects.toMatchObject({
+        reason: "wrong-type",
+      });
       expect(await resolveExistingChild(canonical, "internal.txt", "file")).toBe(
         join(canonical, "child", "inside.txt"),
       );

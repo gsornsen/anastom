@@ -36,8 +36,14 @@ export async function resolveExistingChild(
     throw new PathPolicyError("invalid", "Child path is empty or contains a null byte");
   }
   const lexical = resolve(root, input);
+  if (lexical === root) {
+    if (expectedType !== "directory") {
+      throw new PathPolicyError("wrong-type", "Child is not an existing file");
+    }
+    return root;
+  }
   const boundary = root.endsWith(sep) ? root : root + sep;
-  if (lexical !== root && !lexical.startsWith(boundary)) {
+  if (!lexical.startsWith(boundary)) {
     throw new PathPolicyError("outside-root", "Child path escapes its trusted root");
   }
   const canonical = await realpath(lexical);
