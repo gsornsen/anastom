@@ -21,6 +21,8 @@ import { runCli, type DurableRunInspection } from "./index.js";
 const execute = promisify(execFile);
 const repositories: string[] = [];
 const cliEntrypoint = resolve("packages/cli/src/bin.ts");
+const cliProcessTimeoutMs = 15_000;
+const laterProcessTestTimeoutMs = 20_000;
 
 afterEach(async () => {
   for (const repository of repositories.splice(0)) {
@@ -53,7 +55,7 @@ async function runCliInNewProcess(args: string[], cwd = process.cwd()): Promise<
   const result = await execute(
     process.execPath,
     ["--import", import.meta.resolve("tsx"), cliEntrypoint, ...args],
-    { cwd, maxBuffer: 2_097_152 },
+    { cwd, maxBuffer: 2_097_152, timeout: cliProcessTimeoutMs, killSignal: "SIGKILL" },
   );
   return result.stdout;
 }
@@ -139,27 +141,29 @@ describe("Durable task execution", () => {
     expect(await readFile(diff.uri, "utf8")).toContain("/health");
   });
 
-  it("recovers status, definition digest, and ordered events in later processes", async () => {
-    const repository = await newEndpointRepository();
-    const output = await runCliInNewProcess(fakeTaskArguments(repository));
-    const runId = createdRunId(output);
+  it(
+    "recovers status, definition digest, and ordered events in later processes",
+    async () => {
+      const repository = await newEndpointRepository();
+      const output = await runCliInNewProcess(fakeTaskArguments(repository));
+      const runId = createdRunId(output);
 
-    const status = await runCliInNewProcess([
-      "status",
-      runId,
-      "--state-dir",
-      join(repository, ".anastom"),
-    ]);
-    const inspection = await inspectInNewProcess(runId, repository);
+      const [status, inspection, implicitStateDirectoryStatus] = await Promise.all([
+        runCliInNewProcess(["status", runId, "--state-dir", join(repository, ".anastom")]),
+        inspectInNewProcess(runId, repository),
+        runCliInNewProcess(["status", runId], repository),
+      ]);
 
-    expect(status).toContain("[succeeded]");
-    expect(inspection.state.status).toBe("succeeded");
-    expect(inspection.definitionDigest).toMatch(/^sha256:/);
-    expect(inspection.events.map((event) => event.sequence)).toEqual(
-      inspection.events.map((_, index) => index + 1),
-    );
-    expect(await runCliInNewProcess(["status", runId], repository)).toContain("[succeeded]");
-  });
+      expect(status).toContain("[succeeded]");
+      expect(inspection.state.status).toBe("succeeded");
+      expect(inspection.definitionDigest).toMatch(/^sha256:/);
+      expect(inspection.events.map((event) => event.sequence)).toEqual(
+        inspection.events.map((_, index) => index + 1),
+      );
+      expect(implicitStateDirectoryStatus).toContain("[succeeded]");
+    },
+    laterProcessTestTimeoutMs,
+  );
 
   it("retains the failed verifier's output and workspace when the worker makes no changes", async () => {
     const repository = await newEndpointRepository();
