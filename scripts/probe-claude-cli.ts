@@ -6,10 +6,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const RELEASE = "2.1.268";
-if (process.argv.length !== 2) {
-  throw new Error("The offline probe takes no arguments; install Claude Code on PATH");
+if (process.argv.length > 3 || (process.argv[2] && process.argv[2] !== "--stream-json")) {
+  throw new Error("Use --stream-json to probe native JSONL; install Claude Code on PATH");
 }
 const executable = "claude";
+const outputFormat = process.argv[2] === "--stream-json" ? "stream-json" : "json";
 
 const fixtureRoot = await mkdtemp(join(tmpdir(), "anastom-claude-offline-"));
 const workspace = join(fixtureRoot, "workspace");
@@ -18,6 +19,16 @@ await Promise.all([mkdir(workspace), mkdir(config)]);
 await writeFile(join(workspace, "CLAUDE.md"), "AMBIENT_SENTINEL project context\n");
 await writeFile(join(config, "CLAUDE.md"), "AMBIENT_SENTINEL user context\n");
 await mkdir(join(workspace, ".claude"));
+await mkdir(join(workspace, ".claude", "skills", "fixture-skill"), { recursive: true });
+await mkdir(join(workspace, ".claude", "agents"));
+await writeFile(
+  join(workspace, ".claude", "skills", "fixture-skill", "SKILL.md"),
+  "---\nname: fixture-skill\ndescription: Synthetic ignored skill\n---\nAMBIENT_SENTINEL skill\n",
+);
+await writeFile(
+  join(workspace, ".claude", "agents", "fixture-agent.md"),
+  "---\nname: fixture-agent\ndescription: Synthetic ignored agent\n---\nAMBIENT_SENTINEL agent\n",
+);
 await writeFile(
   join(workspace, ".claude", "probe-claude-hook.mjs"),
   await readFile(join(import.meta.dirname, "probe-claude-hook.mjs")),
@@ -145,7 +156,8 @@ try {
     "--no-session-persistence",
     "--print",
     "--output-format",
-    "json",
+    outputFormat,
+    ...(outputFormat === "stream-json" ? ["--verbose"] : []),
     "--json-schema",
     JSON.stringify({
       type: "object",
@@ -194,8 +206,17 @@ try {
     })
     .finally(() => clearTimeout(timer));
   let result: Record<string, unknown> | undefined;
+  let nativeFrames: Record<string, unknown>[] = [];
   try {
-    result = JSON.parse(stdout) as Record<string, unknown>;
+    if (outputFormat === "stream-json") {
+      nativeFrames = stdout
+        .trimEnd()
+        .split("\n")
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+      result = nativeFrames.at(-1);
+    } else {
+      result = JSON.parse(stdout) as Record<string, unknown>;
+    }
   } catch {
     // Preserve only bounded shape evidence in public output.
   }
@@ -203,6 +224,7 @@ try {
     () => true,
     () => false,
   );
+  const init = nativeFrames.find((frame) => frame.type === "system");
   process.stdout.write(
     JSON.stringify({
       release: RELEASE,
@@ -215,6 +237,32 @@ try {
       resultSubtype: result?.subtype,
       resultHasUsage: !!result?.usage,
       resultHasStructuredOutput: !!result?.structured_output,
+      outputFormat,
+      frameTypes: nativeFrames.map((frame) => ({ type: frame.type, subtype: frame.subtype })),
+      initKeys: Object.keys(init ?? {}),
+      initTools: Array.isArray(init?.tools) ? init.tools : [],
+      initMcpCount: Array.isArray(init?.mcp_servers) ? init.mcp_servers.length : undefined,
+      initAgentsCount:
+        init?.agents && typeof init.agents === "object"
+          ? Object.keys(init.agents).length
+          : undefined,
+      initSkillsCount: Array.isArray(init?.skills) ? init.skills.length : undefined,
+      initPluginsCount: Array.isArray(init?.plugins) ? init.plugins.length : undefined,
+      fixtureAgentPresent: !!init?.agents && JSON.stringify(init.agents).includes("fixture-agent"),
+      fixtureSkillPresent: !!init?.skills && JSON.stringify(init.skills).includes("fixture-skill"),
+      assistantBlockTypes: nativeFrames.flatMap((frame) => {
+        if (frame.type !== "assistant" || !frame.message || typeof frame.message !== "object") {
+          return [];
+        }
+        const message = frame.message as Record<string, unknown>;
+        return Array.isArray(message.content)
+          ? message.content.map((block: unknown) =>
+              block && typeof block === "object" && "type" in block ? block.type : "unknown",
+            )
+          : [];
+      }),
+      resultUsageKeys:
+        result?.usage && typeof result.usage === "object" ? Object.keys(result.usage) : [],
       stdoutBytes,
       stderrBytes,
     }) + "\n",

@@ -9,7 +9,7 @@ M1 proves the single-worker contract through Pi. M2 must demonstrate the same Ta
 
 ## Accepted decision
 
-Use the documented `codex exec --json` interface behind `packages/runtime-codex`, with the official `@openai/codex` executable package pinned to the inspected `0.154.0` baseline. Own one process group per attempt on Linux/macOS, frame and validate bounded JSONL, whitelist public observations, and validate the final report with Anastom's schema. The process seam is injectable for deterministic tests.
+Use the documented `codex exec --json` interface behind `packages/runtime-codex`, with the official `@openai/codex` executable package pinned to the inspected `0.154.0` baseline. Own one process group per attempt on Linux/macOS, frame and validate bounded JSONL, allowlist public observations, and validate the final report with Anastom's schema. The process seam is injectable for deterministic tests.
 
 Keep runtime/model selection outside authored Tasks. Codex uses its built-in OpenAI provider and requires explicit paired `--provider` and `--model` selections in this slice so ignoring user configuration does not select an unrecorded default. Pi's existing configured providers and selection behavior remain compatible. Record whether identity is configured or reported; a configured model name must not be represented as provider-confirmed identity.
 
