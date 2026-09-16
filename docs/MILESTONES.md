@@ -118,7 +118,7 @@ The source adapter invokes an end user's separately installed, unmodified Claude
 
 ## M3 — Durable execution: "Kill it and it comes back"
 
-Status: design accepted by the owner on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23). The [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) settle the recovery semantics while gating exact APIs on feasibility evidence. The first [process-ownership probe](M3_FEASIBILITY.md) rejects current handles and leader-only PIDs and advances a shared parent-death supervisor candidate to Linux/macOS CI.
+Status: design accepted by the owner on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23). The [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) settle the recovery semantics while gating exact APIs on feasibility evidence. The first [process-ownership probe](M3_FEASIBILITY.md) rejects current handles and leader-only PIDs; its shared parent-death supervisor candidate passes on Ubuntu 24.04 and macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24). The production-shaped protocol and remaining persistence/workspace probes are next.
 
 ### Demo
 

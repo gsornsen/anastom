@@ -2,7 +2,7 @@
 
 ## Status
 
-Process-ownership phase implemented and passing on the owner macOS host on 2026-09-16. Linux and clean macOS CI remain acceptance gates for this phase. SQLite lease/idempotency contention, exact workspace checkpoints, snapshot fallback, and a production-shaped supervisor IPC protocol remain later feasibility phases before public M3 APIs are frozen.
+Process-ownership phase implemented and passing on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24) on 2026-09-16. SQLite lease/idempotency contention, exact workspace checkpoints, snapshot fallback, and a production-shaped supervisor IPC protocol remain later feasibility phases before public M3 APIs are frozen.
 
 The accepted [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) require evidence before choosing an execution-recovery interface. This document records that evidence. The process probe makes no provider request, reads no real authentication store, and changes no production runtime contract.
 
@@ -111,7 +111,7 @@ No public signature is fixed by this phase. The next prototype must relay bounde
 - A SHA-256 boot-identity digest is emitted to demonstrate same-boot binding without printing the source boot identifier. It is temporary console evidence and is not checked into the repository.
 - The probe's `ps` start token distinguishes ordinary PID reuse on the same identified host boot, but macOS exposes that value only to one-second precision. It is evidence for this experiment, not sufficient production authority. The production protocol must combine the strongest portable process identity available with a supervisor-issued random execution capability and host/boot binding, and it must fail closed when those cannot authenticate the intended process. Cross-host recovery remains rejected by ADR 0017.
 - The local run used synthetic adapter/session doubles and a generic supervisor worker. It proves lifecycle mechanics, not provider-session behavior or model quality.
-- macOS results do not establish Linux portability. The same Vitest boundary is added to the existing Ubuntu and macOS jobs; both must pass before this phase is accepted.
+- The same Vitest boundary passed on Ubuntu 24.04 and macOS 15 in PR #24. That establishes portability of this probe and prototype behavior on the supported CI hosts; the production-shaped supervisor protocol must pass both again.
 - The probe intentionally leaves SQLite fencing, snapshot correctness, workspace checkpoints, runtime-descriptor reconstruction, and complete pause/cancel/resume semantics unproved.
 
 ## Next feasibility gates
