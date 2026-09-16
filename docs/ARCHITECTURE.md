@@ -2,7 +2,7 @@
 
 ## Status and objective
 
-This document describes the implemented control plane through M2.5. The accepted M3 durability design is labeled explicitly; its exact API shapes remain gated on feasibility evidence and are not implemented yet.
+This document describes the implemented control plane through M2.5. The accepted M3 durability design and model-free feasibility prototypes are labeled explicitly; M3 product behavior and exact API shapes are not implemented yet.
 
 Anastom keeps engineering policy independent from agent runtime implementation. The control plane owns authoritative state and verification; a runtime adapter owns one bounded agent loop.
 
@@ -111,7 +111,7 @@ type ExecutionRequest = {
 
 Runtime and model configuration resolve outside the workflow role. M2 added capability negotiation and made portability across Pi and Codex observable; M2.5 applied the same boundary to Claude Code.
 
-`recover` is optional contract space that no live adapter implements. SQLite durability supports cross-process `status` and `inspect`, but an attempt running during coordinator loss cannot yet continue. Accepted [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) removes session adoption from the M3 baseline and replaces it with fenced ownership plus evidence-backed execution reconciliation before a fresh attempt.
+`recover` is optional contract space that no live adapter implements. SQLite durability supports cross-process `status` and `inspect`, but an attempt running during coordinator loss cannot yet continue. Accepted [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) removes session adoption from the M3 baseline and replaces it with fenced ownership plus evidence-backed execution reconciliation before a fresh attempt. The M3 supervisor probe deliberately remains repository-level feasibility code until its shared lifecycle boundary and the persistence/workspace evidence justify a replacement package contract.
 
 ## Runtime capabilities
 
@@ -219,7 +219,7 @@ Retry policy reacts to the category and budget. Exhaustion is fail-fast in M1. R
 
 M3 adds local single-host recovery after coordinator loss. Its accepted design uses an expiring run lease with a monotonically increasing fencing generation, durable sanitized runtime reconstruction, pre-attempt workspace checkpoints, typed orphan attempts, rebuildable state snapshots, and explicit pause/cancel/resume operations. A replacement attempt starts only after the former owner is absent, the old execution is stopped, the workspace still matches its checkpoint, and authored attempt budget remains. See the [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md).
 
-Initial [M3 process-ownership feasibility](M3_FEASIBILITY.md) shows that all current execution owners can leave descendants after coordinator `SIGKILL`. It also rejects a direct native leader PID as the complete durable identity because a descendant can retain the group after that leader exits. A shared parent-death supervisor prototype passes on Ubuntu and macOS CI and is the current candidate for owning agent and command process trees; its two-phase start, supervisor-issued execution capability, durable manifest, IPC, and production-shaped cross-platform behavior remain feasibility gates before the runtime contract changes.
+Initial [M3 process-ownership feasibility](M3_FEASIBILITY.md) shows that all current execution owners can leave descendants after coordinator `SIGKILL`. It also rejects a direct native leader PID as the complete durable identity because a descendant can retain the group after that leader exits. A shared parent-death supervisor prototype passes on Ubuntu and macOS CI. The next production-shaped probe adds an execution UUID, fence and boot binding, an atomic manifest, private random capability, durable two-phase start authorization, and exact bounded local-socket frames. On the owner macOS host, model-free Pi, Codex, Claude Code, and command executions pass success relay, cancellation, and parent-death cleanup. Supervisor loss produces `unknown` and forbids replacement. Cross-platform CI and the remaining persistence/workspace probes still gate a runtime contract change.
 
 Provider-session reattachment, automatic worktree reset, exactly-once external effects, force takeover, distributed scheduling, human gates, nested workflows, fan-out, shared integration, automatic capability routing, cost routing, circuit breakers beyond current attempt/duration limits, and a general evidence graph remain deferred.
 
