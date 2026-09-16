@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
+import { canonicalExistingRoot, resolveExistingChild } from "@anastom/path-policy";
 import { fileURLToPath } from "node:url";
 import Ajv from "ajv";
 import taskDocumentSchema from "../schemas/task-document.v1alpha1.json" with { type: "json" };
@@ -139,10 +140,7 @@ export async function compileTask(
  * @remarks This local CLI API reads with caller permissions. Remote hosts must authorize filenames before calling it.
  * @throws WorkflowValidationError for unreadable or invalid tasks.
  */
-export async function loadTask(file: string): Promise<WorkflowDefinition> {
-  // Operator-selected local file, as with loadWorkflow. This is not a network
-  // request boundary: callers exposing it remotely must authorize filenames.
-  const absolutePath = resolve(file);
+async function readTaskSource(absolutePath: string): Promise<string> {
   let source: string;
   try {
     source = await readFile(absolutePath, "utf8");
@@ -154,5 +152,22 @@ export async function loadTask(file: string): Promise<WorkflowDefinition> {
         (error instanceof Error ? error.message : String(error)),
     ]);
   }
-  return compileTask(parseTaskMarkdown(source), absolutePath);
+  return source;
+}
+
+/** Load a trusted operator-selected local Task file. */
+export async function loadTask(file: string): Promise<WorkflowDefinition> {
+  const absolutePath = resolve(file);
+  return compileTask(parseTaskMarkdown(await readTaskSource(absolutePath)), absolutePath);
+}
+
+/** Scope a CLI-selected Task read to one caller-authorized source tree. */
+export async function loadTaskWithinRoot(
+  rootPath: string,
+  filePath: string,
+): Promise<WorkflowDefinition> {
+  const root = await canonicalExistingRoot(rootPath);
+  const selected = relative(resolve(rootPath), resolve(rootPath, filePath));
+  const sourcePath = await resolveExistingChild(root, selected, "file");
+  return compileTask(parseTaskMarkdown(await readTaskSource(sourcePath)), sourcePath);
 }

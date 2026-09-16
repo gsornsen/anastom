@@ -73,7 +73,7 @@ describe("owned Codex process boundaries", () => {
       await fixture.dispose();
     }
   });
-  it("accepts split native frames and rejects oversized frames without retaining private bodies", async () => {
+  it("accepts split native frames without retaining private bodies", async () => {
     const split = await syntheticCodex("split");
     try {
       const runtime = adapter(split.executable, split.authDirectory);
@@ -84,18 +84,23 @@ describe("owned Codex process boundaries", () => {
     } finally {
       await split.dispose();
     }
-    const oversized = await syntheticCodex("oversize");
-    try {
-      const runtime = adapter(oversized.executable, oversized.authDirectory);
-      const handle = await runtime.start(conformanceRequest(oversized.workspace));
-      const result = await runtime.collect(handle);
-      if (result.status !== "failed" || result.failure.category !== "schema-violation") {
-        throw new Error("Oversized frame fixture failed: " + JSON.stringify(result));
-      }
-    } finally {
-      await oversized.dispose();
-    }
   });
+  it.each([1, 2, 3, 4, 5])(
+    "rejects an oversized native frame after confirmed cleanup (sample %i)",
+    async () => {
+      const oversized = await syntheticCodex("oversize");
+      try {
+        const runtime = adapter(oversized.executable, oversized.authDirectory);
+        const handle = await runtime.start(conformanceRequest(oversized.workspace));
+        const result = await runtime.collect(handle);
+        if (result.status !== "failed" || result.failure.category !== "schema-violation") {
+          throw new Error("Oversized frame fixture failed: " + JSON.stringify(result));
+        }
+      } finally {
+        await oversized.dispose();
+      }
+    },
+  );
   it("cancels a TERM-resistant process once and closes the terminal stream", async () => {
     const fixture = await syntheticCodex("term-resistant");
     try {

@@ -1,10 +1,13 @@
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 
 import { describe, expect, it } from "vitest";
 
 import {
   WorkflowValidationError,
   loadWorkflow,
+  loadWorkflowWithinRoot,
   normalizeWorkflow,
   parseWorkflowYaml,
   validateJsonValue,
@@ -38,6 +41,43 @@ describe("Workflow IR", () => {
       maxDurationMs: 60_000,
     });
     expect(workflow.nodes.verify?.output.schema).toMatchObject({ type: "object" });
+  });
+
+  it("scopes a CLI workflow and its schema reads to one source tree", async () => {
+    const fixture = await mkdtemp(join(tmpdir(), "anastom-scoped-workflow-"));
+    const root = join(fixture, "root");
+    const workflows = join(root, "workflows");
+    const schemas = join(root, "schemas");
+    const source = join(workflows, "workflow.yaml");
+    const outside = join(fixture, "outside.json");
+    try {
+      await Promise.all([
+        mkdir(workflows, { recursive: true }),
+        mkdir(schemas, { recursive: true }),
+      ]);
+      await writeFile(join(schemas, "inside.json"), '{"type":"object"}');
+      await writeFile(outside, '{"type":"object"}');
+      const authored = (schema: string) =>
+        workflowYaml(`  work:\n    kind: command\n    output: { schema: ${schema} }`);
+      await writeFile(source, authored("../schemas/inside.json"));
+      await expect(loadWorkflowWithinRoot(root, source)).resolves.toMatchObject({
+        nodes: { work: { output: { schema: { type: "object" } } } },
+      });
+      await writeFile(source, authored("../../outside.json"));
+      await expect(loadWorkflowWithinRoot(root, source)).rejects.toMatchObject({
+        reason: "outside-root",
+      });
+      await symlink(outside, join(schemas, "escape.json"));
+      await writeFile(source, authored("../schemas/escape.json"));
+      await expect(loadWorkflowWithinRoot(root, source)).rejects.toMatchObject({
+        reason: "outside-root",
+      });
+      await expect(loadWorkflowWithinRoot(root, outside)).rejects.toMatchObject({
+        reason: "outside-root",
+      });
+    } finally {
+      await rm(fixture, { recursive: true, force: true });
+    }
   });
 
   it("supports exactly the four authored node kinds", async () => {

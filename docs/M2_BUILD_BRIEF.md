@@ -122,7 +122,7 @@ The suite must cover:
 5. schema-valid success, invalid/missing reports, upstream failure, and premature EOF;
 6. cancellation during initialization/execution, concurrent requests, late results, and completed-result immutability;
 7. pressure and framing limits, preserving required observations while bounding logs;
-8. whitelisted identity/usage, missing/zero/partial counters, duplicate prevention, and private-data exclusion;
+8. allowlisted identity/usage, missing/zero/partial counters, duplicate prevention, and private-data exclusion;
 9. defensive collection and deterministic rejection of unknown handles;
 10. session/process/file cleanup and confirmed absence of post-terminal writes.
 

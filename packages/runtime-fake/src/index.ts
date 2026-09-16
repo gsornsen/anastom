@@ -1,5 +1,6 @@
 import { readFile, writeFile, realpath, mkdir, lstat } from "node:fs/promises";
 import { resolve, relative, isAbsolute, dirname } from "node:path";
+import { PathPolicyError, resolveExistingChild } from "@anastom/path-policy";
 
 import type { JsonValue } from "@anastom/core";
 import type { FAILURE_CATEGORIES } from "@anastom/runtime-contract";
@@ -115,10 +116,14 @@ async function loadReferencedFile(root: string, source: string): Promise<string>
       "Scenario file reference must stay within its directory",
     ]);
   }
-  const path = await realpath(resolve(root, source));
-  const rel = relative(root, path);
-  if (!rel || rel === ".." || rel.startsWith("../") || rel.startsWith("..\\") || isAbsolute(rel)) {
-    throw new FakeScenarioValidationError(["Scenario file reference escapes its directory"]);
+  let path: string;
+  try {
+    path = await resolveExistingChild(root, source, "file");
+  } catch (error) {
+    if (error instanceof PathPolicyError && error.reason === "outside-root") {
+      throw new FakeScenarioValidationError(["Scenario file reference escapes its directory"]);
+    }
+    throw error;
   }
   return readFile(path, "utf8");
 }

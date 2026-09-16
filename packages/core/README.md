@@ -4,13 +4,13 @@ Parse authored workflows and Markdown tasks into strict, replayable definitions.
 
 ## Public API
 
-`loadWorkflow` and `loadTask` load operator-selected local files. `parseWorkflowYaml` and `parseTaskMarkdown` validate authored text. `normalizeWorkflow` and `compileTask` resolve execution policy. `assertWorkflowDefinition` validates stored snapshots. `canonicalJson`, `digestBytes`, and `digestJson` provide deterministic evidence identity.
+`loadWorkflow` and `loadTask` load files selected by a trusted local caller. `loadWorkflowWithinRoot(root, file)` and `loadTaskWithinRoot(root, file)` additionally confine an operator-selected source to an authorized directory; the scoped workflow loader confines referenced schemas to that same source tree. `parseWorkflowYaml` and `parseTaskMarkdown` validate authored text. `normalizeWorkflow` and `compileTask` resolve execution policy. `assertWorkflowDefinition` validates stored snapshots. `canonicalJson`, `digestBytes`, and `digestJson` provide deterministic evidence identity.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api core`; output is in `.generated/api/core/` and is not committed.
 
 ## Boundaries and invariants
 
-Core imports no engine, runtime, storage, model, or harness implementation. Schema loading is local and injectable. Remote hosts must authorize filenames before calling these local-file APIs. Versioned assets in `schemas/` are part of the contract; stored snapshots retain their original embedded schemas.
+Core imports no engine, runtime, storage, model, or harness implementation. The [path-policy operation](../path-policy/README.md) resolves existing children of a caller-authorized canonical source root, rejecting lexical and symlink escape. Direct local loaders retain trusted-caller semantics; remote hosts must authorize filenames and use the scoped APIs when arguments can select paths. Schema loading is local and injectable. Versioned assets in `schemas/` are part of the contract; stored snapshots retain their original embedded schemas.
 
 ## Development
 

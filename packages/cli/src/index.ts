@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { resolve, extname } from "node:path";
-import { digestJson, loadTask, loadWorkflow, type WorkflowDefinition } from "@anastom/core";
+import {
+  digestJson,
+  loadTaskWithinRoot,
+  loadWorkflowWithinRoot,
+  type WorkflowDefinition,
+} from "@anastom/core";
 import {
   InMemoryRunPersistence,
   WorkflowEngine,
@@ -17,6 +22,7 @@ import { SqliteRunPersistence, FileArtifactStore } from "@anastom/persistence";
 import { GitWorkspaceManager, resolveGitRepository, assertRunId } from "@anastom/workspaces";
 import { PiRuntimeAdapter } from "@anastom/runtime-pi";
 import { CodexRuntimeAdapter } from "@anastom/runtime-codex";
+import { ClaudeCodeRuntimeAdapter, type ClaudeAuthSource } from "@anastom/runtime-claude-code";
 import { probeRuntime, RuntimePreflightError } from "@anastom/runtime-contract";
 import type { RuntimeAdapter } from "@anastom/runtime-contract";
 
@@ -55,7 +61,7 @@ function usage(): string {
     "  anastom graph <workflow>",
     "  anastom run <workflow> --fake-scenario <file>",
     "  anastom inspect <run>",
-    "  anastom run <task.md> --runtime pi|codex|fake [--repo <path>] [--provider <id> --model <id>] [--reasoning-effort <level>] [--fake-scenario <file>]",
+    "  anastom run <task.md> --runtime pi|codex|claude-code|fake [--repo <path>] [--provider <id> --model <id>] [--auth-source subscription|api-key] [--reasoning-effort <level>] [--fake-scenario <file>]",
     "  anastom status <run> [--state-dir <path>]",
     "  anastom inspect <run> [--state-dir <path>] [--json]",
   ].join("\n");
@@ -85,10 +91,13 @@ function stringFlag(options: Record<string, string | true>, name: string): strin
   return typeof value === "string" ? value : undefined;
 }
 function loadTarget(file: string) {
-  return extname(file).toLowerCase() === ".md" ? loadTask(file) : loadWorkflow(file);
+  const root = process.cwd();
+  return extname(file).toLowerCase() === ".md"
+    ? loadTaskWithinRoot(root, file)
+    : loadWorkflowWithinRoot(root, file);
 }
 
-type TaskRuntimeId = "pi" | "fake" | "codex";
+type TaskRuntimeId = "pi" | "fake" | "codex" | "claude-code";
 const reasoningLevels = ["low", "medium", "high", "xhigh", "max"] as const;
 
 function checkedReasoningEffort(
@@ -107,6 +116,52 @@ function checkedReasoningEffort(
   return value as (typeof reasoningLevels)[number];
 }
 
+function assertClaudeAuthSelection(
+  runtimeId: TaskRuntimeId,
+  provider: string | undefined,
+  model: string | undefined,
+  authSource: string | undefined,
+): void {
+  if (
+    runtimeId === "claude-code" &&
+    (!provider || !model || (authSource !== "subscription" && authSource !== "api-key"))
+  ) {
+    throw new Error(
+      "Claude Code requires explicit --provider anthropic, --model and --auth-source subscription|api-key",
+    );
+  }
+  if (runtimeId !== "claude-code" && authSource) {
+    throw new Error("--auth-source is valid for Claude Code only");
+  }
+}
+
+function assertTaskSelection(selection: {
+  runtimeId: TaskRuntimeId;
+  scenario?: string;
+  provider?: string;
+  model?: string;
+  reasoningEffort?: string;
+  authSource?: string;
+}): void {
+  const { runtimeId, scenario, provider, model, reasoningEffort, authSource } = selection;
+  if (runtimeId === "fake" && !scenario) {
+    throw new Error("Fake task execution requires an explicit --fake-scenario <file>");
+  }
+  if (runtimeId !== "fake" && scenario) {
+    throw new Error("--fake-scenario is only valid for fake execution");
+  }
+  if (
+    Boolean(provider) !== Boolean(model) ||
+    (runtimeId === "fake" && (provider || model || reasoningEffort || authSource))
+  ) {
+    throw new Error("--provider and --model must be specified together for real runtimes");
+  }
+  if (runtimeId === "codex" && (!provider || !model)) {
+    throw new Error("Codex requires explicit --provider openai and --model selection");
+  }
+  assertClaudeAuthSelection(runtimeId, provider, model, authSource);
+}
+
 function parseTaskOptions(args: readonly string[]): {
   opts: Record<string, string | true>;
   runtimeId: TaskRuntimeId;
@@ -114,6 +169,7 @@ function parseTaskOptions(args: readonly string[]): {
   provider?: string;
   model?: string;
   reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max";
+  authSource?: ClaudeAuthSource;
 } {
   const opts = flags(args, [
     "--runtime",
@@ -123,30 +179,23 @@ function parseTaskOptions(args: readonly string[]): {
     "--provider",
     "--model",
     "--reasoning-effort",
+    "--auth-source",
   ]);
   const runtimeId = stringFlag(opts, "--runtime");
-  if (runtimeId !== "pi" && runtimeId !== "fake" && runtimeId !== "codex") {
-    throw new Error("Task run requires --runtime pi, codex or fake");
+  if (
+    runtimeId !== "pi" &&
+    runtimeId !== "fake" &&
+    runtimeId !== "codex" &&
+    runtimeId !== "claude-code"
+  ) {
+    throw new Error("Task run requires --runtime pi, codex, claude-code or fake");
   }
   const scenario = stringFlag(opts, "--fake-scenario");
-  if (runtimeId === "fake" && !scenario) {
-    throw new Error("Fake task execution requires an explicit --fake-scenario <file>");
-  }
-  if (runtimeId !== "fake" && scenario) {
-    throw new Error("--fake-scenario is only valid for fake execution");
-  }
   const provider = stringFlag(opts, "--provider"),
     model = stringFlag(opts, "--model");
   const reasoningEffort = checkedReasoningEffort(stringFlag(opts, "--reasoning-effort"), runtimeId);
-  if (
-    Boolean(provider) !== Boolean(model) ||
-    (runtimeId === "fake" && (provider || model || reasoningEffort))
-  ) {
-    throw new Error("--provider and --model must be specified together for real runtimes");
-  }
-  if (runtimeId === "codex" && (!provider || !model)) {
-    throw new Error("Codex requires explicit --provider openai and --model selection");
-  }
+  const authSource = stringFlag(opts, "--auth-source");
+  assertTaskSelection({ runtimeId, scenario, provider, model, reasoningEffort, authSource });
   return {
     opts,
     runtimeId,
@@ -154,6 +203,7 @@ function parseTaskOptions(args: readonly string[]): {
     provider,
     model,
     ...(reasoningEffort ? { reasoningEffort } : {}),
+    ...(authSource ? { authSource: authSource as ClaudeAuthSource } : {}),
   };
 }
 
@@ -166,6 +216,13 @@ async function selectedTaskRuntime(
   if (selection.runtimeId === "pi") {
     return new PiRuntimeAdapter({ provider: selection.provider, model: selection.model });
   }
+  if (selection.runtimeId === "claude-code") {
+    return new ClaudeCodeRuntimeAdapter({
+      provider: selection.provider as string,
+      model: selection.model as string,
+      authSource: selection.authSource as ClaudeAuthSource,
+    });
+  }
   return new CodexRuntimeAdapter({
     provider: selection.provider as string,
     model: selection.model as string,
@@ -176,7 +233,7 @@ async function selectedTaskRuntime(
 async function runTask(target: string, args: readonly string[], io: CliIo): Promise<number> {
   const selection = parseTaskOptions(args);
   const opts = selection.opts;
-  const workflow = await loadTask(target);
+  const workflow = await loadTaskWithinRoot(process.cwd(), target);
   const runtime = await selectedTaskRuntime(selection);
   const { repoRoot } = await resolveGitRepository(stringFlag(opts, "--repo") ?? process.cwd());
   const stateDir = resolve(stringFlag(opts, "--state-dir") ?? resolve(repoRoot, ".anastom"));
@@ -343,7 +400,7 @@ async function runFakeWorkflow(
   if (scenarioPath === undefined || args.length !== 2 || scenarioFlag !== 0) {
     throw new Error("run requires exactly one --fake-scenario <file> option");
   }
-  const workflow = await loadWorkflow(target);
+  const workflow = await loadWorkflowWithinRoot(process.cwd(), target);
   const runtime = new FakeRuntimeAdapter(await loadFakeScenario(scenarioPath));
   const engine = new WorkflowEngine({ runtime, persistence: options.persistence });
   const state = await engine.start(workflow);

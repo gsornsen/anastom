@@ -62,6 +62,9 @@ importers:
       '@anastom/persistence':
         specifier: workspace:*
         version: link:../persistence
+      '@anastom/runtime-claude-code':
+        specifier: workspace:*
+        version: link:../runtime-claude-code
       '@anastom/runtime-codex':
         specifier: workspace:*
         version: link:../runtime-codex
@@ -80,6 +83,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@anastom/path-policy':
+        specifier: workspace:*
+        version: link:../path-policy
       ajv:
         specifier: ^8.17.1
         version: 8.20.0
@@ -92,6 +98,9 @@ importers:
       '@anastom/core':
         specifier: workspace:*
         version: link:../core
+      '@anastom/path-policy':
+        specifier: workspace:*
+        version: link:../path-policy
       '@anastom/runtime-contract':
         specifier: workspace:*
         version: link:../runtime-contract
@@ -102,6 +111,8 @@ importers:
       '@anastom/runtime-fake':
         specifier: workspace:*
         version: link:../runtime-fake
+
+  packages/path-policy: {}
 
   packages/persistence:
     dependencies:
@@ -118,6 +129,15 @@ importers:
       '@anastom/runtime-fake':
         specifier: workspace:*
         version: link:../runtime-fake
+
+  packages/runtime-claude-code:
+    dependencies:
+      '@anastom/core':
+        specifier: workspace:*
+        version: link:../core
+      '@anastom/runtime-contract':
+        specifier: workspace:*
+        version: link:../runtime-contract
 
   packages/runtime-codex:
     dependencies:
@@ -145,6 +165,9 @@ importers:
       '@anastom/core':
         specifier: workspace:*
         version: link:../core
+      '@anastom/path-policy':
+        specifier: workspace:*
+        version: link:../path-policy
       '@anastom/runtime-contract':
         specifier: workspace:*
         version: link:../runtime-contract

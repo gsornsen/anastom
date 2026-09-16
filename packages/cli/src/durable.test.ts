@@ -102,6 +102,15 @@ function fakeTaskArguments(repository: string, scenario = healthEndpointScenario
 }
 
 describe("Durable task execution", () => {
+  it("keeps operator-selected Task reads under the CLI's current source directory", async () => {
+    const repository = await newEndpointRepository();
+    const output = captureCliOutput();
+    expect(
+      await runCli(["validate", join(repository, "tasks", "add-endpoint.md")], { io: output.io }),
+    ).toBe(1);
+    expect(output.stderr.join("\n")).toContain("escapes its trusted root");
+  });
+
   it("runs the scripted endpoint fix and verifier successfully", async () => {
     const repository = await newEndpointRepository();
 
@@ -214,6 +223,37 @@ describe("Durable task execution", () => {
       ["--runtime", "codex", "--provider", "other", "--model", "fixture"],
     ],
     ["Codex with incomplete selection", ["--runtime", "codex", "--provider", "openai"]],
+    [
+      "Claude Code without auth source",
+      ["--runtime", "claude-code", "--provider", "anthropic", "--model", "claude-opus-4-8"],
+    ],
+    [
+      "Claude Code with invalid auth source",
+      [
+        "--runtime",
+        "claude-code",
+        "--provider",
+        "anthropic",
+        "--model",
+        "claude-opus-4-8",
+        "--auth-source",
+        "automatic",
+      ],
+    ],
+    [
+      "Claude Code with unsupported provider",
+      [
+        "--runtime",
+        "claude-code",
+        "--provider",
+        "other",
+        "--model",
+        "claude-opus-4-8",
+        "--auth-source",
+        "subscription",
+      ],
+    ],
+    ["Pi with Claude auth source", ["--runtime", "pi", "--auth-source", "subscription"]],
     [
       "fake with model flags",
       [

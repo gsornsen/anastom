@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
-import { realpath } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
+import { isAbsolute } from "node:path";
+import { canonicalExistingRoot, resolveExistingChild } from "@anastom/path-policy";
 import type { CommandDefinition } from "@anastom/core";
 import type { ExecutionFailure, WorkspaceRef } from "@anastom/runtime-contract";
 
@@ -77,12 +77,8 @@ export class LocalCommandExecutor implements CommandExecutor {
     if (isAbsolute(command.cwd)) {
       throw new Error("Command cwd must be workspace-relative");
     }
-    const root = await realpath(workspace.path);
-    const cwd = await realpath(resolve(root, command.cwd));
-    const rel = relative(root, cwd);
-    if (rel === ".." || rel.startsWith("../") || rel.startsWith("..\\") || isAbsolute(rel)) {
-      throw new Error("Command cwd escapes workspace");
-    }
+    const root = await canonicalExistingRoot(workspace.path);
+    const cwd = await resolveExistingChild(root, command.cwd, "directory");
     if (
       !Number.isSafeInteger(command.maxDurationMs) ||
       command.maxDurationMs <= 0 ||
