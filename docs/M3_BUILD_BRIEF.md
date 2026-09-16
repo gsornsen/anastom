@@ -127,7 +127,7 @@ The current owner notices the request while an adapter or command is active, app
 
 The model-free SQLite contention phase implements these rules in a temporary checked-in schema without changing the production migration or package contract. Across the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #26, pairs of real processes under `BEGIN IMMEDIATE` produced exactly one initial owner, one expired takeover winner, and one post-release generation-three owner. Current renewal succeeded while stale renewal and release failed. Concurrent identical mutation IDs returned one physical append and the same sequence range; a changed digest conflicted; wrong expected sequence left no partial event; and both pre-takeover and post-release generations were fenced from later appends. Duplicate control ID/action pairs returned one SQLite-assigned timestamp and row, while competing actions for one ID produced one winner and one conflict.
 
-The probe confirms that process liveness remains an input to takeover rather than a fact inferred from SQLite. After an external `absent` conclusion, the transaction still compares the observed owner, generation, expiry, and release state. Fence validation occurs before idempotent mutation replay, so an earlier generation cannot reuse a successful operation ID. The exact schema, error classes, and TypeScript signatures remain gated on workspace and snapshot evidence.
+The probe confirms that process liveness remains an input to takeover rather than a fact inferred from SQLite. After an external `absent` conclusion, the transaction still compares the observed owner, generation, expiry, and release state. Fence validation occurs before idempotent mutation replay, so an earlier generation cannot reuse a successful operation ID. The exact schema, error classes, and TypeScript signatures remain gated on cross-platform workspace and snapshot evidence.
 
 ## Runtime and process-ownership contract
 
@@ -176,16 +176,23 @@ Fake scenario file paths are not durable runtime configuration. The M0 YAML fake
 
 Immediately before an attempt enters the running state, Anastom captures its owned workspace with the existing temporary-index approach. The checkpoint records:
 
+- a checkpoint schema version, workspace identity, and run base commit;
 - current `HEAD` commit;
 - SHA-256 of the binary-capable diff relative to the run base;
 - ordered changed-file names;
+- a bounded digest plus entry and byte counts for ignored directories, ordinary files, modes, content, and symlink target bytes;
+- canonical repository, Git common-directory, worktree, Git-directory, branch, ownership-manifest, and worktree-registration identity; and
 - a durable diff artifact reference when the workspace is not clean.
+
+The capture uses a temporary index and does not alter the user's staging index. Staged and unstaged arrangements with identical complete content are the same checkpoint. Capture runs twice and rejects an unstable observation. Invalid UTF-8 paths, unsupported ignored entry types, or an ignored tree beyond reviewed entry/byte limits fail closed rather than producing a partial identity.
 
 The scheduling transition persists the attempt identity, execution ID, and checkpoint before runtime start. An artifact body written before that transaction but left unreferenced by a crash is never treated as evidence and may be collected later.
 
 Recovery captures the workspace by the same algorithm. Exact equality permits a replacement attempt. Any different head, diff digest, file set, ownership manifest, worktree registration, branch, symlink boundary, or repository identity produces `workspace-conflict` and retains the worktree.
 
 M3 provides no automatic reset or acceptance of orphan edits. Documentation shows how to inspect the checkpoint and current diff. A future checkpoint-to-new-worktree operation requires its own design because it changes evidence and Git ownership semantics.
+
+The model-free workspace phase exercises this candidate without exporting its types. Locally on the owner macOS host, it captures committed, tracked, untracked, staged, binary, symlink, ignored-file, and ignored-directory state; preserves the staging index; detects every content/`HEAD` mutation; rejects branch, manifest, symlink-boundary, and registration changes; distinguishes a clone with identical Git content; and returns to exact equality after restoration. Linux and clean macOS CI remain required before this refinement is considered cross-platform evidence. Production code must stream bounded ignored-file reads and persist the diff artifact under the fenced scheduling transition.
 
 ## Pause, cancel, and resume semantics
 

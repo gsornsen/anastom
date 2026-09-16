@@ -2,7 +2,7 @@
 
 ## Status
 
-Process-ownership phase implemented and passing on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24) on 2026-09-16. The production-shaped supervisor-protocol phase also passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked [PR #25](https://github.com/gsornsen/anastom/pull/25). The SQLite lease, fencing, idempotency, and control-inbox contention phase passes on the same local/CI platforms in stacked [PR #26](https://github.com/gsornsen/anastom/pull/26). Exact workspace checkpoints and snapshot fallback remain later feasibility phases before public M3 APIs are frozen.
+Process-ownership phase implemented and passing on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24) on 2026-09-16. The production-shaped supervisor-protocol phase also passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked [PR #25](https://github.com/gsornsen/anastom/pull/25). The SQLite lease, fencing, idempotency, and control-inbox contention phase passes on the same local/CI platforms in stacked [PR #26](https://github.com/gsornsen/anastom/pull/26). The exact workspace-checkpoint phase passes locally on the owner macOS host; Linux and clean macOS CI are pending on its stacked change. Snapshot fallback remains the final feasibility phase before public M3 APIs are frozen.
 
 The accepted [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) require evidence before choosing an execution-recovery interface. This document records that evidence. The process probe makes no provider request, reads no real authentication store, and changes no production runtime contract.
 
@@ -39,6 +39,15 @@ pnpm test scripts/probe-m3-sqlite-contention.test.ts
 ```
 
 It creates a temporary database from a checked-in feasibility schema, releases pairs of real worker processes through explicit round barriers, uses injected logical time for lease expiry, and removes the database afterward. Its Vitest boundary has a 60-second outer limit; every internal readiness and completion wait is bounded, and the local 12-round matrix currently completes in about 3.2 seconds.
+
+The workspace-checkpoint phase is independently reproducible with:
+
+```bash
+pnpm probe:m3:workspace
+pnpm test scripts/probe-m3-workspace-checkpoint.test.ts
+```
+
+It creates temporary source and clone repositories plus owned Git worktrees. It captures the same rich workspace twice, tests exact restoration after content and ownership changes, and removes both repositories afterward. The probe invokes no runtime or model and reads no authentication store. Its Vitest boundary has a 60-second outer limit; the local matrix currently completes in about 5.5 seconds.
 
 The test has a 45-second outer limit. Every internal wait is bounded and driven by a file or process-state condition. No assertion infers readiness from a fixed sleep. Fixture programs are checked-in files; none is embedded in a string. Child fixtures accept only fixed behavior names, use their inherited canonical working directory as the authorized record root, and publish readiness JSON by atomic rename so readers cannot observe partial records.
 
@@ -167,6 +176,30 @@ The experiment refines the persistence contract in four ways:
 
 The probe also rejects unsafe integer overflow in clock arithmetic, generations, and event sequences, validates exact worker request/response shapes, and caps append batch size. Its schema is feasibility support, not a migration proposal: it does not yet integrate existing run/event validation, snapshots, schema compatibility, or final error names. Those remain part of the reviewed persistence implementation after all evidence phases complete.
 
+## Exact workspace checkpoint protocol
+
+The fourth probe exercises the existing temporary-index capture without changing the production workspace package. Its fixture combines a worker commit after the run base, tracked unstaged and staged edits, untracked text, binary bytes, a symlink whose target is outside-looking but never followed, an ignored file, and an ignored empty directory. The capture preserves the real staging index and produces the same binary-capable diff and ordered changed-file list after the staged edit is moved back to unstaged state. Staging arrangement is therefore not retry identity; the complete content relative to the run base is.
+
+Git's binary diff does not include ignored material, which can still affect a replacement worker. The candidate checkpoint therefore adds a bounded fingerprint of ignored directories, ordinary files, file modes, content, and symlink target bytes. Unsupported filesystem entry types, invalid UTF-8 paths, more than 4,096 ignored entries, or more than 64 MiB of ignored content fail closed instead of silently weakening equality. The filesystem itself rejects the invalid-byte fixture on macOS; platforms that permit the path must reject it during decoding. Capturing twice rejects a workspace that changes during observation.
+
+The checkpoint also binds the workspace ID and base commit to its current `HEAD`, diff digest, changed-file list, and canonical ownership evidence: repository root/common Git directory, worktree path/Git directory, branch, ownership-manifest digest, and worktree-registration digest. The probe changed each relevant boundary independently and observed refusal or a classified mismatch:
+
+| Boundary                                           | Observed result                                           |
+| -------------------------------------------------- | --------------------------------------------------------- |
+| identical repeated capture                         | exact match                                               |
+| staged versus unstaged arrangement, same content   | exact match; real staging index preserved                 |
+| tracked, untracked, binary, or symlink-target edit | diff mismatch                                             |
+| ignored-file edit                                  | ignored-content mismatch                                  |
+| `HEAD` changed with the same tree                  | head mismatch                                             |
+| branch, manifest, or symlinked owned path          | capture rejected                                          |
+| moved Git worktree registration                    | capture rejected while the expected physical path existed |
+| cloned repository with identical Git content       | repository identity mismatch                              |
+| complete content and ownership restoration         | exact match; source checkout remained clean               |
+
+This refines the accepted contract in three ways. The durable checkpoint needs an explicit schema version, workspace/run identity, base commit, ignored-content digest/counts, and canonical ownership fields in addition to the already proposed `HEAD`, diff digest, changed-file list, and diff artifact. A later attempt may ignore staging layout only because the temporary-index capture proves the same complete content. Any unrepresentable path, over-limit ignored tree, unstable double capture, or ownership ambiguity must pause recovery rather than authorize retry.
+
+The types and limits remain feasibility-local. Production code should stream bounded ignored-file reads rather than retain them in memory, use the shared path-policy vocabulary when that API is extracted, persist the diff as a verified artifact, and integrate capture atomically with the fenced attempt-start transition.
+
 ## Contract refinement from this phase
 
 The evidence rejects two narrower designs:
@@ -185,7 +218,7 @@ The production-shaped protocol confirms this candidate boundary on the observed 
 - Recovery trusts neither a launcher PID nor an unverified manifest. It checks host/boot identity, a production-grade process identity, process group, supervisor-issued execution capability, execution ID, lease generation, run-owned path, and manifest schema before requesting cleanup.
 - If both supervisor and authenticated execution leader are absent but a group may remain, recovery reports `unknown` and pauses. It never signals a bare numeric group.
 
-No public signature is fixed by this phase. Bounded public event/result relay and cancel/parent-death behavior now pass for Pi, Codex, Claude Code, and commands in the temporary run-owned boundary. Cross-platform CI, final state-layout placement, and the other M3 feasibility tracks remain gates before `RuntimeAdapter.recover()` is removed or replaced.
+No public signature is fixed by this phase. Bounded public event/result relay and cancel/parent-death behavior now pass for Pi, Codex, Claude Code, and commands in the temporary run-owned boundary. Workspace identity now has local evidence, but its cross-platform result, final state-layout placement, snapshot fallback, and remaining production concerns remain gates before `RuntimeAdapter.recover()` is removed or replaced.
 
 ## Security and evidence limits
 
@@ -194,11 +227,12 @@ No public signature is fixed by this phase. Bounded public event/result relay an
 - The probe's `ps` start token distinguishes ordinary PID reuse on the same identified host boot, but macOS exposes that value only to one-second precision. It is evidence for this experiment, not sufficient production authority. The production protocol must combine the strongest portable process identity available with a supervisor-issued random execution capability and host/boot binding, and it must fail closed when those cannot authenticate the intended process. Cross-host recovery remains rejected by ADR 0017.
 - The local run used synthetic adapter/session doubles and a generic supervisor worker. It proves lifecycle mechanics, not provider-session behavior or model quality.
 - The first Vitest boundary passed on Ubuntu 24.04 and macOS 15 in PR #24. The production-shaped supervisor protocol passed both supported CI hosts again in stacked PR #25.
-- The probe intentionally leaves SQLite fencing, snapshot correctness, workspace checkpoints, runtime-descriptor reconstruction, and complete pause/cancel/resume semantics unproved.
+- The workspace probe hashes ignored content in bounded feasibility memory; the production implementation must stream bounded reads and retain the same fail-closed outcomes.
+- Snapshot correctness, runtime-descriptor reconstruction, production integration, and complete pause/cancel/resume semantics remain unproved.
 
 ## Next feasibility gates
 
-1. Prove exact workspace checkpoints across tracked, untracked, staged, committed, binary, and symlink changes.
+1. Confirm the workspace-checkpoint matrix on Ubuntu 24.04 and clean macOS 15 CI.
 2. Prove snapshot-plus-tail equality and corrupt/unknown snapshot fallback to full event replay.
 3. Resolve production process identity, socket placement/path length, and bounded operational-record loading before promoting the prototypes into package contracts.
 4. Revise ADR 0017 and the M3 build brief if any later evidence contradicts the accepted boundaries.
