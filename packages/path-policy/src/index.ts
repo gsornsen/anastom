@@ -1,5 +1,5 @@
 import { realpath, stat } from "node:fs/promises";
-import { isAbsolute, resolve, sep } from "node:path";
+import { resolve, sep } from "node:path";
 
 /** The trust boundary required before interpreting a caller's child path. */
 export class PathPolicyError extends Error {
@@ -22,10 +22,6 @@ export async function canonicalExistingRoot(path: string): Promise<string> {
   return root;
 }
 
-function inside(root: string, path: string): boolean {
-  return path === root || path.startsWith(root.endsWith(sep) ? root : root + sep);
-}
-
 /**
  * Resolve one existing child of a canonical trusted root. An internal symlink is allowed;
  * lexical traversal and a symlink target outside the root are rejected. Callers still own
@@ -40,13 +36,12 @@ export async function resolveExistingChild(
     throw new PathPolicyError("invalid", "Child path is empty or contains a null byte");
   }
   const lexical = resolve(root, input);
-  // An absolute operator path may use an OS alias such as macOS /var -> /private/var.
-  // Resolve it physically before judging containment; relative traversal still fails early.
-  if (!inside(root, lexical) && !isAbsolute(input)) {
+  const boundary = root.endsWith(sep) ? root : root + sep;
+  if (lexical !== root && !lexical.startsWith(boundary)) {
     throw new PathPolicyError("outside-root", "Child path escapes its trusted root");
   }
   const canonical = await realpath(lexical);
-  if (!inside(root, canonical)) {
+  if (canonical !== root && !canonical.startsWith(boundary)) {
     throw new PathPolicyError("outside-root", "Child symlink target escapes its trusted root");
   }
   const metadata = await stat(canonical);

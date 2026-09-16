@@ -1,5 +1,5 @@
 import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { resolve, sep } from "node:path";
 import { digestBytes } from "@anastom/core";
 import type { ArtifactStore, ArtifactWrite } from "@anastom/engine";
 import type { ArtifactRef } from "@anastom/runtime-contract";
@@ -66,21 +66,33 @@ export class FileArtifactStore implements ArtifactStore {
    * Read referenced evidence within the configured root and verify its SHA-256 digest.
    */
   async read(artifact: ArtifactRef): Promise<Buffer> {
+    const runId = artifact.producer.runId;
+    const id = artifact.id;
     if (
-      ![artifact.producer.runId, artifact.id].every((id) => /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(id))
+      !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(runId) ||
+      !/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(id)
     ) {
       throw new Error("Invalid artifact identity");
     }
-    const expectedDir = await realpath(
-      resolve(this.stateDir, "runs", artifact.producer.runId, "artifacts"),
-    );
-    if (
-      resolve(artifact.uri) !== resolve(expectedDir, artifact.id) ||
-      (await realpath(artifact.uri)) !== artifact.uri
-    ) {
+    const stateRoot = await realpath(this.stateDir);
+    const authoredDir = resolve(stateRoot, "runs", runId, "artifacts");
+    const boundary = stateRoot.endsWith(sep) ? stateRoot : stateRoot + sep;
+    if (!authoredDir.startsWith(boundary)) {
+      throw new Error("Artifact parent escapes the configured state root");
+    }
+    // No run-owned ancestor may redirect the read outside the state root.
+    if ((await realpath(authoredDir)) !== authoredDir) {
+      throw new Error("Artifact parent is a symlink");
+    }
+    const expectedFile = resolve(authoredDir, id);
+    if (resolve(artifact.uri) !== expectedFile) {
       throw new Error("Invalid artifact path");
     }
-    const bytes = await readFile(artifact.uri);
+    const metadata = await lstat(expectedFile);
+    if (!metadata.isFile() || metadata.isSymbolicLink()) {
+      throw new Error("Artifact file must be an ordinary file");
+    }
+    const bytes = await readFile(expectedFile);
     if (digestBytes(bytes) !== artifact.digest) {
       throw new Error("Artifact digest mismatch");
     }

@@ -4,12 +4,16 @@ import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { FileArtifactStore } from "../packages/persistence/src/index.js";
 import { runCli, type DurableRunInspection } from "../packages/cli/src/index.js";
+import { canonicalExistingRoot, resolveExistingChild } from "../packages/path-policy/src/index.js";
 
 const [runId, directory] = process.argv.slice(2);
 if (!runId || !directory) {
   throw new Error("Usage: verify-durable-artifacts <run-id> <state-dir>");
 }
-const stateDir = resolve(directory);
+const auditRoot = await canonicalExistingRoot(
+  process.platform === "darwin" ? "/private/tmp" : "/tmp",
+);
+const stateDir = await resolveExistingChild(auditRoot, directory, "directory");
 const output: string[] = [];
 const errors: string[] = [];
 const code = await runCli(["inspect", runId, "--state-dir", stateDir, "--json"], {

@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { canonicalExistingRoot, resolveExistingChild } from "@anastom/path-policy";
 
 import Ajv, { type ErrorObject } from "ajv";
@@ -297,7 +297,10 @@ export async function loadWorkflowWithinRoot(
   filePath: string,
 ): Promise<WorkflowDefinition> {
   const root = await canonicalExistingRoot(rootPath);
-  const sourcePath = await resolveExistingChild(root, filePath, "file");
+  // Keep an absolute operator path relative to the selected lexical root before
+  // checking its canonical root. macOS /var may physically resolve to /private/var.
+  const selected = relative(resolve(rootPath), resolve(rootPath, filePath));
+  const sourcePath = await resolveExistingChild(root, selected, "file");
   const source = await readWorkflowSource(sourcePath);
   return normalizeWorkflow(parseWorkflowYaml(source), {
     sourcePath,

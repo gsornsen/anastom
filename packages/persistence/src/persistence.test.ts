@@ -1,5 +1,5 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdtemp, rename, rm, symlink } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
@@ -180,5 +180,24 @@ describe("filesystem artifacts", () => {
     await writeFile(ref.uri, "tampered");
     await expect(artifacts.read(ref)).rejects.toThrow("digest");
     await expect(artifacts.write({ ...input, runId: "../outside" })).rejects.toThrow("identity");
+  });
+  it("rejects a run-owned artifact parent redirected outside the state root", async () => {
+    const { root, store } = await setup();
+    store.close();
+    const artifacts = new FileArtifactStore(root);
+    const ref = await artifacts.write({
+      runId: "redirected",
+      nodeId: "work",
+      attempt: 1,
+      type: "diff",
+      mediaType: "text/plain",
+      bytes: "original",
+    });
+    const outside = await mkdtemp(join(dirname(root), "anastom-artifact-outside-"));
+    roots.push(outside);
+    const runDir = dirname(dirname(ref.uri));
+    await rename(runDir, join(outside, "redirected"));
+    await symlink(join(outside, "redirected"), runDir, "dir");
+    await expect(artifacts.read(ref)).rejects.toThrow("symlink");
   });
 });

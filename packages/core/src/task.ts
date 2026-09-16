@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { canonicalExistingRoot, resolveExistingChild } from "@anastom/path-policy";
 import { fileURLToPath } from "node:url";
 import Ajv from "ajv";
@@ -167,6 +167,7 @@ export async function loadTaskWithinRoot(
   filePath: string,
 ): Promise<WorkflowDefinition> {
   const root = await canonicalExistingRoot(rootPath);
-  const sourcePath = await resolveExistingChild(root, filePath, "file");
+  const selected = relative(resolve(rootPath), resolve(rootPath, filePath));
+  const sourcePath = await resolveExistingChild(root, selected, "file");
   return compileTask(parseTaskMarkdown(await readTaskSource(sourcePath)), sourcePath);
 }
