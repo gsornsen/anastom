@@ -26,6 +26,7 @@
     "hygiene": "tsx scripts/check-hygiene.ts",
     "docs:api": "tsx scripts/generate-api-docs.ts",
     "probe:m3:process": "tsx scripts/probe-m3-process-ownership.ts",
+    "probe:m3:sqlite": "tsx scripts/probe-m3-sqlite-contention.ts",
     "probe:m3:supervisor": "tsx scripts/probe-m3-supervisor-protocol.ts",
     "changeset": "changeset",
     "version:packages": "changeset version",

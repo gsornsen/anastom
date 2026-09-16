@@ -4,6 +4,11 @@ import { join } from "node:path";
 
 export type M3RecordName =
   | "attempt-plan.json"
+  | "contention-a-ready.json"
+  | "contention-a-request.json"
+  | "contention-b-ready.json"
+  | "contention-b-request.json"
+  | "contention-gate.json"
   | "execution-control.json"
   | "execution-manifest.json"
   | "execution-probe.json"
