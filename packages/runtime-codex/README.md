@@ -4,7 +4,7 @@ Adapt the exact-pinned Codex CLI to Anastom's single-worker runtime contract. On
 
 ## Public API
 
-`CodexRuntimeAdapter` requires an explicit `openai` provider and model ID, with an optional reasoning effort. It declares supported workspace modes, checks the effective native policy before a model call, starts a bounded execution process, emits sanitized public lifecycle/identity/partial-usage observations, validates the final report, and confirms process cleanup before success. `validateSelection` checks selection before creating state.
+`CodexRuntimeAdapter` requires an explicit `openai` provider and model ID, with an optional reasoning effort. `codexRuntimeDescriptorCodec` validates and reconstructs its exact versioned public selection with fixed file-store authentication ownership; executable and auth-directory overrides never enter the descriptor. The adapter declares supported workspace modes, checks the effective native policy before a model call, starts a bounded execution process, emits sanitized public lifecycle/identity/partial-usage observations, validates the final report, and confirms process cleanup before success. `validateSelection` checks selection before creating state.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api runtime-codex`; output is in `.generated/api/runtime-codex/` and is not committed.
 

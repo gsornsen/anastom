@@ -2,7 +2,7 @@
 
 ## Status and review boundary
 
-This is the exact production-contract proposal requested after the five M3 feasibility phases. It is **proposed, not implemented or accepted**. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. If review accepts this proposal, implementation must preserve these names, ownership boundaries, state transitions, and compatibility rules unless new evidence first amends the proposal and the build brief.
+This is the exact production-contract proposal requested after the five M3 feasibility phases. The owner authorized a stacked production implementation against it, with acceptance and merge deferred until review of the complete stack. The runtime-descriptor and event/reducer slice is implemented; the durable store, private path root, workspace checkpoint implementation, execution host, recovery coordinator, CLI, and final acceptance evidence remain in later slices. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Implementation must preserve these names, ownership boundaries, state transitions, and compatibility rules unless new evidence first amends the proposal and the build brief.
 
 The proposal covers local Linux and macOS Task runs. It does not add provider-session adoption, remote workers, parallel scheduling, force takeover, automatic worktree repair, or exactly-once external effects.
 
@@ -20,6 +20,7 @@ The feasibility work exposed several places where the earlier design could have 
 8. **Snapshots do not introduce a second history.** New events receive transactionally maintained rolling integrity digests. Legacy prefixes without contiguous integrity coverage continue to be hashed from their stored bytes.
 9. **Path policy remains split by trust domain.** The existing authored-child resolver stays narrow. A new private-state-root capability handles run-owned directories, records, and socket paths; it is not a universal `resolvePath()` helper.
 10. **Bounded reads apply before parsing.** Every operational record and IPC frame is size-checked as bytes, then decoded, exact-schema validated, and identity checked.
+11. **Workspace evidence types follow the existing portable boundary.** `WorkspaceCheckpoint` and `WorkspaceDifference` live beside `WorkspaceRef` and `WorkspaceCapture` in `@anastom/runtime-contract`, so `@anastom/engine` and `@anastom/workspaces` share the record without a reverse dependency. Checkpoint capture and comparison remain owned by `@anastom/workspaces`.
 
 ## Package ownership
 
@@ -38,7 +39,7 @@ cli -> engine, persistence, workspaces, execution-host, runtime adapters
 | Package                     | M3 responsibility                                                                                                                                                                                          |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@anastom/core`             | Existing workflow and canonical JSON primitives. It gains no M3 process or database concepts.                                                                                                              |
-| `@anastom/runtime-contract` | Runtime descriptors, the existing one-attempt adapter interface, public observations, and normalized results. It removes adapter-level recovery.                                                           |
+| `@anastom/runtime-contract` | Runtime descriptors, portable workspace evidence shapes, the existing one-attempt adapter interface, public observations, and normalized results. It removes adapter-level recovery.                       |
 | `@anastom/engine`           | M3 events, reducer state, lease/store interfaces, execution-host interface, control/recovery policy, and typed errors. It imports no SQLite or vendor runtime.                                             |
 | `@anastom/persistence`      | SQLite migrations and the `DurableRunStore` implementation, including leases, fencing, idempotency, controls, rolling event integrity, and snapshots.                                                      |
 | `@anastom/execution-host`   | New shared POSIX supervisor implementation, process observation, private control records, bounded framed IPC, and the engine-owned `ExecutionHost` implementation. It imports no concrete runtime adapter. |

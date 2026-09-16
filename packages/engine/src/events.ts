@@ -3,6 +3,9 @@ import type {
   ArtifactRef,
   ExecutionFailure,
   RuntimeEvent,
+  RuntimeDescriptor,
+  WorkspaceCheckpoint,
+  WorkspaceDifference,
   WorkspaceRef,
   RuntimeNegotiation,
   RuntimeUsage,
@@ -13,12 +16,62 @@ import { assertRunEvent } from "./event-validation.js";
 /**
  * The lifecycle state of the complete run, reconstructed from ordered events.
  */
-export type RunStatus = "running" | "blocked" | "succeeded" | "failed" | "paused" | "cancelled";
+export type RunStatus =
+  "running" | "blocked" | "succeeded" | "failed" | "paused" | "cancelled" | "recovery-blocked";
 /**
  * The lifecycle state of one scheduled node execution.
  */
 export type AttemptStatus =
-  "scheduled" | "running" | "blocked" | "succeeded" | "failed" | "cancelled";
+  | "scheduled"
+  | "prepared"
+  | "running"
+  | "orphaned"
+  | "blocked"
+  | "succeeded"
+  | "failed"
+  | "cancelled";
+
+/** Durable identity committed before an execution supervisor is prepared. */
+export interface ExecutionPlanRef {
+  version: "anastom.dev/owned-execution/v1alpha1";
+  runId: string;
+  executionId: string;
+  kind: "runtime" | "command";
+  generation: number;
+  planDigest: string;
+}
+
+/** Sanitized proof that a supervisor published the manifest for an execution plan. */
+export interface PersistedExecutionRef extends ExecutionPlanRef {
+  manifestDigest: string;
+}
+
+/** Evidence that prevents recovery from claiming an execution is absent. */
+export type RecoveryBlockReason =
+  | {
+      kind: "execution-unknown";
+      executionId: string;
+      detail:
+        | "invalid-record"
+        | "identity-mismatch"
+        | "boot-mismatch"
+        | "supervisor-unreachable"
+        | "supervisor-lost"
+        | "cleanup-unconfirmed";
+    }
+  | { kind: "cleanup-unknown"; executionId: string }
+  | {
+      kind: "history-incompatible";
+      detail: "missing-descriptor" | "missing-execution-ref";
+    };
+
+/** Typed operator or safety policy reason attached to M3 pause transitions. */
+export type PauseReason =
+  | { kind: "operator"; operationId: string }
+  | { kind: "workspace-conflict"; differences: WorkspaceDifference[] }
+  | { kind: "attempt-budget-exhausted"; nodeId: string; attempts: number }
+  | { kind: "runtime-unavailable"; runtimeId: string }
+  | { kind: "policy-violation"; runtimeId: string };
 
 /**
  * Execution identity, result, and timeout diagnostics for a single node attempt.
@@ -36,6 +89,22 @@ export interface AttemptState {
     cancellation?: "succeeded" | "failed" | "unavailable";
     lateStatus?: "succeeded" | "failed" | "blocked" | "cancelled";
   };
+  executionPlan?: ExecutionPlanRef;
+  execution?: PersistedExecutionRef;
+  workspaceCheckpoint?: WorkspaceCheckpoint;
+  cleanup?: Array<{
+    executionId: string;
+    cause: "pause" | "cancel" | "timeout" | "recovery";
+    outcome: "confirmed" | "unknown";
+  }>;
+  orphan?: {
+    executionId: string;
+    lostGeneration: number;
+    reason: "coordinator-lost" | "launch-interrupted";
+    workspaceObservation: WorkspaceCheckpoint;
+    workspaceDifferences: WorkspaceDifference[];
+    terminalArtifactId?: string;
+  };
 }
 
 /**
@@ -49,6 +118,7 @@ export interface NodeRunState {
   failure?: ExecutionFailure;
   blockedReason?: string;
   command?: CommandReport;
+  pauseReason?: PauseReason;
 }
 
 /**
@@ -65,6 +135,9 @@ export interface RunState {
   nodes: Record<string, NodeRunState>;
   workspace?: WorkspaceRef;
   runtimeNegotiation?: RuntimeNegotiation;
+  runtimeDescriptor?: RuntimeDescriptor;
+  pauseReason?: PauseReason;
+  recoveryBlock?: { operationId: string; reason: RecoveryBlockReason };
   artifacts?: ArtifactRef[];
   workspaceObservation?: { headCommit: string; changedFiles: string[]; diffArtifactId: string };
 }
@@ -74,6 +147,7 @@ export interface RunState {
  */
 export type RunEventPayload =
   | { type: "RuntimeNegotiated"; negotiation: RuntimeNegotiation }
+  | { type: "RuntimeConfigured"; descriptor: RuntimeDescriptor }
   | { type: "WorkspaceAssigned"; workspace: WorkspaceRef }
   | { type: "ArtifactProduced"; nodeId: string; attempt: number; artifact: ArtifactRef }
   | {
@@ -106,8 +180,25 @@ export type RunEventPayload =
       nodeIds: string[];
       inputs: Record<string, JsonValue>;
     }
-  | { type: "NodeReady"; nodeId: string; reason: "dependencies-satisfied" | "retry" | "resumed" }
+  | {
+      type: "NodeReady";
+      nodeId: string;
+      reason: "dependencies-satisfied" | "retry" | "resumed" | "recovered";
+    }
   | { type: "AttemptScheduled"; nodeId: string; attempt: number; runtimeId: string }
+  | {
+      type: "AttemptPrepared";
+      nodeId: string;
+      attempt: number;
+      execution: ExecutionPlanRef;
+      workspaceCheckpoint: WorkspaceCheckpoint;
+    }
+  | {
+      type: "AttemptStartAuthorized";
+      nodeId: string;
+      attempt: number;
+      execution: PersistedExecutionRef;
+    }
   | { type: "AttemptStarted"; nodeId: string; attempt: number }
   | { type: "RuntimeEventObserved"; nodeId: string; attempt: number; event: RuntimeEvent }
   | { type: "AttemptSucceeded"; nodeId: string; attempt: number; output: JsonValue }
@@ -117,12 +208,42 @@ export type RunEventPayload =
   | { type: "NodeSucceeded"; nodeId: string }
   | { type: "NodeFailed"; nodeId: string; failure: ExecutionFailure }
   | { type: "NodeBlocked"; nodeId: string; reason: string }
+  | {
+      type: "AttemptOrphaned";
+      nodeId: string;
+      attempt: number;
+      executionId: string;
+      lostGeneration: number;
+      reason: "coordinator-lost" | "launch-interrupted";
+      workspaceObservation: WorkspaceCheckpoint;
+      workspaceDifferences: WorkspaceDifference[];
+      terminalArtifactId?: string;
+    }
+  | {
+      type: "ControlRequestObserved";
+      operationId: string;
+      action: "pause" | "cancel";
+      recordedAtMs: number;
+    }
+  | {
+      type: "ExecutionCleanupObserved";
+      nodeId: string;
+      attempt: number;
+      executionId: string;
+      cause: "pause" | "cancel" | "timeout" | "recovery";
+      outcome: "confirmed" | "unknown";
+    }
   | { type: "NodePaused"; nodeId: string }
+  | { type: "NodePaused"; nodeId: string; reason: PauseReason }
   | { type: "NodeCancelled"; nodeId: string; reason: string }
   | { type: "RunPaused" }
+  | { type: "RunPaused"; reason: PauseReason }
   | { type: "RunResumed" }
+  | { type: "RunResumed"; operationId: string }
+  | { type: "RunRecoveryBlocked"; operationId: string; reason: RecoveryBlockReason }
   | { type: "RunBlocked"; reason: string }
   | { type: "RunCancelled"; reason: string }
+  | { type: "RunCancelled"; operationId: string; reason: string }
   | { type: "RunCompleted"; outcome: "succeeded" | "failed" };
 
 /**
@@ -220,12 +341,33 @@ export function applyRunEvent(current: RunState | undefined, event: RunEvent): R
   state.sequence = event.sequence;
 
   switch (event.type) {
+    case "RuntimeConfigured":
+      if (
+        state.runtimeDescriptor ||
+        Object.values(state.nodes).some((node) => node.attempts.length)
+      ) {
+        throw new InvalidTransitionError("Runtime configuration must occur once before attempts");
+      }
+      if (
+        state.runtimeNegotiation &&
+        state.runtimeNegotiation.runtimeId !== event.descriptor.runtimeId
+      ) {
+        throw new InvalidTransitionError("Runtime configuration does not match negotiation");
+      }
+      state.runtimeDescriptor = structuredClone(event.descriptor);
+      break;
     case "RuntimeNegotiated":
       if (
         state.runtimeNegotiation ||
         Object.values(state.nodes).some((node) => node.attempts.length)
       ) {
         throw new InvalidTransitionError("Runtime negotiation must occur once before attempts");
+      }
+      if (
+        state.runtimeDescriptor &&
+        state.runtimeDescriptor.runtimeId !== event.negotiation.runtimeId
+      ) {
+        throw new InvalidTransitionError("Runtime negotiation does not match configuration");
       }
       state.runtimeNegotiation = structuredClone(event.negotiation);
       break;
@@ -240,13 +382,20 @@ export function applyRunEvent(current: RunState | undefined, event: RunEvent): R
     case "LateResultObserved":
       applyTimeoutEvent(state, event);
       break;
+    case "ControlRequestObserved":
+    case "ExecutionCleanupObserved":
+      applyOperationalEvent(state, event);
+      break;
     case "AttemptScheduled":
+    case "AttemptPrepared":
+    case "AttemptStartAuthorized":
     case "AttemptStarted":
     case "RuntimeEventObserved":
     case "AttemptSucceeded":
     case "AttemptFailed":
     case "AttemptBlocked":
     case "AttemptCancelled":
+    case "AttemptOrphaned":
       applyAttemptEvent(state, event);
       break;
     case "NodeReady":
@@ -262,11 +411,41 @@ export function applyRunEvent(current: RunState | undefined, event: RunEvent): R
     case "RunBlocked":
     case "RunCancelled":
     case "RunCompleted":
+    case "RunRecoveryBlocked":
       applyLifecycleEvent(state, event);
       break;
   }
 
   return state;
+}
+
+type OperationalEvent = Extract<
+  RunEvent,
+  { type: "ControlRequestObserved" | "ExecutionCleanupObserved" }
+>;
+
+/** Keep mutable controls out of state while retaining immutable execution-cleanup evidence. */
+function applyOperationalEvent(state: RunState, event: OperationalEvent): void {
+  if (event.type === "ControlRequestObserved") {
+    return;
+  }
+  const node = requireNode(state, event.nodeId);
+  const attempt = node.attempts.at(-1);
+  if (
+    !attempt ||
+    attempt.number !== event.attempt ||
+    !["prepared", "running", "orphaned"].includes(attempt.status) ||
+    attempt.executionPlan?.executionId !== event.executionId
+  ) {
+    throw new InvalidTransitionError("Cleanup evidence must identify the current owned execution");
+  }
+  const cleanup = (attempt.cleanup ??= []);
+  if (
+    cleanup.some((item) => item.executionId === event.executionId && item.cause === event.cause)
+  ) {
+    throw new InvalidTransitionError("Cleanup evidence was already recorded for this cause");
+  }
+  cleanup.push({ executionId: event.executionId, cause: event.cause, outcome: event.outcome });
 }
 
 /**
@@ -407,17 +586,37 @@ type AttemptEvent = Extract<
   {
     type:
       | "AttemptScheduled"
+      | "AttemptPrepared"
+      | "AttemptStartAuthorized"
       | "AttemptStarted"
       | "RuntimeEventObserved"
       | "AttemptSucceeded"
       | "AttemptFailed"
       | "AttemptBlocked"
-      | "AttemptCancelled";
+      | "AttemptCancelled"
+      | "AttemptOrphaned";
   }
 >;
 
+type OwnedAttemptEvent = Extract<
+  AttemptEvent,
+  { type: "AttemptPrepared" | "AttemptStartAuthorized" | "AttemptOrphaned" }
+>;
+
+function isOwnedAttemptEvent(event: AttemptEvent): event is OwnedAttemptEvent {
+  return (
+    event.type === "AttemptPrepared" ||
+    event.type === "AttemptStartAuthorized" ||
+    event.type === "AttemptOrphaned"
+  );
+}
+
 /** Apply attempt transitions after run identity and sequence checks. */
 function applyAttemptEvent(state: RunState, event: AttemptEvent): void {
+  if (isOwnedAttemptEvent(event)) {
+    applyOwnedAttemptEvent(state, event);
+    return;
+  }
   switch (event.type) {
     case "AttemptScheduled": {
       const node = requireNode(state, event.nodeId);
@@ -426,6 +625,13 @@ function applyAttemptEvent(state: RunState, event: AttemptEvent): void {
         throw new InvalidTransitionError(
           `Expected attempt ${node.attempts.length + 1} for node ${node.id}`,
         );
+      }
+      if (
+        event.runtimeId !== "command" &&
+        state.runtimeDescriptor &&
+        state.runtimeDescriptor.runtimeId !== event.runtimeId
+      ) {
+        throw new InvalidTransitionError("Scheduled runtime does not match its descriptor");
       }
       node.attempts.push({
         number: event.attempt,
@@ -437,6 +643,11 @@ function applyAttemptEvent(state: RunState, event: AttemptEvent): void {
     case "AttemptStarted": {
       const node = requireNode(state, event.nodeId);
       requireNodeStatus(node, event.type, ["ready"]);
+      if (state.runtimeDescriptor) {
+        throw new InvalidTransitionError(
+          "A configured durable runtime requires prepared start authorization",
+        );
+      }
       requireCurrentAttempt(node, event.attempt, "scheduled").status = "running";
       node.status = "running";
       break;
@@ -508,6 +719,106 @@ function applyAttemptEvent(state: RunState, event: AttemptEvent): void {
   }
 }
 
+/** Apply the M3 prepare, authorize and orphan transitions around owned execution. */
+function applyOwnedAttemptEvent(state: RunState, event: OwnedAttemptEvent): void {
+  switch (event.type) {
+    case "AttemptPrepared":
+      applyAttemptPrepared(state, event);
+      break;
+    case "AttemptStartAuthorized":
+      applyAttemptStartAuthorized(state, event);
+      break;
+    case "AttemptOrphaned":
+      applyAttemptOrphaned(state, event);
+      break;
+  }
+}
+
+function applyAttemptPrepared(
+  state: RunState,
+  event: Extract<OwnedAttemptEvent, { type: "AttemptPrepared" }>,
+): void {
+  const node = requireNode(state, event.nodeId);
+  requireNodeStatus(node, event.type, ["ready"]);
+  const attempt = requireCurrentAttempt(node, event.attempt, "scheduled");
+  const expectedKind = attempt.runtimeId === "command" ? "command" : "runtime";
+  if (
+    event.execution.runId !== state.runId ||
+    event.execution.generation < 1 ||
+    (state.workspace && event.workspaceCheckpoint.workspaceId !== state.workspace.id) ||
+    event.execution.kind !== expectedKind
+  ) {
+    throw new InvalidTransitionError("Prepared attempt evidence does not match the run");
+  }
+  if (
+    expectedKind === "runtime" &&
+    (!state.runtimeDescriptor || state.runtimeDescriptor.runtimeId !== attempt.runtimeId)
+  ) {
+    throw new InvalidTransitionError("Prepared attempt runtime does not match its descriptor");
+  }
+  attempt.status = "prepared";
+  attempt.executionPlan = structuredClone(event.execution);
+  attempt.workspaceCheckpoint = structuredClone(event.workspaceCheckpoint);
+}
+
+function applyAttemptStartAuthorized(
+  state: RunState,
+  event: Extract<OwnedAttemptEvent, { type: "AttemptStartAuthorized" }>,
+): void {
+  const node = requireNode(state, event.nodeId);
+  requireNodeStatus(node, event.type, ["ready"]);
+  const attempt = requireCurrentAttempt(node, event.attempt, "prepared");
+  const plan = attempt.executionPlan;
+  if (
+    !plan ||
+    plan.version !== event.execution.version ||
+    plan.runId !== event.execution.runId ||
+    plan.executionId !== event.execution.executionId ||
+    plan.kind !== event.execution.kind ||
+    plan.generation !== event.execution.generation ||
+    plan.planDigest !== event.execution.planDigest
+  ) {
+    throw new InvalidTransitionError("Authorized execution does not match its prepared plan");
+  }
+  attempt.status = "running";
+  attempt.execution = structuredClone(event.execution);
+  node.status = "running";
+}
+
+function applyAttemptOrphaned(
+  state: RunState,
+  event: Extract<OwnedAttemptEvent, { type: "AttemptOrphaned" }>,
+): void {
+  const node = requireNode(state, event.nodeId);
+  requireNodeStatus(node, event.type, ["ready", "running"]);
+  const attempt = node.attempts.at(-1);
+  if (
+    !attempt ||
+    attempt.number !== event.attempt ||
+    !["prepared", "running"].includes(attempt.status) ||
+    attempt.executionPlan?.executionId !== event.executionId ||
+    attempt.executionPlan.generation !== event.lostGeneration
+  ) {
+    throw new InvalidTransitionError("Orphan evidence must identify the latest owned attempt");
+  }
+  if (
+    event.terminalArtifactId &&
+    !state.artifacts?.some((artifact) => artifact.id === event.terminalArtifactId)
+  ) {
+    throw new InvalidTransitionError("Orphan terminal artifact is missing");
+  }
+  attempt.status = "orphaned";
+  attempt.orphan = {
+    executionId: event.executionId,
+    lostGeneration: event.lostGeneration,
+    reason: event.reason,
+    workspaceObservation: structuredClone(event.workspaceObservation),
+    workspaceDifferences: [...event.workspaceDifferences],
+    ...(event.terminalArtifactId ? { terminalArtifactId: event.terminalArtifactId } : {}),
+  };
+  node.status = "running";
+}
+
 type NodeEvent = Extract<
   RunEvent,
   {
@@ -524,13 +835,20 @@ function applyNodeEvent(state: RunState, event: NodeEvent): void {
       const allowed: Record<typeof event.reason, NodeStatus[]> = {
         retry: ["running"],
         resumed: ["paused"],
+        recovered: ["running"],
         "dependencies-satisfied": ["pending"],
       };
       requireNodeStatus(node, event.type, allowed[event.reason]);
       if (event.reason === "retry" && node.attempts.at(-1)?.status !== "failed") {
         throw new InvalidTransitionError(`Node ${node.id} cannot retry without a failed attempt`);
       }
+      if (event.reason === "recovered" && node.attempts.at(-1)?.status !== "orphaned") {
+        throw new InvalidTransitionError(
+          `Node ${node.id} cannot recover without an orphaned attempt`,
+        );
+      }
       node.status = "ready";
+      delete node.pauseReason;
       break;
     }
     case "NodeSucceeded": {
@@ -560,15 +878,37 @@ function applyNodeEvent(state: RunState, event: NodeEvent): void {
     }
     case "NodePaused": {
       const node = requireNode(state, event.nodeId);
-      requireNodeStatus(node, event.type, ["pending", "ready"]);
+      if ("reason" in event) {
+        requireNodeStatus(node, event.type, ["pending", "ready", "running"]);
+        if (
+          node.status === "running" &&
+          !(["cancelled", "orphaned"] as AttemptStatus[]).includes(
+            node.attempts.at(-1)?.status ?? "scheduled",
+          )
+        ) {
+          throw new InvalidTransitionError(
+            "A running node can pause only after cancellation or orphaning",
+          );
+        }
+        node.pauseReason = structuredClone(event.reason);
+      } else {
+        requireNodeStatus(node, event.type, ["pending", "ready"]);
+      }
       node.status = "paused";
       break;
     }
     case "NodeCancelled": {
       const node = requireNode(state, event.nodeId);
       requireNodeStatus(node, event.type, ["pending", "ready", "running", "blocked", "paused"]);
-      if (node.status === "running") {
-        requireCurrentAttempt(node, node.attempts.length, "cancelled");
+      if (
+        node.status === "running" &&
+        !(["cancelled", "orphaned"] as AttemptStatus[]).includes(
+          node.attempts.at(-1)?.status ?? "scheduled",
+        )
+      ) {
+        throw new InvalidTransitionError(
+          "A running node can cancel only after attempt cancellation or orphaning",
+        );
       }
       node.status = "cancelled";
       node.blockedReason = event.reason;
@@ -579,7 +919,15 @@ function applyNodeEvent(state: RunState, event: NodeEvent): void {
 
 type LifecycleEvent = Extract<
   RunEvent,
-  { type: "RunPaused" | "RunResumed" | "RunBlocked" | "RunCancelled" | "RunCompleted" }
+  {
+    type:
+      | "RunPaused"
+      | "RunResumed"
+      | "RunBlocked"
+      | "RunCancelled"
+      | "RunCompleted"
+      | "RunRecoveryBlocked";
+  }
 >;
 
 /** Apply lifecycle transitions after run identity and sequence checks. */
@@ -589,13 +937,44 @@ function applyLifecycleEvent(state: RunState, event: LifecycleEvent): void {
       if (state.status !== "running") {
         throw new InvalidTransitionError(`RunPaused is invalid in ${state.status} state`);
       }
+      if (
+        "reason" in event &&
+        Object.values(state.nodes).some((node) => node.status === "running")
+      ) {
+        throw new InvalidTransitionError(
+          "A durable pause requires every active node to stop before the run pauses",
+        );
+      }
       state.status = "paused";
+      if ("reason" in event) {
+        state.pauseReason = structuredClone(event.reason);
+      }
       break;
     case "RunResumed":
-      if (state.status !== "paused") {
+      if (
+        state.status !== "paused" &&
+        !("operationId" in event && state.status === "recovery-blocked")
+      ) {
         throw new InvalidTransitionError(`RunResumed is invalid in ${state.status} state`);
       }
+      if (
+        state.status === "recovery-blocked" &&
+        Object.values(state.nodes).some((node) => {
+          const attemptStatus = node.attempts.at(-1)?.status;
+          return (
+            attemptStatus === "prepared" ||
+            attemptStatus === "running" ||
+            (attemptStatus === "orphaned" && node.status !== "ready" && node.status !== "paused")
+          );
+        })
+      ) {
+        throw new InvalidTransitionError(
+          "Recovery must make every affected attempt schedulable or paused before resuming",
+        );
+      }
       state.status = "running";
+      delete state.pauseReason;
+      delete state.recoveryBlock;
       break;
     case "RunBlocked":
       if (state.status !== "running") {
@@ -604,10 +983,27 @@ function applyLifecycleEvent(state: RunState, event: LifecycleEvent): void {
       state.status = "blocked";
       break;
     case "RunCancelled":
-      if (!(["running", "blocked", "paused"] as RunStatus[]).includes(state.status)) {
+      if (
+        !(["running", "blocked", "paused", "recovery-blocked"] as RunStatus[]).includes(
+          state.status,
+        )
+      ) {
         throw new InvalidTransitionError(`RunCancelled is invalid in ${state.status} state`);
       }
+      if (
+        "operationId" in event &&
+        Object.values(state.nodes).some(
+          (node) => !["succeeded", "failed", "cancelled"].includes(node.status),
+        )
+      ) {
+        throw new InvalidTransitionError(
+          "Durable cancellation requires every nonterminal node to be cancelled",
+        );
+      }
       state.status = "cancelled";
+      break;
+    case "RunRecoveryBlocked":
+      applyRunRecoveryBlocked(state, event);
       break;
     case "RunCompleted":
       if (state.status !== "running") {
@@ -628,4 +1024,36 @@ function applyLifecycleEvent(state: RunState, event: LifecycleEvent): void {
       state.status = event.outcome;
       break;
   }
+}
+
+function applyRunRecoveryBlocked(
+  state: RunState,
+  event: Extract<LifecycleEvent, { type: "RunRecoveryBlocked" }>,
+): void {
+  if (!(state.status === "running" || state.status === "recovery-blocked")) {
+    throw new InvalidTransitionError(`RunRecoveryBlocked is invalid in ${state.status} state`);
+  }
+  if (event.reason.kind !== "history-incompatible") {
+    const executionId = event.reason.executionId;
+    const attempt = Object.values(state.nodes)
+      .map((node) => node.attempts.at(-1))
+      .find((candidate) => candidate?.executionPlan?.executionId === executionId);
+    if (!attempt) {
+      throw new InvalidTransitionError("Recovery block does not match an owned execution");
+    }
+    if (
+      event.reason.kind === "cleanup-unknown" &&
+      !attempt.cleanup?.some(
+        (cleanup) =>
+          cleanup.executionId === executionId && cleanup.outcome === "unknown",
+      )
+    ) {
+      throw new InvalidTransitionError("Cleanup recovery block requires unknown cleanup evidence");
+    }
+  }
+  state.status = "recovery-blocked";
+  state.recoveryBlock = {
+    operationId: event.operationId,
+    reason: structuredClone(event.reason),
+  };
 }

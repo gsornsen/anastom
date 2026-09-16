@@ -138,6 +138,9 @@ importers:
       '@anastom/runtime-contract':
         specifier: workspace:*
         version: link:../runtime-contract
+      ajv:
+        specifier: ^8.17.1
+        version: 8.20.0
 
   packages/runtime-codex:
     dependencies:
@@ -150,6 +153,9 @@ importers:
       '@openai/codex':
         specifier: 0.154.0
         version: 0.154.0
+      ajv:
+        specifier: ^8.17.1
+        version: 8.20.0
 
   packages/runtime-contract:
     dependencies:
@@ -189,6 +195,9 @@ importers:
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
         version: 0.85.1(ws@8.21.3)
+      ajv:
+        specifier: ^8.17.1
+        version: 8.20.0
 
   packages/workspaces:
     dependencies:

@@ -4,7 +4,8 @@ import type {
   ExecutionHandle,
   ExecutionRequest,
   ExecutionResult,
-  RuntimeAdapter,
+  DurableRuntimeAdapter,
+  RuntimeDescriptorCodec,
   RuntimeCapabilities,
   RuntimeEvent,
 } from "@anastom/runtime-contract";
@@ -20,6 +21,10 @@ import { ClaudeNativeTurn } from "./native.js";
 import { inspectClaudeManagedPolicy } from "./policy.js";
 import { terminateOwnedGroup } from "./process.js";
 import { createClaudeCodeProfile, validateClaudeSelection } from "./profile.js";
+import {
+  parseClaudeCodeRuntimeDescriptor,
+  type ClaudeCodeRuntimeDescriptor,
+} from "./descriptor.js";
 
 interface Pending {
   queue: RuntimeEvent[];
@@ -66,7 +71,7 @@ function classifyFailure(error: unknown): ExecutionResult {
 }
 
 /** One fresh unmodified native CLI process group per attempt; only public evidence escapes. */
-export class ClaudeCodeRuntimeAdapter implements RuntimeAdapter {
+export class ClaudeCodeRuntimeAdapter implements DurableRuntimeAdapter {
   readonly id = "claude-code";
   private readonly executions = new Map<string, Pending>();
 
@@ -79,6 +84,20 @@ export class ClaudeCodeRuntimeAdapter implements RuntimeAdapter {
         "Claude Code executable injection is test-only",
       );
     }
+  }
+
+  /** Return the exact public selection required to rebuild this adapter after restart. */
+  async descriptor(): Promise<ClaudeCodeRuntimeDescriptor> {
+    return parseClaudeCodeRuntimeDescriptor({
+      version: "anastom.dev/runtime-descriptor/v1alpha1",
+      runtimeId: "claude-code",
+      configurationVersion: "anastom.dev/runtime-claude-code-config/v1alpha1",
+      configuration: {
+        provider: "anthropic",
+        model: this.options.model,
+        authSource: this.options.authSource,
+      },
+    });
   }
 
   private async preflight(): Promise<{ executable: string; environment: NodeJS.ProcessEnv }> {
@@ -324,3 +343,20 @@ export class ClaudeCodeRuntimeAdapter implements RuntimeAdapter {
 export { validateClaudeSelection, createClaudeCodeProfile } from "./profile.js";
 export { CLAUDE_CODE_VERSION, resolveClaudeCodeExecutable } from "./executable.js";
 export type { ClaudeAuthSource } from "./auth.js";
+export { parseClaudeCodeRuntimeDescriptor } from "./descriptor.js";
+export type { ClaudeCodeRuntimeDescriptor } from "./descriptor.js";
+
+/** Exact codec used by the M3 composition root to reconstruct Claude Code safely. */
+export const claudeCodeRuntimeDescriptorCodec: RuntimeDescriptorCodec<ClaudeCodeRuntimeDescriptor> =
+  {
+    runtimeId: "claude-code",
+    parse: parseClaudeCodeRuntimeDescriptor,
+    create: async (descriptor) => {
+      const parsed = parseClaudeCodeRuntimeDescriptor(descriptor);
+      return new ClaudeCodeRuntimeAdapter({
+        provider: parsed.configuration.provider,
+        model: parsed.configuration.model,
+        authSource: parsed.configuration.authSource,
+      });
+    },
+  };

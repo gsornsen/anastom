@@ -1,6 +1,6 @@
 # 0018 — M3 production contract and package boundaries
 
-- Status: Proposed after completed feasibility; owner review required before implementation
+- Status: Proposed after completed feasibility; stacked implementation authorized, owner acceptance required before merge
 - Date: 2026-09-16
 
 ## Context
@@ -11,7 +11,7 @@ Those probes also showed why copying their temporary types directly would be uns
 
 ## Proposal
 
-Adopt [the M3 production contract](../M3_PRODUCTION_CONTRACT.md) as the implementation gate.
+Use [the M3 production contract](../M3_PRODUCTION_CONTRACT.md) as the implementation baseline while the owner reviews the completed stack before acceptance and merge.
 
 The proposal makes the following package decisions:
 
@@ -20,7 +20,7 @@ The proposal makes the following package decisions:
 - add `@anastom/execution-host` for shared POSIX supervision and bounded authenticated IPC;
 - keep execution-host and durable-store interfaces in `@anastom/engine`, with infrastructure packages implementing them;
 - extend `@anastom/persistence` through additive tables for leases, mutation receipts, controls, rolling event integrity, and snapshots;
-- move the proven checkpoint algorithm into `@anastom/workspaces`;
+- keep portable checkpoint evidence shapes beside existing workspace records in `@anastom/runtime-contract`, while moving the proven capture/comparison algorithm into `@anastom/workspaces`;
 - add a private-state-root capability to `@anastom/path-policy` while retaining the existing authored-child resolver; and
 - keep `@anastom/cli` as the runtime registry and process composition root.
 

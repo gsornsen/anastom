@@ -4,13 +4,13 @@ Own deterministic scheduling, typed event transitions, fresh attempt contexts, r
 
 ## Public API
 
-`WorkflowEngine.createRun` preflights a selected worker's capabilities before persisting initial state; `tick` executes one ready attempt; `runToCompletion` advances sequentially. `inspect` and `events` read evidence without invoking workers. `RunPersistence`, `ArtifactStore`, and `CommandExecutor` are injectable boundaries. `buildContext` takes named options and returns frozen context, canonical bytes, and digest. Renderers expose the recorded negotiation, public identity, partial usage, status, and evidence.
+`WorkflowEngine.createRun` preflights a selected worker's capabilities before persisting initial state; `tick` executes one ready attempt; `runToCompletion` advances sequentially. `inspect` and `events` read evidence without invoking workers. `RunPersistence`, `ArtifactStore`, and `CommandExecutor` are injectable boundaries. `buildContext` takes named options and returns frozen context, canonical bytes, and digest. M3 event contracts add exact runtime configuration, prepared and authorized execution references, workspace checkpoints, control/cleanup observations, orphan evidence, typed pause reasons, and recovery-blocked state while preserving legacy lifecycle records. Renderers expose the recorded negotiation, public identity, partial usage, status, and evidence.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api engine`; output is in `.generated/api/engine/` and is not committed.
 
 ## Boundaries and invariants
 
-The engine imports core, path-policy, and runtime contracts, not Pi or provider SDKs. Events are authoritative; worker runs record the accepted capability snapshot before attempts, then replay validated identity and one final usage observation from existing append-only events. A sanitized typed policy rejection from an adapter's `start` is persisted as that attempt's failure and prevents retry. No telemetry decides node success. All outputs pass schema validation before node success. A timeout wins over a late success, and uncertain termination prevents unsafe retry. The local verifier uses argv without a shell, resolves an existing working directory inside its canonical workspace including safe internal symlinks, and excludes provider credentials.
+The engine imports core, path-policy, and runtime contracts, not Pi or provider SDKs. Events are authoritative; worker runs record the accepted capability snapshot before attempts, then replay validated identity and one final usage observation from existing append-only events. New M3 histories separate durable preparation from start authorization and classify an unconfirmed execution as `recovery-blocked`; they do not infer absence from a lease or PID. Command and runtime attempts share the same owned-execution evidence. Legacy events replay with their original meaning. A sanitized typed policy rejection from an adapter's `start` is persisted as that attempt's failure and prevents retry. No telemetry decides node success. All outputs pass schema validation before node success. A timeout wins over a late success, and uncertain termination prevents unsafe retry. The local verifier uses argv without a shell, resolves an existing working directory inside its canonical workspace including safe internal symlinks, and excludes provider credentials.
 
 ## Development
 
@@ -27,6 +27,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker task execution is delivered. Parallel graphs, approvals, durable worker recovery, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
+Single-worker task execution is delivered. M3 descriptor and event/reducer contracts are implemented, but the durable store, execution host, recovery coordinator, and operator commands are still being built. Parallel graphs, approvals, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
 
 License: [AGPL-3.0-only](../../LICENSE).

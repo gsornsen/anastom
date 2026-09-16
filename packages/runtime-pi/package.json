@@ -8,6 +8,7 @@
   "dependencies": {
     "@anastom/core": "workspace:*",
     "@anastom/runtime-contract": "workspace:*",
-    "@earendil-works/pi-coding-agent": "0.85.1"
+    "@earendil-works/pi-coding-agent": "0.85.1",
+    "ajv": "^8.17.1"
   }
 }

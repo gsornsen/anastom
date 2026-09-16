@@ -1,9 +1,12 @@
 import Ajv from "ajv";
+import { canonicalJson } from "@anastom/core";
 import capabilitiesSchema from "../schemas/capabilities.v1alpha1.json" with { type: "json" };
 import observationSchema from "../schemas/observation.v1alpha1.json" with { type: "json" };
+import runtimeDescriptorSchema from "../schemas/runtime-descriptor.v1alpha1.json" with { type: "json" };
 import type {
   RuntimeAdapter,
   RuntimeCapabilities,
+  RuntimeDescriptor,
   RuntimeEvent,
   RuntimeNegotiation,
 } from "./index.js";
@@ -11,6 +14,8 @@ import type {
 const ajv = new Ajv({ allErrors: true, strict: false });
 const capabilitiesValidator = ajv.compile(capabilitiesSchema);
 const observationValidator = ajv.compile(observationSchema);
+const runtimeDescriptorValidator = ajv.compile(runtimeDescriptorSchema);
+const MAX_RUNTIME_DESCRIPTOR_BYTES = 16 * 1024;
 
 /** A sanitized pre-state failure to probe or satisfy the explicitly selected runtime. */
 export class RuntimePreflightError extends Error {
@@ -38,6 +43,22 @@ export function assertRuntimeCapabilities(value: unknown): asserts value is Runt
 export function assertRuntimeEvent(value: unknown): asserts value is RuntimeEvent {
   if (!observationValidator(value)) {
     throw new Error("Invalid public runtime observation");
+  }
+}
+
+/** Validate the shared descriptor envelope and its canonical UTF-8 persistence bound. */
+export function assertRuntimeDescriptor(value: unknown): asserts value is RuntimeDescriptor {
+  if (!runtimeDescriptorValidator(value)) {
+    throw new RuntimePreflightError("policy-violation", "Runtime returned an invalid descriptor");
+  }
+  let bytes: number;
+  try {
+    bytes = Buffer.byteLength(canonicalJson(value));
+  } catch {
+    throw new RuntimePreflightError("policy-violation", "Runtime returned an invalid descriptor");
+  }
+  if (bytes > MAX_RUNTIME_DESCRIPTOR_BYTES) {
+    throw new RuntimePreflightError("policy-violation", "Runtime descriptor exceeds 16 KiB");
   }
 }
 

@@ -1,0 +1,52 @@
+[
+  {
+    "type": "RunCreated",
+    "runId": "run",
+    "sequence": 1,
+    "workflowInstanceId": "run:root",
+    "workflowId": "test/workflow",
+    "workflowVersion": "0.1.0",
+    "nodeIds": ["work"],
+    "inputs": {}
+  },
+  {
+    "type": "NodeReady",
+    "runId": "run",
+    "sequence": 2,
+    "nodeId": "work",
+    "reason": "dependencies-satisfied"
+  },
+  {
+    "type": "AttemptScheduled",
+    "runId": "run",
+    "sequence": 3,
+    "nodeId": "work",
+    "attempt": 1,
+    "runtimeId": "pi"
+  },
+  {
+    "type": "AttemptStarted",
+    "runId": "run",
+    "sequence": 4,
+    "nodeId": "work",
+    "attempt": 1
+  },
+  {
+    "type": "RuntimeEventObserved",
+    "runId": "run",
+    "sequence": 5,
+    "nodeId": "work",
+    "attempt": 1,
+    "event": { "type": "metadata", "provider": "anthropic", "model": "legacy" }
+  },
+  {
+    "type": "AttemptSucceeded",
+    "runId": "run",
+    "sequence": 6,
+    "nodeId": "work",
+    "attempt": 1,
+    "output": {}
+  },
+  { "type": "NodeSucceeded", "runId": "run", "sequence": 7, "nodeId": "work" },
+  { "type": "RunCompleted", "runId": "run", "sequence": 8, "outcome": "succeeded" }
+]

@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://anastom.dev/schemas/runtime-codex-config.v1alpha1.json",
+  "title": "Anastom Codex runtime descriptor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "runtimeId", "configurationVersion", "configuration"],
+  "properties": {
+    "version": { "const": "anastom.dev/runtime-descriptor/v1alpha1" },
+    "runtimeId": { "const": "codex" },
+    "configurationVersion": { "const": "anastom.dev/runtime-codex-config/v1alpha1" },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model", "authSource"],
+      "properties": {
+        "provider": { "const": "openai" },
+        "model": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,255}$"
+        },
+        "reasoningEffort": { "enum": ["low", "medium", "high", "xhigh", "max"] },
+        "authSource": { "const": "file-store" }
+      }
+    }
+  }
+}

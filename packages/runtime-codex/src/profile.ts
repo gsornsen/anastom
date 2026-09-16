@@ -75,7 +75,7 @@ export function validateSelection(
     );
   }
   if (
-    !/^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,127}$/.test(model) ||
+    !/^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,255}$/.test(model) ||
     (effort && !["low", "medium", "high", "xhigh", "max"].includes(effort))
   ) {
     throw new RuntimePreflightError(

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add an exact versioned descriptor codec for OpenAI model, optional reasoning effort, and file-store auth ownership while excluding executable and auth-directory overrides.
 - Add the exact-pinned native Codex CLI adapter for one fresh owned filesystem agent attempt, with explicit OpenAI model selection, capability preflight, bounded discovery/context profile, and normal file-backed authentication ownership.
 - Add a model-free native effective-policy inspection before Codex execution; managed requirements/configuration and unavailable policy evidence fail closed without starting the model.
 - Normalize native lifecycle, configured identity, and partial token usage while dropping private transcript, tool, reasoning, and provider-error bodies.

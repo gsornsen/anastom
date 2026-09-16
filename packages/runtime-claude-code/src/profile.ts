@@ -12,7 +12,7 @@ export function validateClaudeSelection(
   model: string,
   source: ClaudeAuthSource,
 ): void {
-  if (provider !== "anthropic" || !/^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,127}$/.test(model)) {
+  if (provider !== "anthropic" || !/^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,255}$/.test(model)) {
     throw new RuntimePreflightError(
       "policy-violation",
       "Claude Code requires explicit --provider anthropic and a supported --model identifier",
