@@ -2,7 +2,7 @@
 
 ## Status
 
-Process-ownership phase implemented and passing on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24) on 2026-09-16. The production-shaped supervisor-protocol phase also passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked [PR #25](https://github.com/gsornsen/anastom/pull/25). The SQLite lease, fencing, idempotency, and control-inbox contention phase passes on the same local/CI platforms in stacked [PR #26](https://github.com/gsornsen/anastom/pull/26). The exact workspace-checkpoint phase passes locally on the owner macOS host; Linux and clean macOS CI are pending on its stacked change. Snapshot fallback remains the final feasibility phase before public M3 APIs are frozen.
+Process-ownership phase implemented and passing on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24) on 2026-09-16. The production-shaped supervisor-protocol phase also passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked [PR #25](https://github.com/gsornsen/anastom/pull/25). The SQLite lease, fencing, idempotency, and control-inbox contention phase passes on the same local/CI platforms in stacked [PR #26](https://github.com/gsornsen/anastom/pull/26). The exact workspace-checkpoint phase passes on those platforms in stacked [PR #27](https://github.com/gsornsen/anastom/pull/27). Snapshot fallback remains the final feasibility phase before public M3 APIs are frozen.
 
 The accepted [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) require evidence before choosing an execution-recovery interface. This document records that evidence. The process probe makes no provider request, reads no real authentication store, and changes no production runtime contract.
 
@@ -218,7 +218,7 @@ The production-shaped protocol confirms this candidate boundary on the observed 
 - Recovery trusts neither a launcher PID nor an unverified manifest. It checks host/boot identity, a production-grade process identity, process group, supervisor-issued execution capability, execution ID, lease generation, run-owned path, and manifest schema before requesting cleanup.
 - If both supervisor and authenticated execution leader are absent but a group may remain, recovery reports `unknown` and pauses. It never signals a bare numeric group.
 
-No public signature is fixed by this phase. Bounded public event/result relay and cancel/parent-death behavior now pass for Pi, Codex, Claude Code, and commands in the temporary run-owned boundary. Workspace identity now has local evidence, but its cross-platform result, final state-layout placement, snapshot fallback, and remaining production concerns remain gates before `RuntimeAdapter.recover()` is removed or replaced.
+No public signature is fixed by this phase. Bounded public event/result relay and cancel/parent-death behavior now pass for Pi, Codex, Claude Code, and commands in the temporary run-owned boundary. Workspace identity now has cross-platform evidence, but final state-layout placement, snapshot fallback, and remaining production concerns remain gates before `RuntimeAdapter.recover()` is removed or replaced.
 
 ## Security and evidence limits
 
@@ -226,13 +226,12 @@ No public signature is fixed by this phase. Bounded public event/result relay an
 - A SHA-256 boot-identity digest is emitted to demonstrate same-boot binding without printing the source boot identifier. It is temporary console evidence and is not checked into the repository.
 - The probe's `ps` start token distinguishes ordinary PID reuse on the same identified host boot, but macOS exposes that value only to one-second precision. It is evidence for this experiment, not sufficient production authority. The production protocol must combine the strongest portable process identity available with a supervisor-issued random execution capability and host/boot binding, and it must fail closed when those cannot authenticate the intended process. Cross-host recovery remains rejected by ADR 0017.
 - The local run used synthetic adapter/session doubles and a generic supervisor worker. It proves lifecycle mechanics, not provider-session behavior or model quality.
-- The first Vitest boundary passed on Ubuntu 24.04 and macOS 15 in PR #24. The production-shaped supervisor protocol passed both supported CI hosts again in stacked PR #25.
+- The process, supervisor, SQLite, and workspace boundaries passed on Ubuntu 24.04 and macOS 15 in stacked PRs #24–#27.
 - The workspace probe hashes ignored content in bounded feasibility memory; the production implementation must stream bounded reads and retain the same fail-closed outcomes.
 - Snapshot correctness, runtime-descriptor reconstruction, production integration, and complete pause/cancel/resume semantics remain unproved.
 
 ## Next feasibility gates
 
-1. Confirm the workspace-checkpoint matrix on Ubuntu 24.04 and clean macOS 15 CI.
-2. Prove snapshot-plus-tail equality and corrupt/unknown snapshot fallback to full event replay.
-3. Resolve production process identity, socket placement/path length, and bounded operational-record loading before promoting the prototypes into package contracts.
-4. Revise ADR 0017 and the M3 build brief if any later evidence contradicts the accepted boundaries.
+1. Prove snapshot-plus-tail equality and corrupt/unknown snapshot fallback to full event replay.
+2. Resolve production process identity, socket placement/path length, and bounded operational-record loading before promoting the prototypes into package contracts.
+3. Revise ADR 0017 and the M3 build brief if any later evidence contradicts the accepted boundaries.
