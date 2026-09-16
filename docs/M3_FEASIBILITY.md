@@ -2,7 +2,7 @@
 
 ## Status
 
-Process-ownership phase implemented and passing on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24) on 2026-09-16. The next production-shaped supervisor-protocol phase passes locally on the owner macOS host and awaits its stacked Linux/macOS CI result. SQLite lease/idempotency contention, exact workspace checkpoints, and snapshot fallback remain later feasibility phases before public M3 APIs are frozen.
+Process-ownership phase implemented and passing on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24) on 2026-09-16. The production-shaped supervisor-protocol phase also passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked [PR #25](https://github.com/gsornsen/anastom/pull/25). SQLite lease/idempotency contention, exact workspace checkpoints, and snapshot fallback remain later feasibility phases before public M3 APIs are frozen.
 
 The accepted [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) require evidence before choosing an execution-recovery interface. This document records that evidence. The process probe makes no provider request, reads no real authentication store, and changes no production runtime contract.
 
@@ -156,14 +156,13 @@ No public signature is fixed by this phase. Bounded public event/result relay an
 - A SHA-256 boot-identity digest is emitted to demonstrate same-boot binding without printing the source boot identifier. It is temporary console evidence and is not checked into the repository.
 - The probe's `ps` start token distinguishes ordinary PID reuse on the same identified host boot, but macOS exposes that value only to one-second precision. It is evidence for this experiment, not sufficient production authority. The production protocol must combine the strongest portable process identity available with a supervisor-issued random execution capability and host/boot binding, and it must fail closed when those cannot authenticate the intended process. Cross-host recovery remains rejected by ADR 0017.
 - The local run used synthetic adapter/session doubles and a generic supervisor worker. It proves lifecycle mechanics, not provider-session behavior or model quality.
-- The first Vitest boundary passed on Ubuntu 24.04 and macOS 15 in PR #24. That establishes portability of the process-ownership prototype on the supported CI hosts; the production-shaped supervisor protocol must pass both again before its cross-platform gate is recorded complete.
+- The first Vitest boundary passed on Ubuntu 24.04 and macOS 15 in PR #24. The production-shaped supervisor protocol passed both supported CI hosts again in stacked PR #25.
 - The probe intentionally leaves SQLite fencing, snapshot correctness, workspace checkpoints, runtime-descriptor reconstruction, and complete pause/cancel/resume semantics unproved.
 
 ## Next feasibility gates
 
-1. Confirm the production-shaped supervisor protocol through model-free Pi, Codex, Claude Code, and command owners on both Linux and macOS CI.
-2. Prove SQLite lease acquisition, fencing, idempotent mutation keys, and control-request contention across real processes.
-3. Prove exact workspace checkpoints across tracked, untracked, staged, committed, binary, and symlink changes.
-4. Prove snapshot-plus-tail equality and corrupt/unknown snapshot fallback to full event replay.
-5. Resolve production process identity, socket placement/path length, and bounded operational-record loading before promoting the prototype into package contracts.
-6. Revise ADR 0017 and the M3 build brief if any later evidence contradicts the shared-supervisor candidate.
+1. Prove SQLite lease acquisition, fencing, idempotent mutation keys, and control-request contention across real processes.
+2. Prove exact workspace checkpoints across tracked, untracked, staged, committed, binary, and symlink changes.
+3. Prove snapshot-plus-tail equality and corrupt/unknown snapshot fallback to full event replay.
+4. Resolve production process identity, socket placement/path length, and bounded operational-record loading before promoting the prototype into package contracts.
+5. Revise ADR 0017 and the M3 build brief if any later evidence contradicts the shared-supervisor candidate.
