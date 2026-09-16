@@ -4,7 +4,7 @@ Expose local operator commands for validation, graph rendering, execution, statu
 
 ## Public API
 
-`runCli(args, options)` returns an exit code with injectable IO. YAML fake workflows retain process-local storage. Markdown task execution creates SQLite state and filesystem artifacts under the selected state directory; separate processes can inspect the resulting run ID and the recorded worker capabilities, identity, and partial usage.
+`runCli(args, options)` returns an exit code with injectable IO. Run Anastom from a directory containing the authored Task/Workflow source tree: CLI-selected Task/Workflow files and workflow schema references must remain inside its current directory after physical resolution. `--repo` can still target a separate Git checkout. Direct core loaders remain available for trusted local callers with their own file authorization. YAML fake workflows retain process-local storage. Markdown task execution creates SQLite state and filesystem artifacts under the selected state directory; separate processes can inspect the resulting run ID and the recorded worker capabilities, identity, and partial usage.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api cli`; output is in `.generated/api/cli/` and is not committed.
 

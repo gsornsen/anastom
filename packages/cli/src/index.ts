@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { resolve, extname } from "node:path";
-import { digestJson, loadTask, loadWorkflow, type WorkflowDefinition } from "@anastom/core";
+import {
+  digestJson,
+  loadTaskWithinRoot,
+  loadWorkflowWithinRoot,
+  type WorkflowDefinition,
+} from "@anastom/core";
 import {
   InMemoryRunPersistence,
   WorkflowEngine,
@@ -86,7 +91,10 @@ function stringFlag(options: Record<string, string | true>, name: string): strin
   return typeof value === "string" ? value : undefined;
 }
 function loadTarget(file: string) {
-  return extname(file).toLowerCase() === ".md" ? loadTask(file) : loadWorkflow(file);
+  const root = process.cwd();
+  return extname(file).toLowerCase() === ".md"
+    ? loadTaskWithinRoot(root, file)
+    : loadWorkflowWithinRoot(root, file);
 }
 
 type TaskRuntimeId = "pi" | "fake" | "codex" | "claude-code";
@@ -225,7 +233,7 @@ async function selectedTaskRuntime(
 async function runTask(target: string, args: readonly string[], io: CliIo): Promise<number> {
   const selection = parseTaskOptions(args);
   const opts = selection.opts;
-  const workflow = await loadTask(target);
+  const workflow = await loadTaskWithinRoot(process.cwd(), target);
   const runtime = await selectedTaskRuntime(selection);
   const { repoRoot } = await resolveGitRepository(stringFlag(opts, "--repo") ?? process.cwd());
   const stateDir = resolve(stringFlag(opts, "--state-dir") ?? resolve(repoRoot, ".anastom"));
@@ -392,7 +400,7 @@ async function runFakeWorkflow(
   if (scenarioPath === undefined || args.length !== 2 || scenarioFlag !== 0) {
     throw new Error("run requires exactly one --fake-scenario <file> option");
   }
-  const workflow = await loadWorkflow(target);
+  const workflow = await loadWorkflowWithinRoot(process.cwd(), target);
   const runtime = new FakeRuntimeAdapter(await loadFakeScenario(scenarioPath));
   const engine = new WorkflowEngine({ runtime, persistence: options.persistence });
   const state = await engine.start(workflow);

@@ -10,7 +10,7 @@ The documented entry point is [src/index.ts](src/index.ts). Generate optional HT
 
 ## Boundaries and invariants
 
-The engine imports core and runtime contracts, not Pi or provider SDKs. Events are authoritative; worker runs record the accepted capability snapshot before attempts, then replay validated identity and one final usage observation from existing append-only events. A sanitized typed policy rejection from an adapter's `start` is persisted as that attempt's failure and prevents retry. No telemetry decides node success. All outputs pass schema validation before node success. A timeout wins over a late success, and uncertain termination prevents unsafe retry. The local verifier uses argv without a shell and excludes provider credentials.
+The engine imports core, path-policy, and runtime contracts, not Pi or provider SDKs. Events are authoritative; worker runs record the accepted capability snapshot before attempts, then replay validated identity and one final usage observation from existing append-only events. A sanitized typed policy rejection from an adapter's `start` is persisted as that attempt's failure and prevents retry. No telemetry decides node success. All outputs pass schema validation before node success. A timeout wins over a late success, and uncertain termination prevents unsafe retry. The local verifier uses argv without a shell, resolves an existing working directory inside its canonical workspace including safe internal symlinks, and excludes provider credentials.
 
 ## Development
 

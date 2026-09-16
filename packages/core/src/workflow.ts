@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
+import { canonicalExistingRoot, resolveExistingChild } from "@anastom/path-policy";
 
 import Ajv, { type ErrorObject } from "ajv";
 import { parse } from "yaml";
@@ -269,8 +270,7 @@ export async function normalizeWorkflow(
  * Load an operator-selected local Workflow file and resolve schemas relative to that file.
  * @remarks Remote callers must authorize the workflow and schema filenames before using this local-file API.
  */
-export async function loadWorkflow(filePath: string): Promise<WorkflowDefinition> {
-  const absolutePath = resolve(filePath);
+async function readWorkflowSource(absolutePath: string): Promise<string> {
   let source: string;
   try {
     source = await readFile(absolutePath, "utf8");
@@ -278,7 +278,32 @@ export async function loadWorkflow(filePath: string): Promise<WorkflowDefinition
     const message = error instanceof Error ? error.message : String(error);
     throw new WorkflowValidationError([`cannot load workflow ${absolutePath}: ${message}`]);
   }
+  return source;
+}
+
+/** Load a trusted operator-selected workflow and its local schemas. */
+export async function loadWorkflow(filePath: string): Promise<WorkflowDefinition> {
+  const absolutePath = resolve(filePath);
+  const source = await readWorkflowSource(absolutePath);
   return normalizeWorkflow(parseWorkflowYaml(source), { sourcePath: absolutePath });
+}
+
+/**
+ * Scope CLI-selected workflow and schema reads to one caller-authorized source tree.
+ * Direct local loaders retain their existing trusted-caller semantics.
+ */
+export async function loadWorkflowWithinRoot(
+  rootPath: string,
+  filePath: string,
+): Promise<WorkflowDefinition> {
+  const root = await canonicalExistingRoot(rootPath);
+  const sourcePath = await resolveExistingChild(root, filePath, "file");
+  const source = await readWorkflowSource(sourcePath);
+  return normalizeWorkflow(parseWorkflowYaml(source), {
+    sourcePath,
+    loadSchema: async (schemaPath) =>
+      defaultSchemaLoader(await resolveExistingChild(root, schemaPath, "file")),
+  });
 }
 
 /**

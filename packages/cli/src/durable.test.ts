@@ -102,6 +102,15 @@ function fakeTaskArguments(repository: string, scenario = healthEndpointScenario
 }
 
 describe("Durable task execution", () => {
+  it("keeps operator-selected Task reads under the CLI's current source directory", async () => {
+    const repository = await newEndpointRepository();
+    const output = captureCliOutput();
+    expect(
+      await runCli(["validate", join(repository, "tasks", "add-endpoint.md")], { io: output.io }),
+    ).toBe(1);
+    expect(output.stderr.join("\n")).toContain("escapes its trusted root");
+  });
+
   it("runs the scripted endpoint fix and verifier successfully", async () => {
     const repository = await newEndpointRepository();
 

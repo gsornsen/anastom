@@ -68,8 +68,8 @@ line({
 });
 if (["cancellable", "term-resistant", "descendant", "late-write"].includes(scenario)) {
   if (scenario === "late-write") {
-    const marker = join(root, "late-write-marker");
-    const descendant = spawn(process.execPath, [join(root, "late-write-child.mjs"), marker], {
+    const descendant = spawn(process.execPath, [join(root, "late-write-child.mjs")], {
+      cwd: root,
       stdio: "ignore",
     });
     writeFileSync(join(root, "child-pid"), String(descendant.pid));

@@ -46,6 +46,7 @@ The name comes from **anastomosis**: branching structures that reconnect to exch
 The TypeScript pnpm workspace supports:
 
 - strict YAML Workflow IR validation, local JSON Schema loading, and normalized workflow definitions;
+- source-scoped CLI Task/Workflow/schema reads and a shared canonical-root resolver for existing scenario-file and verifier-directory children;
 - dependency scheduling with stable ordering and one active node at a time;
 - a scriptable fake runtime with per-node, per-attempt outcomes;
 - schema-validated results, verifier pass/fail handling, retries, and failure propagation;
@@ -69,7 +70,7 @@ See the [M0 retrospective](docs/M0_RETROSPECTIVE.md) and [M1 retrospective](docs
 
 ## Try the current demo
 
-Run from source with **Node.js 24 or newer** and **pnpm 11.9.0**:
+Run from the directory containing your authored Task/Workflow source tree with **Node.js 24 or newer** and **pnpm 11.9.0**. CLI-selected source files and schema references must remain inside that directory after symlink resolution; `--repo` can point to a separate target checkout:
 
 ```bash
 git clone https://github.com/gsornsen/anastom.git
@@ -124,30 +125,31 @@ Each milestone must produce a useful, testable demonstration. Planned milestones
 
 M1 persistence enables inspection from later processes. Recovery of an attempt that was running during a crash is explicitly M3 work.
 
-Claude Code support follows M2 as [M2.5](https://github.com/gsornsen/anastom/issues/13), before M3. The source adapter checks the exact native release, a first-party personal-plan subscription login or an explicit API key, and the absence of relevant managed policy before creating a run. It owns a fresh restricted process per attempt, accepts only schema-valid final output, and exposes bounded public evidence. [Model-free and synthetic-native feasibility](docs/M2_5_FEASIBILITY.md) covers the owner macOS installation, authentication selection, ordinary customization suppression, file-tool confinement, and process cleanup without calling Anthropic. Anthropic's bare API-key mode exposed Read/Edit only in the pinned release, so it can edit existing files but cannot create new ones through Write. A live execution of the unchanged M2 Task and owner implementation review remain open; synthetic results are not provider-backed acceptance. The [M2.5 evidence](docs/M2_5_EVIDENCE.md) separates passed native checks from completion gates. The [accepted worker profile](docs/adr/0015-claude-code-worker-profile.md) records the legal and managed-policy boundaries; [ADR 0016](docs/adr/0016-path-policy-after-third-adapter.md) compares path rules across the three adapters before a shared API is designed. The [Codex SDK backlog](https://github.com/gsornsen/anastom/issues/12) records the limitations that must be resolved or disproven before reconsidering that interface.
+Claude Code support follows M2 as [M2.5](https://github.com/gsornsen/anastom/issues/13), before M3. The source adapter checks the exact native release, a first-party personal-plan subscription login or an explicit API key, and the absence of relevant managed policy before creating a run. It owns a fresh restricted process per attempt, accepts only schema-valid final output, and exposes bounded public evidence. [Model-free and synthetic-native feasibility](docs/M2_5_FEASIBILITY.md) covers the owner macOS installation, authentication selection, ordinary customization suppression, file-tool confinement, and process cleanup without calling Anthropic. Anthropic's bare API-key mode exposed Read/Edit only in the pinned release, so it can edit existing files but cannot create new ones through Write. A live execution of the unchanged M2 Task and owner implementation review remain open; synthetic results are not provider-backed acceptance. The [M2.5 evidence](docs/M2_5_EVIDENCE.md) separates passed native checks from completion gates. The [accepted worker profile](docs/adr/0015-claude-code-worker-profile.md) records the legal and managed-policy boundaries; [ADR 0016](docs/adr/0016-path-policy-after-third-adapter.md) compares path rules across the three adapters and the narrow existing-child API added after CodeQL flagged operator-file reads. Executable provenance, managed policy, and durable artifacts keep separate rules. The [Codex SDK backlog](https://github.com/gsornsen/anastom/issues/12) records the limitations that must be resolved or disproven before reconsidering that interface.
 
 See the [full milestones](docs/MILESTONES.md), [M1 build brief](docs/M1_BUILD_BRIEF.md), [M2 build brief](docs/M2_BUILD_BRIEF.md), [M2.5 build brief](docs/M2_5_BUILD_BRIEF.md), and [changelog](CHANGELOG.md) for scope and progress.
 
 ## Learn more
 
-| Question                                                | Document                                                     |
-| ------------------------------------------------------- | ------------------------------------------------------------ |
-| What principles guide the project?                      | [Vision](docs/VISION.md)                                     |
-| Who is it for, and how will it grow?                    | [Strategy](docs/STRATEGY.md)                                 |
-| What is the first useful product target?                | [Minimum lovable product requirements](docs/PRD_MLP.md)      |
-| Who owns execution, state, and verification?            | [Architecture](docs/ARCHITECTURE.md)                         |
-| How are workflows represented?                          | [Workflow IR](docs/WORKFLOW_IR.md)                           |
-| How do we keep contributions readable and maintainable? | [Engineering standards](docs/ENGINEERING.md)                 |
-| Why were foundational decisions made?                   | [Architecture decision records](docs/adr/)                   |
-| What did M0 settle?                                     | [M0 retrospective](docs/M0_RETROSPECTIVE.md)                 |
-| How do I run and inspect a single worker?               | [M1 demo guide](docs/M1_DEMO.md)                             |
-| What proves M1 works?                                   | [M1 completion evidence](docs/M1_EVIDENCE.md)                |
-| What did M1 teach us?                                   | [M1 retrospective](docs/M1_RETROSPECTIVE.md)                 |
-| What contract governs portable workers?                 | [M2 build brief](docs/M2_BUILD_BRIEF.md)                     |
-| What proves M2 works?                                   | [M2 completion evidence](docs/M2_EVIDENCE.md)                |
-| What is passed and still open for M2.5?                 | [Claude Code implementation evidence](docs/M2_5_EVIDENCE.md) |
-| How does Mycelium carry forward?                        | [Migration strategy](docs/MYCELIUM_MIGRATION.md)             |
-| Which existing systems inform the design?               | [Runtimes and inspiration](docs/RUNTIMES_AND_INSPIRATION.md) |
+| Question                                                | Document                                                                        |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| What principles guide the project?                      | [Vision](docs/VISION.md)                                                        |
+| Who is it for, and how will it grow?                    | [Strategy](docs/STRATEGY.md)                                                    |
+| What is the first useful product target?                | [Minimum lovable product requirements](docs/PRD_MLP.md)                         |
+| Who owns execution, state, and verification?            | [Architecture](docs/ARCHITECTURE.md)                                            |
+| How are workflows represented?                          | [Workflow IR](docs/WORKFLOW_IR.md)                                              |
+| How do we keep contributions readable and maintainable? | [Engineering standards](docs/ENGINEERING.md)                                    |
+| Why were foundational decisions made?                   | [Architecture decision records](docs/adr/)                                      |
+| What did M0 settle?                                     | [M0 retrospective](docs/M0_RETROSPECTIVE.md)                                    |
+| How do I run and inspect a single worker?               | [M1 demo guide](docs/M1_DEMO.md)                                                |
+| What proves M1 works?                                   | [M1 completion evidence](docs/M1_EVIDENCE.md)                                   |
+| What did M1 teach us?                                   | [M1 retrospective](docs/M1_RETROSPECTIVE.md)                                    |
+| What contract governs portable workers?                 | [M2 build brief](docs/M2_BUILD_BRIEF.md)                                        |
+| What proves M2 works?                                   | [M2 completion evidence](docs/M2_EVIDENCE.md)                                   |
+| What is passed and still open for M2.5?                 | [Claude Code implementation evidence](docs/M2_5_EVIDENCE.md)                    |
+| Which path rules can be shared safely?                  | [Third-adapter path decision](docs/adr/0016-path-policy-after-third-adapter.md) |
+| How does Mycelium carry forward?                        | [Migration strategy](docs/MYCELIUM_MIGRATION.md)                                |
+| Which existing systems inform the design?               | [Runtimes and inspiration](docs/RUNTIMES_AND_INSPIRATION.md)                    |
 
 ## License and community
 

@@ -6,6 +6,7 @@
   "type": "module",
   "exports": "./src/index.ts",
   "dependencies": {
+    "@anastom/path-policy": "workspace:*",
     "ajv": "^8.17.1",
     "@anastom/core": "workspace:*",
     "@anastom/runtime-contract": "workspace:*"

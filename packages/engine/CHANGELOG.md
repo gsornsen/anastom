@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Resolve verifier working directories through the shared canonical-root existing-child policy, preserving internal-symlink behavior and rejecting escapes.
 - Preflight selected worker capabilities before durable creation; persist versioned negotiation, sanitized identity, and at most one partial/complete usage observation through append-only events and replay.
 - Preserve a sanitized typed runtime policy rejection when a worker refuses to start, and stop retrying that attempt.
 - Render unavailable and partial counters explicitly while keeping verification and historical event histories independent of telemetry.
