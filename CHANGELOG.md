@@ -8,7 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
-- Implement a source-level Claude Code CLI worker with explicit subscription/API-key selection, signed-release native-byte attestation, model-free authentication and managed-policy preflight, bounded JSONL/public evidence, structured reports, and confirmed POSIX process cleanup. Native localhost probes establish ordinary customization suppression and file-tool confinement; a live provider-backed Task demonstration and owner review remain open.
+- Implement a source-level Claude Code CLI worker with explicit subscription/API-key selection, signed-release native-byte attestation, model-free authentication and managed-policy preflight, bounded JSONL/public evidence, structured reports, and confirmed POSIX process cleanup. The subscription-backed unchanged M2 Task passed its independent verifier and 9/9 durable artifact checks; final evidence review remains.
 - Add later-process historical M1/M2 store replay evidence and a proposed third-adapter path-policy decision before extracting a shared resolver.
 - Add a narrow canonical-root existing-child resolver for Fake scenario references, verifier working directories, and scoped CLI source/schema reads. The CLI now requires authored source files inside its current directory; its SemVer plan records this selection change as breaking.
 - Reject symlinked run-owned artifact parents on later-process evidence reads.
