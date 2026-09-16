@@ -2,7 +2,7 @@
 
 ## Status
 
-Process-ownership phase implemented and passing on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24) on 2026-09-16. The production-shaped supervisor-protocol phase also passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked [PR #25](https://github.com/gsornsen/anastom/pull/25). The SQLite lease, fencing, idempotency, and control-inbox contention phase passes locally on the owner macOS host and awaits its stacked Linux/macOS CI result. Exact workspace checkpoints and snapshot fallback remain later feasibility phases before public M3 APIs are frozen.
+Process-ownership phase implemented and passing on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24) on 2026-09-16. The production-shaped supervisor-protocol phase also passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked [PR #25](https://github.com/gsornsen/anastom/pull/25). The SQLite lease, fencing, idempotency, and control-inbox contention phase passes on the same local/CI platforms in stacked [PR #26](https://github.com/gsornsen/anastom/pull/26). Exact workspace checkpoints and snapshot fallback remain later feasibility phases before public M3 APIs are frozen.
 
 The accepted [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) require evidence before choosing an execution-recovery interface. This document records that evidence. The process probe makes no provider request, reads no real authentication store, and changes no production runtime contract.
 
@@ -198,8 +198,7 @@ No public signature is fixed by this phase. Bounded public event/result relay an
 
 ## Next feasibility gates
 
-1. Confirm SQLite lease acquisition, fencing, idempotent mutation keys, and control-request contention on both Linux and macOS CI.
-2. Prove exact workspace checkpoints across tracked, untracked, staged, committed, binary, and symlink changes.
-3. Prove snapshot-plus-tail equality and corrupt/unknown snapshot fallback to full event replay.
-4. Resolve production process identity, socket placement/path length, and bounded operational-record loading before promoting the prototypes into package contracts.
-5. Revise ADR 0017 and the M3 build brief if any later evidence contradicts the accepted boundaries.
+1. Prove exact workspace checkpoints across tracked, untracked, staged, committed, binary, and symlink changes.
+2. Prove snapshot-plus-tail equality and corrupt/unknown snapshot fallback to full event replay.
+3. Resolve production process identity, socket placement/path length, and bounded operational-record loading before promoting the prototypes into package contracts.
+4. Revise ADR 0017 and the M3 build brief if any later evidence contradicts the accepted boundaries.
