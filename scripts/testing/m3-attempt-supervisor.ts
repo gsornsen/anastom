@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { canonicalExistingRoot } from "@anastom/path-policy";
 import {
   inspectProcess,
   isLiveProcess,
@@ -9,6 +9,7 @@ import {
   waitForCondition,
   type ProcessIdentity,
 } from "../m3-process-identity.js";
+import { readM3Record, writeM3Record } from "./m3-records.js";
 
 interface WorkerRecord {
   leaderPid: number;
@@ -16,27 +17,18 @@ interface WorkerRecord {
 }
 
 async function readWorker(root: string): Promise<WorkerRecord | null> {
-  try {
-    return JSON.parse(await readFile(join(root, "worker.json"), "utf8")) as WorkerRecord;
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-      return null;
-    }
-    throw error;
-  }
+  return readM3Record<WorkerRecord>(root, "worker.json");
 }
 
-const [root, workerProgram] = process.argv.slice(2);
-if (!root || !workerProgram) {
-  throw new Error("Usage: m3-attempt-supervisor.ts <record-directory> <worker-program>");
+const recordRoot = await canonicalExistingRoot(".");
+const workerPath = fileURLToPath(new URL("./m3-attempt-worker.mjs", import.meta.url));
+const ownerIdentity = await readM3Record<ProcessIdentity>(recordRoot, "supervisor-owner.json");
+if (ownerIdentity === null) {
+  throw new Error("Supervisor owner identity is missing");
 }
-const recordRoot = root;
-const workerPath = workerProgram;
-const ownerIdentity = JSON.parse(
-  await readFile(join(recordRoot, "supervisor-owner.json"), "utf8"),
-) as ProcessIdentity;
 
-const worker = spawn(process.execPath, [workerPath, recordRoot, "hold"], {
+const worker = spawn(process.execPath, [workerPath, "hold"], {
+  cwd: recordRoot,
   detached: true,
   stdio: "ignore",
 });
@@ -61,15 +53,16 @@ if (
 ) {
   throw new Error("Supervised execution identities could not be established");
 }
-await writeFile(
-  join(recordRoot, "supervisor-ready.json"),
-  JSON.stringify({
+try {
+  await writeM3Record(recordRoot, "supervisor-ready.json", {
     supervisor: supervisorIdentity,
     execution: leaderIdentity,
     descendant: descendantIdentity,
-  }),
-  { mode: 0o600 },
-);
+  });
+} catch (error) {
+  await terminateObservedGroup(leaderIdentity);
+  throw error;
+}
 
 let cleanup: Promise<void> | undefined;
 function clean(): Promise<void> {
@@ -80,9 +73,7 @@ function clean(): Promise<void> {
     } catch {
       outcome = "unknown";
     }
-    await writeFile(join(recordRoot, "supervisor-cleaned.json"), JSON.stringify({ outcome }), {
-      mode: 0o600,
-    });
+    await writeM3Record(recordRoot, "supervisor-cleaned.json", { outcome });
   })());
 }
 

@@ -1,10 +1,27 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = dirname(fileURLToPath(import.meta.url));
+function writeAtomicRecord(name, value) {
+  const temporary = join(root, `.${name}.${process.pid}.tmp`);
+  try {
+    writeFileSync(temporary, value, { flag: "wx", mode: 0o600 });
+    renameSync(temporary, join(root, name));
+  } finally {
+    rmSync(temporary, { force: true });
+  }
+}
+function writeDescendantPid(descendant) {
+  try {
+    writeAtomicRecord("child-pid", String(descendant.pid));
+  } catch (error) {
+    descendant.kill("SIGKILL");
+    throw error;
+  }
+}
 const { scenario, report } = JSON.parse(readFileSync(join(root, "fixture.json"), "utf8"));
 if (process.argv.slice(2).join(" ") === "auth status --json") {
   process.stdout.write(
@@ -19,9 +36,9 @@ if (process.argv.slice(2).join(" ") === "auth status --json") {
   process.exit(0);
 }
 if (scenario === "initializing") {
-  writeFileSync(join(root, "startup-pid"), String(process.pid));
+  writeAtomicRecord("startup-pid", String(process.pid));
   const descendant = spawn("/bin/sleep", ["10"], { stdio: "ignore" });
-  writeFileSync(join(root, "child-pid"), String(descendant.pid));
+  writeDescendantPid(descendant);
   process.on("SIGTERM", () => {});
   setTimeout(() => {}, 10_000);
   await new Promise(() => {});
@@ -34,15 +51,14 @@ const chunks = [];
 for await (const chunk of process.stdin) {
   chunks.push(chunk);
 }
-writeFileSync(
-  join(root, `entry-${process.pid}.json`),
+writeAtomicRecord(
+  `entry-${process.pid}.json`,
   JSON.stringify({
     prompt: Buffer.concat(chunks).toString("utf8"),
     requiredOutputSchema: schema,
     resourceId: String(process.pid),
     args: process.argv.slice(2),
   }),
-  { mode: 0o600 },
 );
 
 const line = (frame) => process.stdout.write(JSON.stringify(frame) + "\n");
@@ -72,12 +88,12 @@ if (["cancellable", "term-resistant", "descendant", "late-write"].includes(scena
       cwd: root,
       stdio: "ignore",
     });
-    writeFileSync(join(root, "child-pid"), String(descendant.pid));
+    writeDescendantPid(descendant);
     line({ type: "result", subtype: "success", structured_output: report, usage });
     process.exit(0);
   }
   const descendant = spawn("/bin/sleep", ["10"], { stdio: "ignore" });
-  writeFileSync(join(root, "child-pid"), String(descendant.pid));
+  writeDescendantPid(descendant);
   if (scenario !== "descendant") {
     process.on("SIGTERM", () => {});
     setTimeout(() => {}, 10_000);

@@ -78,6 +78,10 @@ function testingProgram(name: string): string {
   return fileURLToPath(new URL(`./testing/${name}`, import.meta.url));
 }
 
+function repositoryProgram(name: string): string {
+  return fileURLToPath(new URL(`../${name}`, import.meta.url));
+}
+
 async function readJson<T>(path: string): Promise<T | null> {
   try {
     return JSON.parse(await readFile(path, "utf8")) as T;
@@ -101,11 +105,13 @@ function startCoordinator(
     process.execPath,
     [
       fileURLToPath(import.meta.resolve("tsx/cli")),
+      "--tsconfig",
+      repositoryProgram("tsconfig.json"),
       testingProgram("m3-runtime-coordinator.ts"),
       owner,
-      root,
     ],
     {
+      cwd: root,
       detached: true,
       env: { ...process.env, NODE_ENV: "test" },
       stdio: ["pipe", "pipe", "pipe"],
@@ -221,14 +227,11 @@ async function observeCurrentOwner(owner: Owner): Promise<CurrentOwnerObservatio
 
 async function observeExitedLeader(): Promise<M3ProcessOwnershipEvidence["exitedLeader"]> {
   const root = await mkdtemp(join(tmpdir(), "anastom-m3-exited-leader-"));
-  const child = spawn(
-    process.execPath,
-    [testingProgram("m3-attempt-worker.mjs"), root, "exit-leader"],
-    {
-      detached: true,
-      stdio: "ignore",
-    },
-  );
+  const child = spawn(process.execPath, [testingProgram("m3-attempt-worker.mjs"), "exit-leader"], {
+    cwd: root,
+    detached: true,
+    stdio: "ignore",
+  });
   const exited = once(child, "exit");
   let leader: ProcessIdentity | undefined;
   let descendant: ProcessIdentity | undefined;

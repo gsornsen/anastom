@@ -1,20 +1,34 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const [root, behavior = "hold"] = process.argv.slice(2);
-if (!root || !["hold", "exit-leader"].includes(behavior)) {
-  throw new Error("Usage: m3-attempt-worker.mjs <record-directory> <hold|exit-leader>");
+const [behavior = "hold"] = process.argv.slice(2);
+if (!["hold", "exit-leader"].includes(behavior)) {
+  throw new Error("Usage: m3-attempt-worker.mjs <hold|exit-leader>");
 }
+const root = realpathSync(".");
 
 const descendant = spawn("/bin/sleep", ["30"], { stdio: "ignore" });
 descendant.unref();
-writeFileSync(
-  join(root, "worker.json"),
-  JSON.stringify({ leaderPid: process.pid, descendantPid: descendant.pid }),
-  { mode: 0o600 },
-);
+const record = join(root, "worker.json");
+const temporary = join(root, `.worker.${process.pid}.tmp`);
+try {
+  writeFileSync(
+    temporary,
+    JSON.stringify({ leaderPid: process.pid, descendantPid: descendant.pid }),
+    {
+      flag: "wx",
+      mode: 0o600,
+    },
+  );
+  renameSync(temporary, record);
+} catch (error) {
+  descendant.kill("SIGKILL");
+  throw error;
+} finally {
+  rmSync(temporary, { force: true });
+}
 
 if (behavior === "exit-leader") {
   setInterval(() => {

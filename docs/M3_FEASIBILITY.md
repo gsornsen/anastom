@@ -22,7 +22,7 @@ The corresponding Vitest boundary is:
 pnpm test scripts/probe-m3-process-ownership.test.ts
 ```
 
-The test has a 45-second outer limit. Every internal wait is bounded and driven by a file or process-state condition. No assertion infers readiness from a fixed sleep. Fixture programs are checked-in files; none is embedded in a string.
+The test has a 45-second outer limit. Every internal wait is bounded and driven by a file or process-state condition. No assertion infers readiness from a fixed sleep. Fixture programs are checked-in files; none is embedded in a string. Child fixtures accept only fixed behavior names, use their inherited canonical working directory as the authorized record root, and publish readiness JSON by atomic rename so readers cannot observe partial records.
 
 ## Current contract audit
 
