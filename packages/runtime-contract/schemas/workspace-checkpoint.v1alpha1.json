@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://anastom.dev/schemas/workspace-checkpoint.v1alpha1.json",
+  "title": "Anastom workspace checkpoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "workspaceId",
+    "baseCommit",
+    "headCommit",
+    "diffDigest",
+    "changedFiles",
+    "ignoredDigest",
+    "ignoredEntryCount",
+    "ignoredByteCount",
+    "ownership"
+  ],
+  "properties": {
+    "version": { "const": "anastom.dev/workspace-checkpoint/v1alpha1" },
+    "workspaceId": { "$ref": "#/$defs/id" },
+    "baseCommit": { "$ref": "#/$defs/nonempty" },
+    "headCommit": { "$ref": "#/$defs/nonempty" },
+    "diffDigest": { "$ref": "#/$defs/digest" },
+    "changedFiles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/nonempty" },
+      "uniqueItems": true
+    },
+    "ignoredDigest": { "$ref": "#/$defs/digest" },
+    "ignoredEntryCount": { "type": "integer", "minimum": 0, "maximum": 4096 },
+    "ignoredByteCount": { "type": "integer", "minimum": 0, "maximum": 67108864 },
+    "ownership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repositoryRoot",
+        "repositoryCommonDirectory",
+        "workspacePath",
+        "workspaceGitDirectory",
+        "branch",
+        "manifestDigest",
+        "registrationDigest"
+      ],
+      "properties": {
+        "repositoryRoot": { "$ref": "#/$defs/nonempty" },
+        "repositoryCommonDirectory": { "$ref": "#/$defs/nonempty" },
+        "workspacePath": { "$ref": "#/$defs/nonempty" },
+        "workspaceGitDirectory": { "$ref": "#/$defs/nonempty" },
+        "branch": { "$ref": "#/$defs/nonempty" },
+        "manifestDigest": { "$ref": "#/$defs/digest" },
+        "registrationDigest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "diffArtifactId": { "$ref": "#/$defs/artifactId" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$" },
+    "artifactId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,254}$"
+    },
+    "nonempty": { "type": "string", "minLength": 1 },
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}

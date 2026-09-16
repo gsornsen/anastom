@@ -122,6 +122,9 @@ importers:
       '@anastom/engine':
         specifier: workspace:*
         version: link:../engine
+      '@anastom/path-policy':
+        specifier: workspace:*
+        version: link:../path-policy
       '@anastom/runtime-contract':
         specifier: workspace:*
         version: link:../runtime-contract
@@ -201,6 +204,12 @@ importers:
 
   packages/workspaces:
     dependencies:
+      '@anastom/core':
+        specifier: workspace:*
+        version: link:../core
+      '@anastom/path-policy':
+        specifier: workspace:*
+        version: link:../path-policy
       '@anastom/runtime-contract':
         specifier: workspace:*
         version: link:../runtime-contract

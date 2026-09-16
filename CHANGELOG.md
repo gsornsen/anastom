@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
+- Add the second stacked M3 production slice: a fixed-segment private-state root, exact workspace-checkpoint validation, double-captured Git/content/ownership evidence, bounded streamed ignored-content hashing, and focused workspace/artifact path migrations.
 - Begin the stacked M3 production implementation with bounded credential-free runtime descriptors and exact Pi, Codex, and Claude Code reconstruction codecs. Add prepare/authorize, control, cleanup, orphan, typed pause, and recovery-blocked event/reducer contracts for runtime and command attempts while preserving legacy event replay.
 - Propose the exact M3 production contract after all five feasibility phases: package ownership, sanitized runtime descriptors, two-stage execution references, engine-owned durable-store and execution-host interfaces, typed recovery events, rolling event integrity, bounded supervisor records, and a private-state-root path capability. ADR 0018 keeps the proposal review-gated before implementation.
 - Add a model-free M3 snapshot probe with a checked-in folded-state schema, exact workflow/event-prefix/state digest binding, snapshot-plus-tail equality across reopened lifecycle histories, newest-compatible selection, corrupt-snapshot fallback, and rejection of corrupt authoritative events. The matrix passes on Linux and macOS; exact persistence APIs remain for separate review.

@@ -59,3 +59,9 @@ export async function resolveExistingChild(
   }
   return canonical;
 }
+
+export {
+  ensurePrivatePathRoot,
+  PrivatePathError,
+  type PrivatePathRoot,
+} from "./private-path-root.js";

@@ -3,18 +3,21 @@ import { canonicalJson } from "@anastom/core";
 import capabilitiesSchema from "../schemas/capabilities.v1alpha1.json" with { type: "json" };
 import observationSchema from "../schemas/observation.v1alpha1.json" with { type: "json" };
 import runtimeDescriptorSchema from "../schemas/runtime-descriptor.v1alpha1.json" with { type: "json" };
+import workspaceCheckpointSchema from "../schemas/workspace-checkpoint.v1alpha1.json" with { type: "json" };
 import type {
   RuntimeAdapter,
   RuntimeCapabilities,
   RuntimeDescriptor,
   RuntimeEvent,
   RuntimeNegotiation,
+  WorkspaceCheckpoint,
 } from "./index.js";
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 const capabilitiesValidator = ajv.compile(capabilitiesSchema);
 const observationValidator = ajv.compile(observationSchema);
 const runtimeDescriptorValidator = ajv.compile(runtimeDescriptorSchema);
+const workspaceCheckpointValidator = ajv.compile(workspaceCheckpointSchema);
 const MAX_RUNTIME_DESCRIPTOR_BYTES = 16 * 1024;
 
 /** A sanitized pre-state failure to probe or satisfy the explicitly selected runtime. */
@@ -59,6 +62,13 @@ export function assertRuntimeDescriptor(value: unknown): asserts value is Runtim
   }
   if (bytes > MAX_RUNTIME_DESCRIPTOR_BYTES) {
     throw new RuntimePreflightError("policy-violation", "Runtime descriptor exceeds 16 KiB");
+  }
+}
+
+/** Validate exact durable workspace evidence and its feasibility-tested bounds. */
+export function assertWorkspaceCheckpoint(value: unknown): asserts value is WorkspaceCheckpoint {
+  if (!workspaceCheckpointValidator(value)) {
+    throw new Error("Invalid workspace checkpoint");
   }
 }
 

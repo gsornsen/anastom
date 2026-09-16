@@ -8,6 +8,7 @@
   "dependencies": {
     "@anastom/core": "workspace:*",
     "@anastom/engine": "workspace:*",
+    "@anastom/path-policy": "workspace:*",
     "@anastom/runtime-contract": "workspace:*"
   },
   "devDependencies": {

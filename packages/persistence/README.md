@@ -4,7 +4,7 @@ Persist immutable workflow definitions, ordered events, and filesystem evidence 
 
 ## Public API
 
-`SqliteRunPersistence` implements atomic create, optimistic append, validated load, and close. Its constructor validates and applies versioned migrations. `FileArtifactStore` writes immutable evidence and verifies content digests on read, rejecting symlinked run-owned artifact parents and nonordinary artifact files.
+`SqliteRunPersistence` implements atomic create, optimistic append, validated load, and close. Its constructor validates and applies versioned migrations. `FileArtifactStore` creates artifact parents through the fixed-segment private-state root, atomically publishes synced immutable evidence without replacement, and verifies content digests on read, rejecting symlinked run-owned artifact parents and nonordinary artifact files.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api persistence`; output is in `.generated/api/persistence/` and is not committed.
 

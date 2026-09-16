@@ -1,7 +1,8 @@
-import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
-import { resolve, sep } from "node:path";
+import { lstat, readFile, realpath } from "node:fs/promises";
+import { join, resolve, sep } from "node:path";
 import { digestBytes } from "@anastom/core";
 import type { ArtifactStore, ArtifactWrite } from "@anastom/engine";
+import { ensurePrivatePathRoot } from "@anastom/path-policy";
 import type { ArtifactRef } from "@anastom/runtime-contract";
 
 /**
@@ -28,31 +29,13 @@ export class FileArtifactStore implements ArtifactStore {
     const digest = digestBytes(artifact.bytes);
     const id =
       artifact.nodeId + "-" + artifact.attempt + "-" + artifact.type + "-" + digest.slice(7);
-    await mkdir(this.stateDir, { recursive: true, mode: 0o700 });
-    const stateRoot = await realpath(this.stateDir);
-    const authoredDir = resolve(stateRoot, "runs", artifact.runId, "artifacts");
-    await mkdir(authoredDir, { recursive: true, mode: 0o700 });
-    if ((await lstat(authoredDir)).isSymbolicLink()) {
-      throw new Error("Artifact directory must not be a symlink");
-    }
-    const dir = await realpath(authoredDir);
-    if (dir !== authoredDir) {
-      throw new Error("Artifact parent must not be a symlink");
-    }
-    const uri = resolve(dir, id);
-    try {
-      await writeFile(uri, artifact.bytes, { flag: "wx", mode: 0o600 });
-    } catch (error) {
-      if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) {
-        throw error;
-      }
-      if ((await lstat(uri)).isSymbolicLink()) {
-        throw new Error("Artifact file must not be a symlink", { cause: error });
-      }
-      if (digestBytes(await readFile(uri)) !== digest) {
-        throw new Error("Existing artifact digest mismatch", { cause: error });
-      }
-    }
+    const state = await ensurePrivatePathRoot(this.stateDir);
+    const dir = await state.ensureDirectory(["runs", artifact.runId, "artifacts"]);
+    const bytes = Buffer.from(artifact.bytes);
+    await state.writeFileExclusive(["runs", artifact.runId, "artifacts", id], bytes, {
+      maxBytes: bytes.byteLength,
+    });
+    const uri = join(dir, id);
     return {
       id,
       type: artifact.type,

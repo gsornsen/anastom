@@ -2,7 +2,7 @@
 
 ## Status and review boundary
 
-This is the exact production-contract proposal requested after the five M3 feasibility phases. The owner authorized a stacked production implementation against it, with acceptance and merge deferred until review of the complete stack. The runtime-descriptor and event/reducer slice is implemented; the durable store, private path root, workspace checkpoint implementation, execution host, recovery coordinator, CLI, and final acceptance evidence remain in later slices. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Implementation must preserve these names, ownership boundaries, state transitions, and compatibility rules unless new evidence first amends the proposal and the build brief.
+This is the exact production-contract proposal requested after the five M3 feasibility phases. The owner authorized a stacked production implementation against it, with acceptance and merge deferred until review of the complete stack. The runtime-descriptor/event slice and the private-path/workspace slice are implemented in the review stack; the durable store, execution host, recovery coordinator, CLI, and final acceptance evidence remain in later slices. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Implementation must preserve these names, ownership boundaries, state transitions, and compatibility rules unless new evidence first amends the proposal and the build brief.
 
 The proposal covers local Linux and macOS Task runs. It does not add provider-session adoption, remote workers, parallel scheduling, force takeover, automatic worktree repair, or exactly-once external effects.
 
@@ -21,6 +21,8 @@ The feasibility work exposed several places where the earlier design could have 
 9. **Path policy remains split by trust domain.** The existing authored-child resolver stays narrow. A new private-state-root capability handles run-owned directories, records, and socket paths; it is not a universal `resolvePath()` helper.
 10. **Bounded reads apply before parsing.** Every operational record and IPC frame is size-checked as bytes, then decoded, exact-schema validated, and identity checked.
 11. **Workspace evidence types follow the existing portable boundary.** `WorkspaceCheckpoint` and `WorkspaceDifference` live beside `WorkspaceRef` and `WorkspaceCapture` in `@anastom/runtime-contract`, so `@anastom/engine` and `@anastom/workspaces` share the record without a reverse dependency. Checkpoint capture and comparison remain owned by `@anastom/workspaces`.
+12. **Private replacement and immutable publication are different operations.** The first caller migration showed that one atomic-replace method would weaken existing ownership-manifest and artifact semantics. `writeFileExclusive` now publishes through a synced same-directory temporary file and hard link, accepts identical existing bytes idempotently, and never replaces different content.
+13. **Readonly checkpoints keep private state outside the checkout.** `AttemptPrepared` requires a checkpoint for either negotiated filesystem mode, but a repository-local state root would recursively enter a readonly checkout's ignored-content digest and expose control-plane files as worker input. Readonly checkpoint capture therefore requires an external state root; isolated worktrees retain the repository-local default because their state root is outside the selected worktree.
 
 ## Package ownership
 
@@ -191,6 +193,8 @@ export type WorkspaceDifference =
 ```
 
 Ignored content is streamed through the digest with the feasibility limits: at most 4,096 entries and 64 MiB of file and symlink-target bytes. A binary diff is at most 16 MiB, matching the current Git capture bound. Non-empty diffs are written as immutable artifacts before the fenced transition; only their reference becomes authoritative in that transition. Two complete captures must match. Capture does not modify the user's staging index.
+
+Both negotiated filesystem modes can produce checkpoints. `GitWorkspaceManager.create` records a private ownership manifest for an isolated worktree or readonly source selection. An isolated checkpoint additionally requires its generated run branch. A readonly checkpoint binds the source checkout's current branch, or the literal `(detached)` state together with its `HEAD` and worktree registration. Its private state root must be outside the repository; otherwise control-plane records would recursively enter ignored-content evidence and remain readable to the readonly worker. In-memory workspaces are not durable M3 execution inputs.
 
 ### Execution references and outcomes
 
@@ -629,13 +633,18 @@ export interface PrivatePathRoot {
     bytes: Uint8Array,
     options: { maxBytes: number },
   ): Promise<void>;
+  writeFileExclusive(
+    segments: readonly string[],
+    bytes: Uint8Array,
+    options: { maxBytes: number },
+  ): Promise<void>;
   socketPath(segments: readonly string[], options: { maxBytes: number }): string;
 }
 
 export function ensurePrivatePathRoot(path: string): Promise<PrivatePathRoot>;
 ```
 
-Every segment must be a single nonempty filename component: no separators, dot components, null bytes, or absolute input. The function creates an absent leaf root at mode `0700`; an existing root must be a canonical ordinary directory owned by the current user with no group/other permissions. Existing M1 state directories are tightened to mode `0700` only after confirming current-user ownership and nonsymlink identity. Methods revalidate run-owned parents as ordinary nonsymlinked directories. Reads open an ordinary nonsymlinked file, reject an initial size above the limit, read at most `maxBytes + 1` through the opened descriptor, and verify its identity did not change. Atomic writes create an exclusive temporary ordinary file in the same parent, apply mode `0600`, enforce the byte limit, sync and close the file, rename it over the fixed leaf, and sync the parent directory. Callers select fixed record names; untrusted text never becomes a path expression.
+Every segment must be a single nonempty filename component: no separators, dot components, null bytes, or absolute input. The function creates an absent leaf root at mode `0700`; an existing root must be a canonical ordinary directory owned by the current user with no group/other permissions. Existing M1 state directories are tightened to mode `0700` only after confirming current-user ownership and nonsymlink identity. Methods revalidate run-owned parents as ordinary nonsymlinked directories. Reads open an ordinary nonsymlinked file, reject an initial size above the limit, read at most `maxBytes + 1` through the opened descriptor, and verify its identity did not change. Atomic replacement creates an exclusive temporary ordinary file in the same parent, applies mode `0600`, enforces the byte limit, syncs and closes the file, renames it over the fixed leaf, and syncs the parent directory. Exclusive publication uses the same temporary-file preparation, hard-links the file into an absent fixed leaf, and accepts an existing leaf only when a bounded stable read exactly matches the requested bytes; it never replaces different content. This second operation preserves immutable ownership-manifest and artifact semantics discovered during the focused caller migration. Callers select fixed record names; untrusted text never becomes a path expression.
 
 `socketPath` validates segments, containment, and the full UTF-8 path limit. It does not unlink an existing entry. The execution host may remove a stale socket only after its authenticated manifest proves the prior supervisor absent or terminal. This capability assumes the current local account is trusted; it is integrity hardening and CodeQL-safe path construction, not protection against a malicious process running as the same user.
 

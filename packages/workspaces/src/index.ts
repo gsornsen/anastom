@@ -1,13 +1,34 @@
 import { execFile } from "node:child_process";
 import { promisify, isDeepStrictEqual } from "node:util";
-import { mkdtemp, mkdir, readFile, realpath, rm, writeFile, lstat } from "node:fs/promises";
+import { mkdtemp, realpath, rm, lstat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { canonicalJson } from "@anastom/core";
+import { ensurePrivatePathRoot } from "@anastom/path-policy";
 import type { WorkspaceRef, WorkspaceCapture } from "@anastom/runtime-contract";
 
 const exec = promisify(execFile);
-async function git(cwd: string, args: string[], env = process.env): Promise<string> {
-  return (await exec("git", args, { cwd, env, maxBuffer: 16_777_216 })).stdout;
+const WORKSPACE_MANIFEST_MAX_BYTES = 64 * 1024;
+const DIFF_MAX_BYTES = 16 * 1024 * 1024;
+async function git(cwd: string, args: readonly string[], env = process.env): Promise<string> {
+  return (await exec("git", args, { cwd, env, maxBuffer: DIFF_MAX_BYTES + 1 })).stdout;
+}
+async function gitBytes(cwd: string, args: readonly string[], env = process.env): Promise<Buffer> {
+  return (
+    await exec("git", args, {
+      cwd,
+      encoding: "buffer",
+      env,
+      maxBuffer: DIFF_MAX_BYTES + 1,
+    })
+  ).stdout;
+}
+function decodeUtf8(bytes: Buffer, label: string): string {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new Error(`Workspace ${label} is not valid UTF-8`);
+  }
 }
 /**
  * Reject identifiers that could escape run-owned filesystem paths.
@@ -52,19 +73,17 @@ export class GitWorkspaceManager {
       if ((await git(repoRoot, ["status", "--porcelain"])).trim()) {
         throw new Error("Readonly workspace requires a clean source checkout");
       }
-      return { id, mode, repoRoot, path: repoRoot, baseCommit };
+      const workspace: WorkspaceRef = { id, mode, repoRoot, path: repoRoot, baseCommit };
+      await this.writeManifest(workspace);
+      return workspace;
     }
     const branch = "anastom/" + id;
-    await mkdir(resolve(this.stateDir, "worktrees"), { recursive: true });
-    if ((await lstat(resolve(this.stateDir, "worktrees"))).isSymbolicLink()) {
-      throw new Error("Workspace parent must not be a symlink");
-    }
-    const parent = await realpath(resolve(this.stateDir, "worktrees"));
+    const state = await ensurePrivatePathRoot(this.stateDir);
+    const parent = await state.ensureDirectory(["worktrees"]);
     const path = join(parent, id);
     await git(repoRoot, ["worktree", "add", "-b", branch, path, baseCommit]);
     const workspace: WorkspaceRef = { id, mode, repoRoot, path, branch, baseCommit };
-    await mkdir(resolve(this.stateDir, "runs", id), { recursive: true });
-    await writeFile(this.manifest(id), JSON.stringify(workspace), { flag: "wx", mode: 0o600 });
+    await this.writeManifest(workspace, state);
     return workspace;
   }
   /**
@@ -76,26 +95,31 @@ export class GitWorkspaceManager {
     }
     if (workspace.mode === "isolated") {
       await this.assertOwned(workspace);
+    } else {
+      await this.assertReadonly(workspace);
     }
     const temp = await mkdtemp(join(tmpdir(), "anastom-index-"));
     try {
       const env = { ...process.env, GIT_INDEX_FILE: join(temp, "index") };
       await git(workspace.path, ["read-tree", workspace.baseCommit], env);
       await git(workspace.path, ["add", "-A", "--", "."], env);
-      const diff = await git(
+      const diffBytes = await gitBytes(
         workspace.path,
         ["diff", "--cached", "--binary", workspace.baseCommit, "--"],
         env,
       );
-      const names = await git(
+      if (diffBytes.byteLength > DIFF_MAX_BYTES) {
+        throw new Error("Workspace diff exceeds the 16 MiB capture limit");
+      }
+      const nameBytes = await gitBytes(
         workspace.path,
         ["diff", "--cached", "--name-only", "-z", workspace.baseCommit, "--"],
         env,
       );
       return {
         headCommit: (await git(workspace.path, ["rev-parse", "--verify", "HEAD^{commit}"])).trim(),
-        diff,
-        changedFiles: names.split("\0").filter(Boolean),
+        diff: decodeUtf8(diffBytes, "diff"),
+        changedFiles: decodeUtf8(nameBytes, "changed-file names").split("\0").filter(Boolean),
       };
     } finally {
       await rm(temp, { recursive: true, force: true });
@@ -128,29 +152,58 @@ export class GitWorkspaceManager {
       await git(workspace.repoRoot, ["branch", "-d", workspace.branch]);
     }
   }
-  private manifest(id: string): string {
-    assertRunId(id);
-    return resolve(this.stateDir, "runs", id, "workspace.json");
+  private async writeManifest(
+    workspace: Exclude<WorkspaceRef, { mode: "memory" }>,
+    existingState?: Awaited<ReturnType<typeof ensurePrivatePathRoot>>,
+  ): Promise<void> {
+    const state = existingState ?? (await ensurePrivatePathRoot(this.stateDir));
+    await state.ensureDirectory(["runs", workspace.id]);
+    await state.writeFileExclusive(
+      ["runs", workspace.id, "workspace.json"],
+      Buffer.from(canonicalJson(workspace)),
+      { maxBytes: WORKSPACE_MANIFEST_MAX_BYTES },
+    );
   }
   private async assertManifest(
-    workspace: Extract<WorkspaceRef, { mode: "isolated" }>,
+    workspace: Exclude<WorkspaceRef, { mode: "memory" }>,
   ): Promise<void> {
-    const parent = await realpath(resolve(this.stateDir, "worktrees"));
-    if (
-      (await lstat(resolve(this.stateDir, "worktrees"))).isSymbolicLink() ||
-      workspace.path !== join(parent, workspace.id) ||
-      workspace.branch !== "anastom/" + workspace.id
-    ) {
-      throw new Error("Workspace is not owned by Anastom");
+    const state = await ensurePrivatePathRoot(this.stateDir);
+    if (workspace.mode === "isolated") {
+      const parent = await state.ensureDirectory(["worktrees"]);
+      if (
+        workspace.path !== join(parent, workspace.id) ||
+        workspace.branch !== "anastom/" + workspace.id
+      ) {
+        throw new Error("Workspace is not owned by Anastom");
+      }
+    } else if (workspace.path !== workspace.repoRoot) {
+      throw new Error("Readonly workspace does not match its repository");
     }
     let recorded: unknown;
     try {
-      recorded = JSON.parse(await readFile(this.manifest(workspace.id), "utf8"));
+      recorded = JSON.parse(
+        (
+          await state.readFile(["runs", workspace.id, "workspace.json"], {
+            maxBytes: WORKSPACE_MANIFEST_MAX_BYTES,
+          })
+        ).toString("utf8"),
+      );
     } catch {
       throw new Error("Missing or corrupt workspace ownership manifest");
     }
     if (!isDeepStrictEqual(recorded, workspace)) {
       throw new Error("Workspace ownership manifest does not match");
+    }
+  }
+  private async assertReadonly(
+    workspace: Extract<WorkspaceRef, { mode: "readonly" }>,
+  ): Promise<void> {
+    await this.assertManifest(workspace);
+    if (
+      (await realpath(workspace.path)) !== workspace.path ||
+      (await git(workspace.path, ["rev-parse", "--show-toplevel"])).trim() !== workspace.path
+    ) {
+      throw new Error("Readonly workspace repository changed");
     }
   }
   private async assertOwned(workspace: Extract<WorkspaceRef, { mode: "isolated" }>): Promise<void> {
@@ -177,3 +230,10 @@ export class GitWorkspaceManager {
     }
   }
 }
+
+export {
+  captureWorkspaceCheckpoint,
+  compareWorkspaceCheckpoints,
+  type WorkspaceCheckpointCapture,
+  type WorkspaceComparison,
+} from "./checkpoint.js";

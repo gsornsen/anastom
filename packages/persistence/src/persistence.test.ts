@@ -1,4 +1,4 @@
-import { mkdtemp, rename, rm, symlink } from "node:fs/promises";
+import { lstat, mkdtemp, readdir, rename, rm, symlink } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
@@ -176,9 +176,15 @@ describe("filesystem artifacts", () => {
     const ref = await artifacts.write(input);
     expect(await artifacts.write(input)).toEqual(ref);
     expect((await artifacts.read(ref)).toString()).toBe("original");
-    const { writeFile } = await import("node:fs/promises");
+    expect((await lstat(root)).mode & 0o777).toBe(0o700);
+    expect((await lstat(dirname(ref.uri))).mode & 0o777).toBe(0o700);
+    expect((await lstat(ref.uri)).mode & 0o777).toBe(0o600);
+    expect((await readdir(dirname(ref.uri))).filter((name) => name.startsWith("."))).toEqual([]);
+    const { readFile, writeFile } = await import("node:fs/promises");
     await writeFile(ref.uri, "tampered");
     await expect(artifacts.read(ref)).rejects.toThrow("digest");
+    await expect(artifacts.write(input)).rejects.toThrow("differ");
+    expect(await readFile(ref.uri, "utf8")).toBe("tampered");
     await expect(artifacts.write({ ...input, runId: "../outside" })).rejects.toThrow("identity");
   });
   it("rejects a run-owned artifact parent redirected outside the state root", async () => {

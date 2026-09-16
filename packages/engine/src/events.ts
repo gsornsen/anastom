@@ -1044,8 +1044,7 @@ function applyRunRecoveryBlocked(
     if (
       event.reason.kind === "cleanup-unknown" &&
       !attempt.cleanup?.some(
-        (cleanup) =>
-          cleanup.executionId === executionId && cleanup.outcome === "unknown",
+        (cleanup) => cleanup.executionId === executionId && cleanup.outcome === "unknown",
       )
     ) {
       throw new InvalidTransitionError("Cleanup recovery block requires unknown cleanup evidence");

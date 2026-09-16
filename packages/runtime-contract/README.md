@@ -4,7 +4,7 @@ Define the harness-independent interface between Anastom's control plane and exe
 
 ## Public API
 
-`RuntimeAdapter` exposes `capabilities`, `start`, `events`, `collect`, and `cancel`. `DurableRuntimeAdapter` adds a bounded credential-free `descriptor`, and `RuntimeDescriptorCodec` parses exact adapter configuration before reconstructing a runtime. `ExecutionRequest`, `ExecutionResult`, `ContextEnvelope`, `WorkspaceRef`, `WorkspaceCheckpoint`, and `ArtifactRef` describe explicit execution and evidence boundaries. `probeRuntime` checks a selected adapter before durable state exists; `RuntimeNegotiation` records the accepted workspace requirement and capability snapshot. Versioned schemas validate descriptor, capability, and public observation shapes.
+`RuntimeAdapter` exposes `capabilities`, `start`, `events`, `collect`, and `cancel`. `DurableRuntimeAdapter` adds a bounded credential-free `descriptor`, and `RuntimeDescriptorCodec` parses exact adapter configuration before reconstructing a runtime. `ExecutionRequest`, `ExecutionResult`, `ContextEnvelope`, `WorkspaceRef`, `WorkspaceCheckpoint`, and `ArtifactRef` describe explicit execution and evidence boundaries. `assertWorkspaceCheckpoint` validates the exact versioned workspace evidence shape and reviewed ignored-content bounds. `probeRuntime` checks a selected adapter before durable state exists; `RuntimeNegotiation` records the accepted workspace requirement and capability snapshot. Versioned schemas validate descriptor, checkpoint, capability, and public observation shapes.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api runtime-contract`; output is in `.generated/api/runtime-contract/` and is not committed.
 
