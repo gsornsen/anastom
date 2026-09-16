@@ -6,8 +6,8 @@ import { assertRuntimeDescriptor } from "@anastom/runtime-contract";
 import type { RunEvent } from "./events.js";
 
 const str = { type: "string" };
-const positive = { type: "integer", minimum: 1 };
-const nonnegative = { type: "integer", minimum: 0 };
+const positive = { type: "integer", minimum: 1, maximum: Number.MAX_SAFE_INTEGER };
+const nonnegative = { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER };
 const digest = { type: "string", pattern: "^sha256:[a-f0-9]{64}$" };
 const identifier = { type: "string", pattern: "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$" };
 const object = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({

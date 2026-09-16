@@ -147,7 +147,9 @@ describe("Versioned SQLite migrations", () => {
         reopened.prepare("SELECT workflow_json FROM runs WHERE run_id='legacy'").get()
           ?.workflow_json,
       ).toBe("original-snapshot-bytes");
-      expect(reopened.prepare("SELECT version FROM schema_migrations").get()?.version).toBe(1);
+      expect(
+        reopened.prepare("SELECT version FROM schema_migrations ORDER BY version").all(),
+      ).toEqual([{ version: 1 }, { version: 2 }]);
       expect(() => reopened.exec("DELETE FROM runs")).toThrow("immutable");
     } finally {
       reopened.close();

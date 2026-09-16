@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
+- Add the third stacked M3 production slice: an engine-owned durable-store contract and matching in-memory/SQLite implementations with leases, monotonic fences, idempotent batches, controls, rolling integrity, rebuildable snapshots, stable errors, and byte-preserving legacy migration.
 - Add the second stacked M3 production slice: a fixed-segment private-state root, exact workspace-checkpoint validation, double-captured Git/content/ownership evidence, bounded streamed ignored-content hashing, and focused workspace/artifact path migrations.
 - Begin the stacked M3 production implementation with bounded credential-free runtime descriptors and exact Pi, Codex, and Claude Code reconstruction codecs. Add prepare/authorize, control, cleanup, orphan, typed pause, and recovery-blocked event/reducer contracts for runtime and command attempts while preserving legacy event replay.
 - Propose the exact M3 production contract after all five feasibility phases: package ownership, sanitized runtime descriptors, two-stage execution references, engine-owned durable-store and execution-host interfaces, typed recovery events, rolling event integrity, bounded supervisor records, and a private-state-root path capability. ADR 0018 keeps the proposal review-gated before implementation.

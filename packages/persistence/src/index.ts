@@ -5,6 +5,7 @@ import { applyMigrations } from "./migrations.js";
 import { assertWorkflowDefinition, canonicalJson, digestBytes } from "@anastom/core";
 import {
   PersistenceConflictError,
+  assertStateMatchesWorkflow,
   replayRun,
   type PersistedRun,
   type RunEvent,
@@ -41,14 +42,10 @@ export class SqliteRunPersistence implements RunPersistence {
   async create(runId: string, run: PersistedRun): Promise<void> {
     assertWorkflowDefinition(run.workflow);
     const state = replayRun(run.events);
-    if (
-      state.runId !== runId ||
-      state.workflowId !== run.workflow.metadata.id ||
-      state.workflowVersion !== run.workflow.metadata.version ||
-      Object.keys(state.nodes).join(",") !== run.workflow.nodeOrder.join(",")
-    ) {
+    if (state.runId !== runId) {
       throw new Error("Run history does not match its definition");
     }
+    assertStateMatchesWorkflow(state, run.workflow);
     const json = canonicalJson(run.workflow);
     this.transaction(() => {
       if (this.db.prepare("SELECT run_id FROM runs WHERE run_id = ?").get(runId)) {
@@ -150,13 +147,7 @@ export class SqliteRunPersistence implements RunPersistence {
       return event as RunEvent;
     });
     const state = replayRun(events);
-    if (
-      state.workflowId !== workflow.metadata.id ||
-      state.workflowVersion !== workflow.metadata.version ||
-      Object.keys(state.nodes).join(",") !== workflow.nodeOrder.join(",")
-    ) {
-      throw new Error("Run definition and history disagree");
-    }
+    assertStateMatchesWorkflow(state, workflow);
     return { workflow, events };
   }
   private insert(runId: string, events: readonly RunEvent[]): void {
@@ -182,3 +173,4 @@ export class SqliteRunPersistence implements RunPersistence {
   }
 }
 export * from "./artifacts.js";
+export { SqliteDurableRunStore } from "./durable-store.js";

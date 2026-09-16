@@ -2,7 +2,7 @@
 
 ## Status and review boundary
 
-This is the exact production-contract proposal requested after the five M3 feasibility phases. The owner authorized a stacked production implementation against it, with acceptance and merge deferred until review of the complete stack. The runtime-descriptor/event slice and the private-path/workspace slice are implemented in the review stack; the durable store, execution host, recovery coordinator, CLI, and final acceptance evidence remain in later slices. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Implementation must preserve these names, ownership boundaries, state transitions, and compatibility rules unless new evidence first amends the proposal and the build brief.
+This is the exact production-contract proposal requested after the five M3 feasibility phases. The owner authorized a stacked production implementation against it, with acceptance and merge deferred until review of the complete stack. The runtime-descriptor/event, private-path/workspace, and durable-store slices are implemented in the review stack; the execution host, recovery coordinator, CLI, and final acceptance evidence remain in later slices. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Implementation must preserve these names, ownership boundaries, state transitions, and compatibility rules unless new evidence first amends the proposal and the build brief.
 
 The proposal covers local Linux and macOS Task runs. It does not add provider-session adoption, remote workers, parallel scheduling, force takeover, automatic worktree repair, or exactly-once external effects.
 
@@ -333,9 +333,9 @@ export interface ControlReceipt extends ControlRequest {
 }
 ```
 
-`createOwned` atomically inserts the immutable definition, initial events, generation-one lease, event integrity, mutation receipt, and initial snapshot. `acquireReleased` handles a released lease or a legacy run without a lease. It never takes an expired unreleased lease. `takeoverExpired` accepts only an exact previously inspected lease plus an `absent` observation and rechecks the owner, generation, expiry, and release state inside `BEGIN IMMEDIATE`.
+`createOwned` atomically inserts the immutable definition, initial events, generation-one lease, event integrity, mutation receipt, and initial snapshot. `acquireReleased` handles a released lease or a legacy run without a lease. It never takes an expired unreleased lease. `takeoverExpired` accepts only an exact previously inspected lease plus an `absent` observation made no earlier than that lease's expiry and no later than the transaction clock. It rechecks the owner, generation, expiry, release state, and observation timing inside `BEGIN IMMEDIATE`.
 
-`commit` validates the unexpired fence before looking up the mutation ID. It then returns an existing same-payload receipt, rejects a changed payload, compares the expected sequence, validates and appends the complete event batch, records event integrity, optionally writes a snapshot, and acknowledges a matching control request in one transaction. The payload digest is computed internally from the canonical expected sequence, events, snapshot identity, and handled control ID.
+`commit` validates the unexpired fence before looking up the mutation ID. It then returns an existing same-payload receipt, rejects a changed payload, compares the expected sequence, validates and appends the complete event batch, records event integrity, optionally writes a snapshot, and acknowledges a matching control request in one transaction. The payload digest is computed internally from the canonical expected sequence, events, handled control ID, and snapshot identity fields: version, reducer version, run ID, definition digest, sequence, state digest, and event-prefix digest. `stateJson` is represented by its validated `stateDigest` rather than duplicated in the idempotency payload.
 
 Expected operational conflicts use one error with a stable code:
 

@@ -1,1 +1,4 @@
-[{ "version": 1, "name": "run-store", "file": "0001-run-store.sql" }]
+[
+  { "version": 1, "name": "run-store", "file": "0001-run-store.sql" },
+  { "version": 2, "name": "durable-run-store", "file": "0002-durable-run-store.sql" }
+]

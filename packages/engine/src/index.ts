@@ -6,3 +6,5 @@ export * from "./scheduler.js";
 export * from "./artifacts.js";
 export * from "./command.js";
 export * from "./context.js";
+export * from "./durable-store.js";
+export { assertRunEvent } from "./event-validation.js";
