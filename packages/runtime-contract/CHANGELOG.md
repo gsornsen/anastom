@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add exact process-boundary validation for persisted execution requests and normalized terminal results, including 4 MiB request and 1 MiB result limits.
 - Add exact validation for versioned workspace checkpoints, ownership evidence, digests, identifiers, and ignored-content limits.
 - Add bounded credential-free runtime descriptors, durable adapter and exact codec contracts, a versioned descriptor envelope schema, and portable workspace checkpoint/difference evidence shapes. Remove the unused adapter-level recovery hook and recovery types so M3 process ownership can live in the shared execution host.
 - Add versioned capability/observation validation, workspace-mode negotiation, configured/reported identity provenance, and optional partial token counters without changing existing lifecycle variants.

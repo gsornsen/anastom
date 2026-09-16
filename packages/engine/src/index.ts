@@ -7,4 +7,5 @@ export * from "./artifacts.js";
 export * from "./command.js";
 export * from "./context.js";
 export * from "./durable-store.js";
+export * from "./execution-host.js";
 export { assertRunEvent } from "./event-validation.js";

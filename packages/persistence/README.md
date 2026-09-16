@@ -27,6 +27,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker task execution is delivered. The M3 durable store is implemented and model-free tested but is not yet connected to the execution host, recovery coordinator, or CLI. Parallel graphs, approvals, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
+Single-worker task execution is delivered. The M3 durable store and execution host are implemented and model-free tested, but the recovery coordinator and CLI do not compose them yet. Parallel graphs, approvals, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
 
 License: [AGPL-3.0-only](../../LICENSE).

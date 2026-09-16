@@ -4,7 +4,7 @@ Own deterministic scheduling, typed event transitions, fresh attempt contexts, r
 
 ## Public API
 
-`WorkflowEngine.createRun` preflights a selected worker's capabilities before persisting initial state; `tick` executes one ready attempt; `runToCompletion` advances sequentially. `inspect` and `events` read evidence without invoking workers. `RunPersistence`, `ArtifactStore`, and `CommandExecutor` remain the M1/M2 injectable boundaries. M3 adds the separate engine-owned `DurableRunStore`, stable `RunStoreError` codes, lease/process/snapshot/control records, snapshot construction, rolling event-history identity, and an `InMemoryDurableRunStore` reference implementation. `buildContext` takes named options and returns frozen context, canonical bytes, and digest. M3 event contracts add exact runtime configuration, prepared and authorized execution references, workspace checkpoints, control/cleanup observations, orphan evidence, typed pause reasons, and recovery-blocked state while preserving legacy lifecycle records. Renderers expose the recorded negotiation, public identity, partial usage, status, and evidence.
+`WorkflowEngine.createRun` preflights a selected worker's capabilities before persisting initial state; `tick` executes one ready attempt; `runToCompletion` advances sequentially. `inspect` and `events` read evidence without invoking workers. `RunPersistence`, `ArtifactStore`, and `CommandExecutor` remain the M1/M2 injectable boundaries. M3 adds the separate engine-owned `DurableRunStore` and `ExecutionHost` interfaces, stable `RunStoreError` codes, lease/process/snapshot/control records, exact execution-plan construction, snapshot construction, rolling event-history identity, and an `InMemoryDurableRunStore` reference implementation. `buildContext` takes named options and returns frozen context, canonical bytes, and digest. M3 event contracts add exact runtime configuration, prepared and authorized execution references, workspace checkpoints, control/cleanup observations, orphan evidence, typed pause reasons, and recovery-blocked state while preserving legacy lifecycle records. Renderers expose the recorded negotiation, public identity, partial usage, status, and evidence.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api engine`; output is in `.generated/api/engine/` and is not committed.
 
@@ -27,6 +27,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker task execution is delivered. M3 descriptor, event/reducer, path/workspace, and durable-store contracts are implemented, but the store is not yet wired into the execution host, recovery coordinator, or operator commands. Parallel graphs, approvals, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
+Single-worker task execution is delivered. M3 descriptor, event/reducer, path/workspace, durable-store, and execution-host contracts are implemented, but the engine recovery coordinator and operator commands do not use them yet. Parallel graphs, approvals, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
 
 License: [AGPL-3.0-only](../../LICENSE).

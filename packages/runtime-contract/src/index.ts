@@ -284,5 +284,7 @@ export {
   assertRuntimeCapabilities,
   assertRuntimeDescriptor,
   assertRuntimeEvent,
+  assertExecutionRequest,
+  assertExecutionResult,
   assertWorkspaceCheckpoint,
 } from "./validation.js";

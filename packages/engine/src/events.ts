@@ -11,6 +11,7 @@ import type {
   RuntimeUsage,
 } from "@anastom/runtime-contract";
 import type { CommandReport } from "./command.js";
+import type { ExecutionPlanRef, PersistedExecutionRef } from "./execution-host.js";
 import { assertRunEvent } from "./event-validation.js";
 
 /**
@@ -30,21 +31,6 @@ export type AttemptStatus =
   | "succeeded"
   | "failed"
   | "cancelled";
-
-/** Durable identity committed before an execution supervisor is prepared. */
-export interface ExecutionPlanRef {
-  version: "anastom.dev/owned-execution/v1alpha1";
-  runId: string;
-  executionId: string;
-  kind: "runtime" | "command";
-  generation: number;
-  planDigest: string;
-}
-
-/** Sanitized proof that a supervisor published the manifest for an execution plan. */
-export interface PersistedExecutionRef extends ExecutionPlanRef {
-  manifestDigest: string;
-}
 
 /** Evidence that prevents recovery from claiming an execution is absent. */
 export type RecoveryBlockReason =

@@ -1,6 +1,6 @@
 # 0018 — M3 production contract and package boundaries
 
-- Status: Proposed after completed feasibility; stacked implementation authorized, owner acceptance required before merge
+- Status: Accepted as the stacked implementation baseline; complete-stack owner acceptance required before merge
 - Date: 2026-09-16
 
 ## Context
@@ -9,9 +9,9 @@
 
 Those probes also showed why copying their temporary types directly would be unsafe. Adapter-level recovery would duplicate OS ownership across vendors. A lease generation cannot prove a process tree absent. One generic path resolver would mix authored paths, private operational state, installed executables, and authentication stores. A snapshot prefix digest without transactionally maintained event integrity would still require hashing the entire prefix.
 
-## Proposal
+## Decision
 
-Use [the M3 production contract](../M3_PRODUCTION_CONTRACT.md) as the implementation baseline while the owner reviews the completed stack before acceptance and merge.
+Use [the M3 production contract](../M3_PRODUCTION_CONTRACT.md) as the implementation baseline while the owner reviews the completed stack before final acceptance and merge.
 
 The proposal makes the following package decisions:
 
@@ -26,7 +26,7 @@ The proposal makes the following package decisions:
 
 The exact public records, event transitions, transaction order, limits, compatibility behavior, CLI syntax, and implementation slices are defined in the proposal. No production API or migration changes in this ADR.
 
-## Consequences if accepted
+## Consequences
 
 M3 recovery will have one OS ownership boundary across all current workers and commands. The engine can remain independent from SQLite and vendor runtimes. Durable mutations will carry explicit lease fences and operation IDs. Runs created before M3 will remain inspectable but cannot be resumed when safe reconstruction evidence is absent.
 
@@ -56,4 +56,4 @@ Fencing protects SQLite history only. It cannot stop a surviving agent or comman
 
 ## Review triggers
 
-Revise the proposal and the accepted M3 build brief before implementation if cross-platform production tests cannot preserve two-phase start authorization, if Pi cannot resolve its effective model without a provider call, if private socket placement cannot satisfy the 100-byte bound, if transactionally maintained event integrity cannot retain old histories unchanged, or if the proposed event transitions cannot represent unknown cleanup without permitting another worker.
+Revise the production contract and the accepted M3 build brief before implementation if cross-platform production tests cannot preserve two-phase start authorization, if Pi cannot resolve its effective model without a provider call, if private socket placement cannot satisfy the 100-byte bound, if transactionally maintained event integrity cannot retain old histories unchanged, or if the event transitions cannot represent unknown cleanup without permitting another worker.

@@ -2,7 +2,7 @@
 
 ## Status and mission
 
-**Accepted by the owner on 2026-09-16 under [issue #22](https://github.com/gsornsen/anastom/issues/22) and [PR #23](https://github.com/gsornsen/anastom/pull/23).** [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) records the accepted boundary. All model-free feasibility phases pass on Linux and macOS in stacked PRs #24–#28. The recovery semantics are approved; the exact runtime, persistence, execution-host, workspace, and path shapes are now proposed in the separate [M3 production contract](M3_PRODUCTION_CONTRACT.md) and [ADR 0018](adr/0018-m3-production-contract-and-package-boundaries.md). They remain unapproved until owner review and must revise this brief if implementation evidence contradicts them.
+**Accepted by the owner on 2026-09-16 under [issue #22](https://github.com/gsornsen/anastom/issues/22) and [PR #23](https://github.com/gsornsen/anastom/pull/23).** [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) records the accepted boundary. All model-free feasibility phases pass on Linux and macOS in stacked PRs #24–#28. The owner also accepted the exact runtime, persistence, execution-host, workspace, and path shapes in the separate [M3 production contract](M3_PRODUCTION_CONTRACT.md) and [ADR 0018](adr/0018-m3-production-contract-and-package-boundaries.md) as the stacked implementation baseline. Final implementation and evidence acceptance remains deferred until complete-stack review; contradictory implementation evidence must revise this brief before changing the contract.
 
 Make a durable Task run survive abrupt coordinator termination. A later Anastom process must reconstruct the run, reject stale ownership, account for the interrupted attempt, preserve its evidence, and either continue as a fresh bounded attempt or stop with a precise reason why continuation is unsafe.
 
@@ -226,7 +226,7 @@ Explicit pause cancellation and crash orphaning are distinct attempt outcomes. I
 
 ## Implementation order and gates
 
-1. **Feasibility evidence:** add deterministic process-identity, descendant-cleanup, SQLite contention, and workspace-checkpoint probes. Record results in `docs/M3_FEASIBILITY.md`. Revise this brief and ADR if evidence contradicts the proposed contract.
+1. **Feasibility evidence:** add deterministic process-identity, descendant-cleanup, SQLite contention, and workspace-checkpoint probes. Record results in `docs/M3_FEASIBILITY.md`. Revise this brief and ADR if evidence contradicts the production contract.
 2. **Schemas and compatibility:** define event/projection additions, sanitized runtime descriptors, typed ownership/control errors, and old-history compatibility tests. Add Changesets for every affected package contract.
 3. **Persistence:** add versioned migrations for leases, mutation keys, control requests, and snapshots; implement fenced/idempotent transactions and full-replay fallback.
 4. **Runtime ownership:** implement the evidence-backed common outcome contract and model-free conformance coverage for each current adapter and command execution.

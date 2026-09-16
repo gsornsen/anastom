@@ -112,6 +112,24 @@ importers:
         specifier: workspace:*
         version: link:../runtime-fake
 
+  packages/execution-host:
+    dependencies:
+      '@anastom/core':
+        specifier: workspace:*
+        version: link:../core
+      '@anastom/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@anastom/path-policy':
+        specifier: workspace:*
+        version: link:../path-policy
+      '@anastom/runtime-contract':
+        specifier: workspace:*
+        version: link:../runtime-contract
+      tsx:
+        specifier: ^4.20.5
+        version: 4.23.13
+
   packages/path-policy: {}
 
   packages/persistence:

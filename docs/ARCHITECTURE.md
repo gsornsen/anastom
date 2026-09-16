@@ -2,7 +2,7 @@
 
 ## Status and objective
 
-This document describes the implemented control plane through M2.5. The accepted M3 durability design, model-free feasibility prototypes, and separately proposed [production contract](M3_PRODUCTION_CONTRACT.md) are labeled explicitly; M3 product behavior and exact API shapes are not implemented yet.
+This document describes the delivered control plane through M2.5 and the implemented M3 production slices in the current review stack. The accepted M3 durability design, model-free feasibility evidence, and [production contract](M3_PRODUCTION_CONTRACT.md) govern the remaining recovery coordinator, CLI, and acceptance work. M3 recovery is not yet exposed as product behavior.
 
 Anastom keeps engineering policy independent from agent runtime implementation. The control plane owns authoritative state and verification; a runtime adapter owns one bounded agent loop.
 
@@ -87,7 +87,6 @@ export interface RuntimeAdapter {
   events(handle: ExecutionHandle): AsyncIterable<RuntimeEvent>;
   collect(handle: ExecutionHandle): Promise<ExecutionResult>;
   cancel(handle: ExecutionHandle): Promise<void>;
-  recover?(persisted: PersistedExecutionRef): Promise<RecoveredExecution | null>;
 }
 ```
 
@@ -111,7 +110,7 @@ type ExecutionRequest = {
 
 Runtime and model configuration resolve outside the workflow role. M2 added capability negotiation and made portability across Pi and Codex observable; M2.5 applied the same boundary to Claude Code.
 
-`recover` is optional contract space that no live adapter implements. SQLite durability supports cross-process `status` and `inspect`, but an attempt running during coordinator loss cannot yet continue. Accepted [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) removes session adoption from the M3 baseline and replaces it with fenced ownership plus evidence-backed execution reconciliation before a fresh attempt. The M3 supervisor probe deliberately remains repository-level feasibility code until its shared lifecycle boundary and the persistence/workspace evidence justify a replacement package contract.
+Adapters own one attempt and do not recover provider sessions. SQLite durability supports cross-process `status` and `inspect`, but an attempt running during coordinator loss cannot yet continue through the CLI. Accepted [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) replaces session adoption with fenced ownership plus evidence-backed execution reconciliation before a fresh attempt. The production `@anastom/execution-host` package now supplies the shared prepare/authorize/inspect/terminate lifecycle proven by the earlier supervisor probe; engine recovery coordination remains the next slice.
 
 ## Runtime capabilities
 
@@ -207,7 +206,7 @@ events(run_id, sequence, event_type, event_json, recorded_at)
 
 `workflow_json` contains the normalized immutable definition. `workflow_digest` covers a canonical serialization of that definition. Database timestamps support operator inspection; event sequence remains the only transition ordering authority.
 
-Artifact bodies live below a per-run filesystem directory. Their digest and metadata enter the event stream. M0-M2.5 do not add mutable node, attempt, lease, snapshot, evidence, usage, or projection tables. Accepted M3 design adds operational lease, idempotency, control-request, and snapshot records while preserving events as the workflow authority. The [M3 build brief](M3_BUILD_BRIEF.md) defines their different trust and lifecycle rules.
+Artifact bodies live below a per-run filesystem directory. Their digest and metadata enter the event stream. M0-M2.5 do not add mutable node, attempt, lease, snapshot, evidence, usage, or projection tables. The M3 durable store adds operational lease, idempotency, control-request, event-integrity, and snapshot records while preserving events as the workflow authority. The [M3 build brief](M3_BUILD_BRIEF.md) defines their different trust and lifecycle rules.
 
 ## Failure semantics
 
@@ -227,7 +226,7 @@ The workspace-checkpoint probe passes on the owner macOS host, Ubuntu 24.04 CI, 
 
 The snapshot probe passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #28. For reopened M1/M2/M2.5-shaped and pause/resume/cancel histories, validated snapshot-plus-tail state equals full replay. Snapshot state is bound to the immutable workflow digest and exact event-prefix digest; invalid snapshots fall back, while corrupt authoritative events still fail. The probe does not add a migration or package API. All feasibility phases are now cross-platform.
 
-The proposed [M3 production contract](M3_PRODUCTION_CONTRACT.md) turns that evidence into an exact review gate: a shared `@anastom/execution-host` owns POSIX supervision; engine-owned interfaces separate policy from SQLite and process infrastructure; adapter-owned descriptors use exact Allow Listed fields; event preparation precedes supervisor preparation and start authorization; and a distinct private-state-root path capability centralizes bounded run-owned records without generalizing unrelated executable or authentication paths. [ADR 0018](adr/0018-m3-production-contract-and-package-boundaries.md) remains proposed until owner review, and none of these shapes are implemented yet.
+The accepted [M3 production contract](M3_PRODUCTION_CONTRACT.md) turns that evidence into exact package boundaries. A shared `@anastom/execution-host` now owns POSIX supervision through a detached supervisor and isolated runtime host; engine-owned interfaces separate policy from SQLite and process infrastructure; adapter-owned descriptors use exact Allow Listed fields; event preparation precedes supervisor preparation and start authorization; and a distinct private-state-root path capability centralizes bounded run-owned records without generalizing unrelated executable or authentication paths. The production stack implements these contracts, the fenced store, and model-free process conformance. The engine recovery coordinator and CLI still need to compose them before M3 is usable.
 
 Provider-session reattachment, automatic worktree reset, exactly-once external effects, force takeover, distributed scheduling, human gates, nested workflows, fan-out, shared integration, automatic capability routing, cost routing, circuit breakers beyond current attempt/duration limits, and a general evidence graph remain deferred.
 
