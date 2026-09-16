@@ -109,13 +109,15 @@ The in-memory store implements the same observable rules for focused engine test
 
 ### Snapshot rules
 
-Snapshots are canonical JSON projections with a snapshot schema/reducer version, event sequence, and SHA-256 digest. The SQLite migration is additive; existing run and event rows remain unchanged.
+Snapshots are canonical JSON projections with a snapshot schema/reducer version, event sequence, workflow-definition digest, exact event-prefix digest, and SHA-256 state digest. The event-prefix binding prevents a snapshot from hiding an earlier authoritative event change. The SQLite migration is additive; existing run and event rows remain unchanged.
 
 The engine writes snapshots at initial scheduling, attempt-terminal transitions, completed pause/cancel transitions, and terminal run completion. It may coalesce a snapshot with the transition transaction. Runtime log, metadata, and usage observations do not each create one.
 
-The execution loader may use the newest compatible valid snapshot and replay later events. The inspection loader can still return the complete history. Unknown versions, digest mismatch, malformed state, a sequence beyond the event tail, or a tail transition that contradicts the snapshot causes the loader to ignore it and perform full replay. A fenced owner may replace the cache later; read-only status and inspection do not mutate it. Corrupt events still fail, so a bad snapshot cannot turn them into a valid run.
+The execution loader may use the newest compatible valid snapshot and replay later events. The inspection loader can still return the complete history. Unknown versions, definition/prefix/state digest mismatch, malformed or noncanonical state, a sequence beyond the event tail, or a tail transition that contradicts the snapshot causes the loader to ignore it and perform full replay. The complete event envelope remains validated; until events have a transactionally maintained rolling history digest, snapshot loading recomputes the prefix digest even when it skips prefix reduction. A fenced owner may replace the cache later; read-only status and inspection do not mutate it. Corrupt events still fail, so a bad snapshot cannot turn them into a valid run.
 
 Compatibility tests open an M1, M2, and M2.5 fixture database, replay it without a snapshot, build one, reopen it, and obtain the same projection and definition digest.
+
+The model-free snapshot phase tests this candidate without a production migration or exported type. Locally on the owner macOS host, reopened M1/M2/M2.5-shaped histories and a pause/resume/cancel history produce snapshot-plus-tail state equal to full replay. Absent, unknown, malformed, oversized, digest-mismatched, identity-mismatched, prefix-mismatched, and tail-contradicting snapshots fall back. Invalid event envelopes and semantically corrupt authoritative history still fail. Linux and clean macOS CI remain required. The checked-in feasibility state schema and 4 MiB limit are inputs to contract review, not approved public constants.
 
 ### Control request rules
 

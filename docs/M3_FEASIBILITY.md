@@ -2,7 +2,7 @@
 
 ## Status
 
-Process-ownership phase implemented and passing on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24) on 2026-09-16. The production-shaped supervisor-protocol phase also passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked [PR #25](https://github.com/gsornsen/anastom/pull/25). The SQLite lease, fencing, idempotency, and control-inbox contention phase passes on the same local/CI platforms in stacked [PR #26](https://github.com/gsornsen/anastom/pull/26). The exact workspace-checkpoint phase passes on those platforms in stacked [PR #27](https://github.com/gsornsen/anastom/pull/27). Snapshot fallback remains the final feasibility phase before public M3 APIs are frozen.
+Process-ownership phase implemented and passing on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in [PR #24](https://github.com/gsornsen/anastom/pull/24) on 2026-09-16. The production-shaped supervisor-protocol phase also passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked [PR #25](https://github.com/gsornsen/anastom/pull/25). The SQLite lease, fencing, idempotency, and control-inbox contention phase passes on the same local/CI platforms in stacked [PR #26](https://github.com/gsornsen/anastom/pull/26), and the exact workspace-checkpoint phase passes there in stacked [PR #27](https://github.com/gsornsen/anastom/pull/27). The snapshot-plus-tail and corrupt-snapshot fallback phase passes locally on the owner macOS host; Linux and clean macOS CI are pending on its stacked change. Public M3 APIs remain unfrozen.
 
 The accepted [M3 build brief](M3_BUILD_BRIEF.md) and [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) require evidence before choosing an execution-recovery interface. This document records that evidence. The process probe makes no provider request, reads no real authentication store, and changes no production runtime contract.
 
@@ -48,6 +48,15 @@ pnpm test scripts/probe-m3-workspace-checkpoint.test.ts
 ```
 
 It creates temporary source and clone repositories plus owned Git worktrees. It captures the same rich workspace twice, tests exact restoration after content and ownership changes, and removes both repositories afterward. The probe invokes no runtime or model and reads no authentication store. Its Vitest boundary has a 60-second outer limit; the local matrix currently completes in about 5.5 seconds.
+
+The snapshot phase is independently reproducible with:
+
+```bash
+pnpm probe:m3:snapshot
+pnpm test scripts/probe-m3-snapshot.test.ts
+```
+
+It creates a temporary current SQLite run store, writes four deterministic lifecycle histories, closes and reopens it, and removes it afterward. It then exercises feasibility-local snapshot records and a checked-in folded-state schema without adding a production migration or package API. The probe invokes no runtime or model and reads no authentication store. Its Vitest boundary has a 30-second outer limit; the local matrix currently completes in under one second.
 
 The test has a 45-second outer limit. Every internal wait is bounded and driven by a file or process-state condition. No assertion infers readiness from a fixed sleep. Fixture programs are checked-in files; none is embedded in a string. Child fixtures accept only fixed behavior names, use their inherited canonical working directory as the authorized record root, and publish readiness JSON by atomic rename so readers cannot observe partial records.
 
@@ -200,6 +209,33 @@ This refines the accepted contract in three ways. The durable checkpoint needs a
 
 The types and limits remain feasibility-local. Production code should stream bounded ignored-file reads rather than retain them in memory, use the shared path-policy vocabulary when that API is extracted, persist the diff as a verified artifact, and integrate capture atomically with the fenced attempt-start transition.
 
+## Snapshot and authoritative replay protocol
+
+The fifth probe folds reopened M1-shaped, M2-shaped, M2.5-shaped, and pause/resume/cancel histories at valid lifecycle boundaries. For every shape, applying later events to the validated snapshot produces the same canonical state as replaying the complete event stream. A snapshot at the event tail also matches full replay, and a newer unknown-version record does not prevent the loader from selecting an older compatible valid candidate. Loading does not mutate the candidate records.
+
+The accepted design proposed a schema/reducer version, event sequence, canonical state bytes, and state digest. The probe found that these fields alone are insufficient: a schema-valid change in an authoritative event before the snapshot could be hidden by tail-only reduction. The candidate therefore also binds the snapshot to the immutable workflow-definition digest and a SHA-256 digest of the exact canonical event prefix. Until production events carry an incrementally verified history digest, loading a snapshot may avoid reducer work but must still validate the complete event envelope and recompute the prefix digest.
+
+The matrix rejects or skips each untrusted snapshot boundary, then performs full replay when no valid candidate remains:
+
+| Boundary                                                    | Observed result                                      |
+| ----------------------------------------------------------- | ---------------------------------------------------- |
+| absent snapshot                                             | full replay                                          |
+| unknown snapshot or reducer version                         | full replay                                          |
+| malformed/extra record fields                               | full replay                                          |
+| wrong run or workflow-definition digest                     | full replay                                          |
+| future event sequence                                       | full replay                                          |
+| state over the 4 MiB feasibility limit                      | full replay                                          |
+| state digest mismatch                                       | full replay                                          |
+| malformed, noncanonical, schema-invalid, or wrong-ID state  | full replay                                          |
+| event-prefix digest mismatch                                | full replay reflects the changed authoritative event |
+| schema-valid snapshot state contradicted by its event tail  | full replay                                          |
+| invalid event shape or sequence gap                         | load rejected before snapshot selection              |
+| semantically corrupt event hidden behind a snapshot attempt | fallback replay rejects the history                  |
+
+This preserves the trust hierarchy: events remain authoritative; the workflow definition remains immutable identity; snapshots are disposable derived caches. A corrupt snapshot cannot validate a corrupt event stream, and read-only loading never repairs storage. The temporary schema is exact for the current `RunState`; later M3 state fields require a reviewed reducer/schema version rather than permissive acceptance.
+
+The candidate numeric limit, rejection names, and TypeScript shapes remain unfrozen. Production design must decide whether to store a rolling event-history digest transactionally, how to read bounded snapshot bytes from SQLite, which stable transitions create snapshots, and how a fenced writer replaces a rejected cache without letting inspection mutate data.
+
 ## Contract refinement from this phase
 
 The evidence rejects two narrower designs:
@@ -218,7 +254,7 @@ The production-shaped protocol confirms this candidate boundary on the observed 
 - Recovery trusts neither a launcher PID nor an unverified manifest. It checks host/boot identity, a production-grade process identity, process group, supervisor-issued execution capability, execution ID, lease generation, run-owned path, and manifest schema before requesting cleanup.
 - If both supervisor and authenticated execution leader are absent but a group may remain, recovery reports `unknown` and pauses. It never signals a bare numeric group.
 
-No public signature is fixed by this phase. Bounded public event/result relay and cancel/parent-death behavior now pass for Pi, Codex, Claude Code, and commands in the temporary run-owned boundary. Workspace identity now has cross-platform evidence, but final state-layout placement, snapshot fallback, and remaining production concerns remain gates before `RuntimeAdapter.recover()` is removed or replaced.
+No public signature is fixed by this phase. Bounded public event/result relay and cancel/parent-death behavior now pass for Pi, Codex, Claude Code, and commands in the temporary run-owned boundary. Workspace identity has cross-platform evidence and snapshot fallback has local evidence, but snapshot cross-platform CI, final state-layout placement, and remaining production concerns remain gates before `RuntimeAdapter.recover()` is removed or replaced.
 
 ## Security and evidence limits
 
@@ -228,10 +264,11 @@ No public signature is fixed by this phase. Bounded public event/result relay an
 - The local run used synthetic adapter/session doubles and a generic supervisor worker. It proves lifecycle mechanics, not provider-session behavior or model quality.
 - The process, supervisor, SQLite, and workspace boundaries passed on Ubuntu 24.04 and macOS 15 in stacked PRs #24–#27.
 - The workspace probe hashes ignored content in bounded feasibility memory; the production implementation must stream bounded reads and retain the same fail-closed outcomes.
-- Snapshot correctness, runtime-descriptor reconstruction, production integration, and complete pause/cancel/resume semantics remain unproved.
+- Snapshot code is a repository-level candidate with a temporary state schema and no production migration. Runtime-descriptor reconstruction, production integration, and complete pause/cancel/resume semantics remain unproved.
 
 ## Next feasibility gates
 
-1. Prove snapshot-plus-tail equality and corrupt/unknown snapshot fallback to full event replay.
-2. Resolve production process identity, socket placement/path length, and bounded operational-record loading before promoting the prototypes into package contracts.
-3. Revise ADR 0017 and the M3 build brief if any later evidence contradicts the accepted boundaries.
+1. Confirm the snapshot matrix on Ubuntu 24.04 and clean macOS 15 CI.
+2. Resolve production process identity, socket placement/path length, bounded operational-record loading, and rolling event-prefix integrity before promoting the prototypes into package contracts.
+3. Propose exact schemas and package APIs in a separate review step; do not combine that contract review with production implementation.
+4. Revise ADR 0017 and the M3 build brief if any later evidence contradicts the accepted boundaries.

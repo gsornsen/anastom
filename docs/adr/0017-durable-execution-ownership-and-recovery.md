@@ -58,9 +58,9 @@ Control requests need no run lease because their purpose is to ask the current o
 
 ### Treat snapshots as verified caches
 
-Snapshots contain a reducer/schema version, run ID, event sequence, canonical state bytes, and digest. They are written transactionally at reviewed stable boundaries such as attempt completion, pause/cancel completion, and run completion. High-volume runtime observations do not each require a snapshot.
+Snapshots contain a reducer/schema version, run ID, event sequence, workflow-definition digest, exact event-prefix digest, canonical state bytes, and state digest. They are written transactionally at reviewed stable boundaries such as attempt completion, pause/cancel completion, and run completion. High-volume runtime observations do not each require a snapshot.
 
-Execution may load the newest compatible snapshot and replay its tail. Full-history inspection remains available. A malformed, unknown-version, or digest-mismatched snapshot is ignored and rebuilt from events; it may not hide a corrupt event stream. Tests must compare snapshot-plus-tail state with full replay for every lifecycle shape introduced by M3.
+Execution may load the newest compatible snapshot and replay its tail. Full-history inspection remains available. A malformed, unknown-version, or digest-mismatched snapshot is ignored and rebuilt from events; it may not hide a changed or corrupt event stream. Until production events carry a transactionally maintained rolling history digest, the loader validates the complete event envelope and recomputes the snapshot's prefix digest even when it skips prefix reduction. Tests must compare snapshot-plus-tail state with full replay for every lifecycle shape introduced by M3.
 
 This is an integrity and consistency boundary for Anastom-managed storage, not a defense against an administrator deliberately rewriting the database and disabling its constraints.
 
@@ -170,3 +170,11 @@ The fourth [M3 feasibility probe](../M3_FEASIBILITY.md) retains the existing tem
 The candidate binds a version, workspace ID, base and current commits, binary diff digest, ordered changed names, a bounded ignored-tree fingerprint, and canonical repository/worktree ownership. Content and `HEAD` mutations produce classified differences. Changed branch, ownership manifest, symlink boundary, or Git registration rejects capture. An independently cloned repository with the same Git content does not inherit the original workspace identity. Invalid UTF-8 paths fail at the filesystem or checkpoint decoder; unsupported ignored entries, over-limit ignored trees, and unstable double captures also fail closed.
 
 The matrix passes on the owner Darwin arm64 host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #27 without a runtime, model request, or authentication read. This refinement makes staging state explicitly non-authoritative and ignored content explicitly part of retry identity. It does not approve the temporary types or numeric limits as public API. Production capture still needs streaming bounds, durable artifact integration, fenced persistence, and snapshot evidence before package contracts are frozen.
+
+## Feasibility refinement — snapshots
+
+The fifth [M3 feasibility probe](../M3_FEASIBILITY.md) folds reopened M1/M2/M2.5-shaped histories and a pause/resume/cancel lifecycle at valid sequences. Each snapshot-plus-tail result equals complete replay, including an empty tail. Unknown newer candidates can be skipped for an older compatible snapshot, and candidate inputs remain immutable during loading.
+
+The probe exposed one missing integrity field in the original decision: a state digest does not bind that state to the authoritative events it replaces. The refined candidate records the immutable workflow-definition digest and SHA-256 of the exact canonical event prefix alongside its schema/reducer version, sequence, canonical state, and state digest. A changed valid prefix therefore triggers full replay and produces the changed authoritative state. Invalid event shapes and gaps fail before snapshot selection; a semantic event contradiction behind a snapshot triggers prefix mismatch and remains rejected by fallback replay.
+
+Absent, malformed, unknown-version, oversized, digest-mismatched, schema-invalid, identity-mismatched, and tail-contradicting snapshots all fall back locally on Darwin arm64. Linux and clean macOS CI remain pending on the stacked change. No production table or package interface changes in this phase. A later contract proposal must settle rolling prefix integrity, bounded SQLite reads, stable write boundaries, fenced cache replacement, state-schema evolution, and exact error names before implementation.
