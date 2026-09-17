@@ -2,7 +2,7 @@
 
 ## Status and review boundary
 
-This is the accepted production contract requested after the five M3 feasibility phases. The owner authorized a stacked implementation against it, with final acceptance and merge deferred until review of the complete stack. The runtime-descriptor/event, private-path/workspace, durable-store, execution-host, and recovery-coordinator slices are implemented in the review stack; CLI composition and final acceptance evidence remain in later slices. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Implementation must preserve these names, ownership boundaries, state transitions, and compatibility rules unless new evidence first amends this contract and the build brief.
+This is the accepted production contract requested after the five M3 feasibility phases. The owner authorized a stacked implementation against it, with final acceptance and merge deferred until review of the complete stack. The production stack through CLI composition is implemented in the review stack; final process-level acceptance evidence remains. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Implementation must preserve these names, ownership boundaries, state transitions, and compatibility rules unless new evidence first amends this contract and the build brief.
 
 The proposal covers local Linux and macOS Task runs. It does not add provider-session adoption, remote workers, parallel scheduling, force takeover, automatic worktree repair, or exactly-once external effects.
 
@@ -31,6 +31,8 @@ The feasibility work exposed several places where the earlier design could have 
 19. **Pre-start artifacts belong to the current attempt.** Context and non-empty pre-attempt diff bytes are immutably published before the fenced scheduling batch. `ArtifactProduced` may therefore identify the current `scheduled` or `prepared` attempt while its node remains ready; every producer field must match that attempt, and `AttemptPrepared` rejects a referenced diff artifact that is absent or belongs to another producer.
 20. **An earlier control outranks a later resume.** A pause/cancel that was acknowledged before coordinator death is recovered from immutable events even though it is no longer in the mutable inbox. The replacement completes that operation and returns its requested state. The same `resume` invocation cannot immediately undo the recovered pause or schedule replacement work after the recovered cancel.
 21. **Coordinator composition remains dependency-injected.** `DurableRunCoordinator` owns heartbeat, transition order, controls, orphan policy, workspace comparison, budgets, and retry decisions. The CLI supplies concrete store, execution-host, artifact, workspace, process-observation, and exact runtime-registry implementations. Descriptor parsing runs before lease acquisition; adapter reconstruction and current capability preflight run only after ownership.
+22. **Owner-state inspection stays conservative during the lease grace period.** The accepted inspection enum has no separate absent-but-unexpired value. A released or missing lease reports `released`, a matching live process reports `live`, and an absent process reports `expired` only after the recorded expiry; absent-before-expiry and inspection failure report `unknown`. Read-only inspection never turns that classification into takeover authority.
+23. **The CLI publishes a stable created boundary before long execution.** A real-runtime `run` creates and releases the descriptor-bound run, prints its run/workspace identity, then resumes through ordinary fenced acquisition. A crash after publication therefore leaves a resumable scheduling boundary rather than hiding a generation-one run ID until execution finishes.
 
 ## Package ownership
 
@@ -721,7 +723,7 @@ Each slice is a separately reviewable stacked PR. Later slices remain based on t
 3. Durable store migration, lease/fence/idempotency/control transactions, event integrity, and snapshot loader.
 4. `@anastom/execution-host`, hidden fixture host, and model-free conformance for all four execution owners.
 5. Engine start, heartbeat, control, orphan, workspace, and recovery state machines. **Implemented in the review stack.**
-6. CLI commands, runtime registry, inspection output, and old-history refusal behavior.
+6. CLI commands, runtime registry, inspection output, and old-history refusal behavior. **Implemented in the review stack.**
 7. Process-level M3 acceptance and `docs/M3_EVIDENCE.md`.
 
 Every code/contract slice carries reviewed package Changesets and updates affected package READMEs/changelogs. No slice uses a real model. A contradiction found during implementation stops the affected slice and updates this proposal, ADR 0018, and the build brief before the API changes.

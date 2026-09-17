@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
+- Add the sixth stacked M3 production slice: CLI composition for exact Pi, Codex, and Claude Code descriptors; an isolated runtime-host entry point; durable `pause`, `cancel`, and `resume`; operational status/inspection; stable exit behavior; and fail-closed legacy resume.
 - Add the fifth stacked M3 production slice: a vendor-neutral durable coordinator with five-second heartbeat, fenced two-phase start order, exact runtime/command ownership, control polling and restart continuation, orphan/workspace reconciliation, attempt-budget enforcement, snapshot boundaries, and typed ownership refusal.
 - Add the fourth stacked M3 production slice: an engine-owned execution-host contract and shared POSIX supervisor with digest-bound private control records, explicit pre-launch readiness, bounded authenticated IPC, runtime/command isolation, parent-death cleanup, fail-closed loss inspection, and model-free coverage for all four current execution owners.
 - Add the third stacked M3 production slice: an engine-owned durable-store contract and matching in-memory/SQLite implementations with leases, monotonic fences, idempotent batches, controls, rolling integrity, rebuildable snapshots, stable errors, and byte-preserving legacy migration.

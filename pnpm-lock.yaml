@@ -59,6 +59,12 @@ importers:
       '@anastom/engine':
         specifier: workspace:*
         version: link:../engine
+      '@anastom/execution-host':
+        specifier: workspace:*
+        version: link:../execution-host
+      '@anastom/path-policy':
+        specifier: workspace:*
+        version: link:../path-policy
       '@anastom/persistence':
         specifier: workspace:*
         version: link:../persistence
@@ -80,6 +86,9 @@ importers:
       '@anastom/workspaces':
         specifier: workspace:*
         version: link:../workspaces
+      tsx:
+        specifier: ^4.20.5
+        version: 4.23.13
 
   packages/core:
     dependencies:

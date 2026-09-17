@@ -157,9 +157,11 @@ describe("Durable task execution", () => {
       expect(status).toContain("[succeeded]");
       expect(inspection.state.status).toBe("succeeded");
       expect(inspection.definitionDigest).toMatch(/^sha256:/);
-      expect(inspection.events.map((event) => event.sequence)).toEqual(
-        inspection.events.map((_, index) => index + 1),
-      );
+      if (!inspection.events) {
+        throw new Error("JSON inspection omitted authoritative events");
+      }
+      const events = inspection.events;
+      expect(events.map((event) => event.sequence)).toEqual(events.map((_, index) => index + 1));
       expect(implicitStateDirectoryStatus).toContain("[succeeded]");
     },
     laterProcessTestTimeoutMs,
@@ -212,7 +214,7 @@ describe("Durable task execution", () => {
       { io: output.io },
     );
 
-    expect(exitCode).toBe(1);
+    expect(exitCode).toBe(2);
     expect(output.stderr.join("\n")).toContain("not found");
   });
 
@@ -275,7 +277,7 @@ describe("Durable task execution", () => {
   ])("rejects %s before execution", async (_reason, args) => {
     const output = captureCliOutput();
     const exitCode = await runCli(["run", healthEndpointTaskPath, ...args], { io: output.io });
-    expect(exitCode).toBe(1);
+    expect(exitCode).toBe(2);
     expect(output.stderr.length).toBeGreaterThan(0);
   });
 });

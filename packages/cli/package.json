@@ -9,11 +9,14 @@
     "@anastom/runtime-contract": "workspace:*",
     "@anastom/runtime-codex": "workspace:*",
     "@anastom/runtime-claude-code": "workspace:*",
+    "@anastom/execution-host": "workspace:*",
+    "@anastom/path-policy": "workspace:*",
     "@anastom/persistence": "workspace:*",
     "@anastom/workspaces": "workspace:*",
     "@anastom/runtime-pi": "workspace:*",
     "@anastom/core": "workspace:*",
     "@anastom/engine": "workspace:*",
-    "@anastom/runtime-fake": "workspace:*"
+    "@anastom/runtime-fake": "workspace:*",
+    "tsx": "^4.20.5"
   }
 }

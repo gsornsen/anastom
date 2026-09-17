@@ -62,11 +62,15 @@ if (
   throw new Error("Later-process durable JSON inspection failed");
 }
 const inspection = JSON.parse(output[0]!) as DurableRunInspection;
+const events = inspection.events;
+if (!events) {
+  throw new Error("Historical JSON inspection omitted authoritative events");
+}
 if (
   inspection.state.runId !== runId ||
   inspection.state.status !== expectedStatus ||
-  inspection.events.length !== expectedEvents ||
-  inspection.events.some((event, index) => event.runId !== runId || event.sequence !== index + 1)
+  events.length !== expectedEvents ||
+  events.some((event, index) => event.runId !== runId || event.sequence !== index + 1)
 ) {
   throw new Error("Historical replay identity, status or event sequence changed");
 }
@@ -78,7 +82,7 @@ process.stdout.write(
   JSON.stringify({
     runId,
     status: inspection.state.status,
-    events: inspection.events.length,
+    events: events.length,
     workflowRowSha256: before.workflow,
     eventRowsSha256: before.events,
     rowsUnchanged: true,
