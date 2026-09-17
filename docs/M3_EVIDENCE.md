@@ -1,6 +1,6 @@
 # M3 durable-execution evidence
 
-Status: **implementation candidate consolidated in PR #24; owner acceptance and final required checks pending.** The production implementation and deterministic process-level acceptance are complete on the owner macOS host. M3 becomes complete only after the owner reviews the combined branch and every final-code repository check passes.
+Status: **implementation candidate consolidated in PR #24; owner acceptance pending.** The production implementation and deterministic process-level acceptance are complete on the owner macOS host, and the cleanup code candidate passes every required repository check. M3 becomes complete only after the owner reviews the combined branch.
 
 ## Reviewed design and implementation identity
 
@@ -112,7 +112,7 @@ Local final-code validation completed on the acceptance candidate:
 | `pnpm docs:api`                     | Passed for all 12 packages; generated output reviewed and left uncommitted                           |
 | Package builds                      | No separate package build scripts exist; repository-wide TypeScript validation is the build boundary |
 
-On the earlier consolidated candidate `779ca38`, Linux and macOS CI, dependency review, DCO, CodeQL analysis, and the CodeQL policy gate passed. The fresh CodeQL scan closed 15 findings through code changes: test fixtures now use the shared private-path capability, the SQLite store requires a caller-authorized existing parent, persisted-event dispatch uses fixed method selection, inherited object keys are rejected, and public validation stops at its first error. The current cleanup candidate still requires its own remote checks.
+On cleanup code candidate `59032bf`, Linux and macOS CI, dependency review, DCO, CodeQL analysis, and the CodeQL policy gate all passed. The CodeQL scan remains clear after the earlier candidate closed 15 findings through code changes: test fixtures now use the shared private-path capability, the SQLite store requires a caller-authorized existing parent, persisted-event dispatch uses fixed method selection, inherited object keys are rejected, and public validation stops at its first error.
 
 CodeQL alert 41 (`js/path-injection`) was individually assessed as a false positive at the private-root trust boundary. A local operator explicitly authorizes the state-root path; `ensurePrivatePathRoot()` canonicalizes its existing parent, fixes the leaf, rejects symlinks and non-directories, requires current-user ownership, tightens mode to `0700`, verifies the canonical result, and returns a capability whose child operations accept validated fixed segments and revalidate parents. A future remote caller must authorize the root before invoking this API. The narrow dismissal and rationale are recorded in GitHub; the path-injection query remains enabled.
 
