@@ -315,6 +315,20 @@ export function createRunSnapshot(
       eventJson: canonicalJson(event),
     }).historyDigest;
   }
+  return createRunSnapshotFromState(workflow, state, eventPrefixDigest);
+}
+
+/** Build a snapshot from validated folded state and its exact cumulative event-prefix digest. */
+export function createRunSnapshotFromState(
+  workflow: WorkflowDefinition,
+  state: RunState,
+  eventPrefixDigest: string,
+): RunSnapshot {
+  assertWorkflowDefinition(workflow);
+  assertStateMatchesWorkflow(state, workflow);
+  if (!digest.test(eventPrefixDigest)) {
+    throw new TypeError("Invalid event-prefix digest");
+  }
   const stateJson = canonicalJson(state);
   if (Buffer.byteLength(stateJson) > RUN_SNAPSHOT_MAX_BYTES) {
     throw new RangeError("Run snapshot exceeds the 4 MiB limit");

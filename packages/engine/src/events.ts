@@ -488,8 +488,21 @@ function applyObservationEvent(state: RunState, event: ObservationEvent): void {
       break;
     case "ArtifactProduced": {
       const node = requireNode(state, event.nodeId);
-      requireNodeStatus(node, event.type, ["running"]);
-      requireCurrentAttempt(node, event.attempt, "running");
+      requireNodeStatus(node, event.type, ["ready", "running"]);
+      if (node.status === "running") {
+        requireCurrentAttempt(node, event.attempt, "running");
+      } else {
+        const attempt = node.attempts.at(-1);
+        if (
+          !attempt ||
+          attempt.number !== event.attempt ||
+          (attempt.status !== "scheduled" && attempt.status !== "prepared")
+        ) {
+          throw new InvalidTransitionError(
+            "Pre-start artifact evidence must identify the current scheduled attempt",
+          );
+        }
+      }
       if (
         event.artifact.producer.runId !== state.runId ||
         event.artifact.producer.nodeId !== event.nodeId ||
@@ -742,6 +755,18 @@ function applyAttemptPrepared(
   ) {
     throw new InvalidTransitionError("Prepared attempt runtime does not match its descriptor");
   }
+  if (
+    event.workspaceCheckpoint.diffArtifactId &&
+    !state.artifacts?.some(
+      (artifact) =>
+        artifact.id === event.workspaceCheckpoint.diffArtifactId &&
+        artifact.producer.runId === state.runId &&
+        artifact.producer.nodeId === event.nodeId &&
+        artifact.producer.attempt === event.attempt,
+    )
+  ) {
+    throw new InvalidTransitionError("Prepared workspace diff artifact is missing");
+  }
   attempt.status = "prepared";
   attempt.executionPlan = structuredClone(event.execution);
   attempt.workspaceCheckpoint = structuredClone(event.workspaceCheckpoint);
@@ -792,6 +817,18 @@ function applyAttemptOrphaned(
     !state.artifacts?.some((artifact) => artifact.id === event.terminalArtifactId)
   ) {
     throw new InvalidTransitionError("Orphan terminal artifact is missing");
+  }
+  if (
+    event.workspaceObservation.diffArtifactId &&
+    !state.artifacts?.some(
+      (artifact) =>
+        artifact.id === event.workspaceObservation.diffArtifactId &&
+        artifact.producer.runId === state.runId &&
+        artifact.producer.nodeId === event.nodeId &&
+        artifact.producer.attempt === event.attempt,
+    )
+  ) {
+    throw new InvalidTransitionError("Orphan workspace diff artifact is missing");
   }
   attempt.status = "orphaned";
   attempt.orphan = {
@@ -920,47 +957,10 @@ type LifecycleEvent = Extract<
 function applyLifecycleEvent(state: RunState, event: LifecycleEvent): void {
   switch (event.type) {
     case "RunPaused":
-      if (state.status !== "running") {
-        throw new InvalidTransitionError(`RunPaused is invalid in ${state.status} state`);
-      }
-      if (
-        "reason" in event &&
-        Object.values(state.nodes).some((node) => node.status === "running")
-      ) {
-        throw new InvalidTransitionError(
-          "A durable pause requires every active node to stop before the run pauses",
-        );
-      }
-      state.status = "paused";
-      if ("reason" in event) {
-        state.pauseReason = structuredClone(event.reason);
-      }
+      applyRunPaused(state, event);
       break;
     case "RunResumed":
-      if (
-        state.status !== "paused" &&
-        !("operationId" in event && state.status === "recovery-blocked")
-      ) {
-        throw new InvalidTransitionError(`RunResumed is invalid in ${state.status} state`);
-      }
-      if (
-        state.status === "recovery-blocked" &&
-        Object.values(state.nodes).some((node) => {
-          const attemptStatus = node.attempts.at(-1)?.status;
-          return (
-            attemptStatus === "prepared" ||
-            attemptStatus === "running" ||
-            (attemptStatus === "orphaned" && node.status !== "ready" && node.status !== "paused")
-          );
-        })
-      ) {
-        throw new InvalidTransitionError(
-          "Recovery must make every affected attempt schedulable or paused before resuming",
-        );
-      }
-      state.status = "running";
-      delete state.pauseReason;
-      delete state.recoveryBlock;
+      applyRunResumed(state, event);
       break;
     case "RunBlocked":
       if (state.status !== "running") {
@@ -1012,11 +1012,63 @@ function applyLifecycleEvent(state: RunState, event: LifecycleEvent): void {
   }
 }
 
+function applyRunPaused(
+  state: RunState,
+  event: Extract<LifecycleEvent, { type: "RunPaused" }>,
+): void {
+  if (state.status !== "running" && !("reason" in event && state.status === "recovery-blocked")) {
+    throw new InvalidTransitionError(`RunPaused is invalid in ${state.status} state`);
+  }
+  if ("reason" in event && Object.values(state.nodes).some((node) => node.status === "running")) {
+    throw new InvalidTransitionError(
+      "A durable pause requires every active node to stop before the run pauses",
+    );
+  }
+  state.status = "paused";
+  if ("reason" in event) {
+    state.pauseReason = structuredClone(event.reason);
+  }
+}
+
+function applyRunResumed(
+  state: RunState,
+  event: Extract<LifecycleEvent, { type: "RunResumed" }>,
+): void {
+  if (
+    state.status !== "paused" &&
+    !("operationId" in event && state.status === "recovery-blocked")
+  ) {
+    throw new InvalidTransitionError(`RunResumed is invalid in ${state.status} state`);
+  }
+  if (
+    state.status === "recovery-blocked" &&
+    Object.values(state.nodes).some((node) => {
+      const attemptStatus = node.attempts.at(-1)?.status;
+      return (
+        attemptStatus === "prepared" ||
+        attemptStatus === "running" ||
+        (attemptStatus === "orphaned" && node.status !== "ready" && node.status !== "paused")
+      );
+    })
+  ) {
+    throw new InvalidTransitionError(
+      "Recovery must make every affected attempt schedulable or paused before resuming",
+    );
+  }
+  state.status = "running";
+  delete state.pauseReason;
+  delete state.recoveryBlock;
+}
+
 function applyRunRecoveryBlocked(
   state: RunState,
   event: Extract<LifecycleEvent, { type: "RunRecoveryBlocked" }>,
 ): void {
-  if (!(state.status === "running" || state.status === "recovery-blocked")) {
+  if (!(
+    state.status === "running" ||
+    state.status === "paused" ||
+    state.status === "recovery-blocked"
+  )) {
     throw new InvalidTransitionError(`RunRecoveryBlocked is invalid in ${state.status} state`);
   }
   if (event.reason.kind !== "history-incompatible") {

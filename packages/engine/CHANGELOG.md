@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add `DurableRunCoordinator` with independent lease heartbeat, exact descriptor prevalidation/current preflight, fenced start ordering, runtime and command result handling, bounded control polling, control-plane duration deadlines, restart-safe control precedence, orphan/workspace reconciliation, snapshots, attempt budgets, and typed ownership refusal. Allow current scheduled/prepared attempts to bind immutable context and workspace-diff artifacts before authorization.
 - Add the engine-owned `ExecutionHost` prepare/authorize/inspect/terminate boundary, exact digest-bound runtime and command launch plans, sanitized execution observations, and owned result/event handles.
 - Add the engine-owned M3 durable run-store contract, stable typed errors, snapshot and rolling-integrity helpers, and an in-memory implementation of production lease, fencing, idempotency, control, and fallback behavior.
 - Add exact M3 runtime configuration, prepare/authorize, control, cleanup, orphan, pause, and recovery-blocked events with replayed execution/checkpoint evidence. Preserve exact legacy lifecycle shapes and apply the same owned-execution transitions to runtime and command attempts.

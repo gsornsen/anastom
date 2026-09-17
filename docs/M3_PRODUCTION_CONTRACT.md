@@ -2,7 +2,7 @@
 
 ## Status and review boundary
 
-This is the accepted production contract requested after the five M3 feasibility phases. The owner authorized a stacked implementation against it, with final acceptance and merge deferred until review of the complete stack. The runtime-descriptor/event, private-path/workspace, durable-store, and execution-host slices are implemented in the review stack; the recovery coordinator, CLI, and final acceptance evidence remain in later slices. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Implementation must preserve these names, ownership boundaries, state transitions, and compatibility rules unless new evidence first amends this contract and the build brief.
+This is the accepted production contract requested after the five M3 feasibility phases. The owner authorized a stacked implementation against it, with final acceptance and merge deferred until review of the complete stack. The runtime-descriptor/event, private-path/workspace, durable-store, execution-host, and recovery-coordinator slices are implemented in the review stack; CLI composition and final acceptance evidence remain in later slices. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Implementation must preserve these names, ownership boundaries, state transitions, and compatibility rules unless new evidence first amends this contract and the build brief.
 
 The proposal covers local Linux and macOS Task runs. It does not add provider-session adoption, remote workers, parallel scheduling, force takeover, automatic worktree repair, or exactly-once external effects.
 
@@ -28,6 +28,9 @@ The feasibility work exposed several places where the earlier design could have 
 16. **Stable manifest identity binds mutable control coordinates.** The private manifest carries a digest of the exact control record, covering the capability and socket endpoint without exposing either in the sanitized reference. Tampering either record fails closed.
 17. **The complete launch is pipe-only.** A validated launch may be as large as 4 MiB while the immutable plan record is capped at 64 KiB. The plan digest binds every launch field; the coordinator sends the complete prompt-bearing launch through the inherited supervisor pipe and no complete copy enters durable state.
 18. **Runtime readiness is an explicit pre-launch boundary.** The hidden runtime host acknowledges readiness on a separate inherited descriptor while it still lacks launch input. The supervisor publishes `starting`, obtains exact process identity and readiness, publishes `active`, and only then transmits the launch. This preserves deterministic start-window crash evidence without a sleep race.
+19. **Pre-start artifacts belong to the current attempt.** Context and non-empty pre-attempt diff bytes are immutably published before the fenced scheduling batch. `ArtifactProduced` may therefore identify the current `scheduled` or `prepared` attempt while its node remains ready; every producer field must match that attempt, and `AttemptPrepared` rejects a referenced diff artifact that is absent or belongs to another producer.
+20. **An earlier control outranks a later resume.** A pause/cancel that was acknowledged before coordinator death is recovered from immutable events even though it is no longer in the mutable inbox. The replacement completes that operation and returns its requested state. The same `resume` invocation cannot immediately undo the recovered pause or schedule replacement work after the recovered cancel.
+21. **Coordinator composition remains dependency-injected.** `DurableRunCoordinator` owns heartbeat, transition order, controls, orphan policy, workspace comparison, budgets, and retry decisions. The CLI supplies concrete store, execution-host, artifact, workspace, process-observation, and exact runtime-registry implementations. Descriptor parsing runs before lease acquisition; adapter reconstruction and current capability preflight run only after ownership.
 
 ## Package ownership
 
@@ -685,6 +688,8 @@ A crash in steps 4–7 consumes the attempt. Recovery classifies it using the pe
 10. Reconstruct the adapter and rerun current preflight. A failure pauses with a typed reason and starts no attempt.
 11. On exact match and remaining budget, emit `NodeReady` with `recovered`, then schedule a freshly numbered attempt.
 
+The engine exposes this policy through `DurableRunCoordinator`. `createRun` creates and releases a safe scheduling boundary, `start` owns a new run through its first terminal/paused/blocked boundary, `submitControl` writes a deduplicated pause/cancel without acquiring ownership, `resume` performs one safe acquisition/reconciliation pass and continues only when no earlier control wins, and `inspect` folds state without ownership or runtime contact. The coordinator owns attempt duration deadlines: it persists `AttemptTimeoutRequested` before cancellation, requires affirmative execution absence before applying retry policy, and records uncertain cleanup as recovery-blocked. Lease-active, owner-alive, and owner-unknown refusals use `RunOwnershipBlockedError` and mutate nothing. Concrete descriptor codecs and workspace implementations remain composition-root concerns.
+
 ### Pause and cancel
 
 `pause` and `cancel` insert a deduplicated control request without acquiring the lease. If no live owner exists, the command may become the coordinator through the ordinary acquisition/takeover path. The owner records `ControlRequestObserved` before cleanup.
@@ -715,7 +720,7 @@ Each slice is a separately reviewable stacked PR. Later slices remain based on t
 2. `PrivatePathRoot`, workspace checkpoint production code, and focused caller migrations.
 3. Durable store migration, lease/fence/idempotency/control transactions, event integrity, and snapshot loader.
 4. `@anastom/execution-host`, hidden fixture host, and model-free conformance for all four execution owners.
-5. Engine start, heartbeat, control, orphan, workspace, and recovery state machines.
+5. Engine start, heartbeat, control, orphan, workspace, and recovery state machines. **Implemented in the review stack.**
 6. CLI commands, runtime registry, inspection output, and old-history refusal behavior.
 7. Process-level M3 acceptance and `docs/M3_EVIDENCE.md`.
 
