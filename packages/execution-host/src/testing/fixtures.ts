@@ -14,7 +14,7 @@ import type { LocalExecutionHostOptions } from "../index.js";
 type RuntimeHostCommand = LocalExecutionHostOptions["runtimeHost"];
 
 export type FixtureOwner = "pi" | "codex" | "claude-code" | "command";
-export type FixtureScenario = "success" | "hold" | "pressure";
+export type FixtureScenario = "success" | "hold" | "pressure" | "unresponsive-cancel";
 
 /** Locate the checked-in fixture runtime host without an inline executable script. */
 export function fixtureRuntimeHost(

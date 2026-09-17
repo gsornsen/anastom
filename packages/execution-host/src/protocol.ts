@@ -36,6 +36,10 @@ export const EXECUTION_PRIVATE_RECORD_MAX_BYTES = 64 * 1024;
 export const EXECUTION_TERMINAL_MAX_BYTES = 4 * 1024 * 1024;
 /** Maximum time allowed to establish and complete one local supervisor request. */
 export const EXECUTION_CONNECTION_TIMEOUT_MS = 5_000;
+/** Grace period before an unresponsive execution process group is force-killed. */
+export const EXECUTION_TERMINATION_GRACE_MS = 5_000;
+/** Request deadline covering graceful and forced process-group cleanup. */
+export const EXECUTION_TERMINATION_TIMEOUT_MS = 15_000;
 /** Maximum bytes accepted for the runtime-host readiness frame. */
 export const EXECUTION_READY_FRAME_MAX_BYTES = 256;
 

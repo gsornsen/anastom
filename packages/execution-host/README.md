@@ -6,7 +6,7 @@ Implement Anastom's shared local POSIX execution-ownership boundary. `LocalExecu
 
 The engine-owned `ExecutionHost` interface and execution reference types live in [`@anastom/engine`](../engine/README.md). This package exports `LocalExecutionHost`, its trusted hidden-runtime command options, sanitized local-process observation, and `runExecutionRuntimeHost` for a composition-root executable that reconstructs exact adapters from their credential-free descriptors.
 
-`prepare` writes immutable plan identity, starts only the supervisor, and returns after private control and `awaiting-start` manifest records exist. `authorize` publishes the exact start authority; the supervisor persists `starting`, waits for the isolated runtime host's readiness proof, persists `active`, and only then sends launch input. `collect` returns after normalized terminal evidence and confirmed cleanup are durable. `inspect` and `terminate` fail closed when identity or cleanup cannot be established.
+`prepare` writes immutable plan identity, starts only the supervisor, and returns after private control and `awaiting-start` manifest records exist. `authorize` publishes the exact start authority; the supervisor persists `starting`, waits for the isolated runtime host's readiness proof, persists `active`, and only then sends launch input. `collect` returns after normalized terminal evidence and confirmed cleanup are durable. `terminate` gives adapter cancellation a bounded grace period, force-kills the authenticated process group when needed, and reports absence only after that group is empty. Its request deadline covers both bounded phases. `inspect` and `terminate` fail closed when identity or cleanup cannot be established.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api execution-host`; output is in `.generated/api/execution-host/` and is not committed.
 
@@ -33,6 +33,6 @@ pnpm lint
 pnpm docs:api execution-host
 ```
 
-The checked-in fixture runtime host makes no provider call and reads no authentication store. Its process tests cover Pi-shaped, Codex-shaped, Claude-Code-shaped, and command ownership through the same supervisor, including success, cancellation, coordinator `SIGKILL`, active and starting supervisor loss, tampered authority, framing, and observation pressure.
+The checked-in fixture runtime host makes no provider call and reads no authentication store. Its process tests cover Pi-shaped, Codex-shaped, Claude-Code-shaped, and command ownership through the same supervisor, including success, cooperative and unresponsive cancellation, coordinator `SIGKILL`, active and starting supervisor loss, tampered authority, framing, and observation pressure.
 
 Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expectations](../../CONTRIBUTING.md). Update this README when package behavior or its API changes. Add a Changeset for code or contract changes. License: [AGPL-3.0-only](../../LICENSE).

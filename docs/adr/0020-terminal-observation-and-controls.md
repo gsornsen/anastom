@@ -18,11 +18,14 @@ Pause and cancel submit the existing idempotent durable controls without acquiri
 
 The store validates a new control against the event-derived run state inside the same write transaction that would persist it. This closes the race between a client's last observation and terminal settlement without weakening operation-ID replay: a previously accepted operation still returns its original receipt.
 
+An explicit termination may outlast the ordinary supervisor request deadline when an adapter does not settle cancellation cooperatively. The termination request therefore has a separate bounded deadline covering the graceful interval, force-kill fallback, process-group absence check, and terminal-record publication. A forced runtime-host exit may discard its partial result, but an empty authenticated process group is sufficient to confirm cleanup and complete the durable control.
+
 Non-TTY attach emits the existing JSON Lines contract. A one-shot plain snapshot provides deterministic logs, support output, and process-level acceptance without ANSI control bytes. `NO_COLOR` affects styling only.
 
 ## Consequences
 
 - The event and control contracts stand without a UI-specific event family; control submission now makes its actionable-state invariant atomic.
+- Live pause remains fail-closed, while an adapter that does not settle cancellation can no longer turn confirmed forced process-group cleanup into a permanent recovery block.
 - The graph resolver becomes a documented engine package API because terminal and future clients need exact expanded topology.
 - Reconnect has one source of truth and reproduces bounded public activity from durable history.
 - Full-history inspection is acceptable for the initial local MLP client and preserves integrity validation. A measured tail-read optimization can be added behind the same view contract if long-run evidence shows it is needed.

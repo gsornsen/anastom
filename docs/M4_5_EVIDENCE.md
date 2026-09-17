@@ -23,6 +23,7 @@ It covers:
 - initial paint, resize, durable pause/cancel submission, separate resume launch, operation notifications, detach, terminal restoration, and reconnect-equivalent first frames through a recorded terminal host;
 - Node TTY raw-mode and three-state `readableFlowing` restoration, including a nonflowing input that must be paused after detach so the CLI exits;
 - rejection of pasted multi-character input as keyboard controls;
+- bounded force-termination of an unresponsive adapter, including client/server request time to confirm that the authenticated process group is empty;
 - later-process `attach --snapshot` output without terminal control bytes; and
 - settled non-TTY attachment as individually parseable public JSON Lines.
 
@@ -72,13 +73,20 @@ Codex used the owner's normal file-backed authentication with explicit `openai` 
 
 Both live runs used the unchanged committed parallel-normalizers fixture and the production CLI/runtime/coordinator/storage/workspace/artifact stack. The checked-in auditor reproduced later-process inspection and projections, verified the retained integration branch and exact protected inputs, re-read every artifact through `FileArtifactStore`, and found no credential patterns or private fields. Authentication remained in each harness's owner-controlled store.
 
+## Live pause acceptance
+
+An additional owner-requested Pi run exercised pause through the interface setup rather than allowing the workflow to settle. The first attempt, run `6095b3a3-90f4-4551-8281-b4016a5a6492`, exposed a supervisor timing defect: Pi did not settle its adapter cancellation within the five-second grace period, the client and server used the same five-second request deadline, and terminal publication classified the force-killed runtime host as cleanup-unknown even after process-group removal. Anastom correctly failed closed as `recovery-blocked`, but could not complete the requested pause.
+
+The execution host now gives termination a separate bounded request deadline and synchronizes terminal publication with graceful/forced process-group cleanup. A checked-in `unresponsive-cancel` runtime fixture reproduces the real behavior without a provider call. Fresh owner-authenticated Pi run `c5c72ab7-d0ea-45c0-a0f0-2d555db0b572` then recorded `ControlRequestObserved`, confirmed cleanup, immutable diff/workspace evidence, a paused analysis node, and `RunPaused` at sequence 30. Later-process status reported `paused`, released ownership generation 2, snapshot-tail sequence 30, zero pending controls, and the exact operator pause operation.
+
 ## Contract findings
 
-The interface pressure test changed three implementation surfaces without adding a UI-specific event or state schema:
+The interface pressure test changed four implementation surfaces without adding a UI-specific event or state schema:
 
 - The existing engine graph resolver is now exported as the exact static-or-expanded topology API. The terminal no longer needs to duplicate expansion ordering or dependency rules.
 - Human terminal renderers neutralize control and bidirectional formatting characters from public text. JSON Lines preserve the original schema-valid value because JSON encoding, rather than terminal interpretation, is its boundary.
 - Durable stores now validate a new pause/cancel request against event-derived state inside the write transaction. This prevents a stale terminal or CLI observation from stranding an unacknowledgeable control after settlement while retaining the original receipt for an already accepted operation ID.
+- The execution supervisor now distinguishes an expected force-terminated runtime host from an unexplained nonzero exit, waits for the authenticated process group to become empty, and lets termination requests outlive the graceful cancellation interval. This preserves fail-closed behavior when absence is still uncertain while allowing a confirmed cleanup to finish pause/cancel.
 
 `LiveRunEvent`, `RunState`, the durable control record, lease semantics, and coordinator resume behavior required no schema or migration change. The terminal view remains a disposable projection. Complete-history reads are integrity checked and acceptable for the initial local MLP client; a measured tail-read optimization can replace that read shape later without changing the terminal contract.
 

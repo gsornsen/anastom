@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Confirm explicit termination after an unresponsive adapter only when the process group is empty, and give that bounded graceful/forced cleanup path its own request deadline.
 - Keep public lease identity independent of Linux process-group evidence while continuing to require a positive authenticated group before any group signal.
 - Remove unused direct exports for the runtime resolver and serialized-command assertion while preserving the documented host and protocol entry points.
 - Add the shared local POSIX execution host with two-phase launch authorization, explicit pre-launch readiness, private digest-bound control records, bounded authenticated Unix-socket IPC, isolated runtime reconstruction, command execution, public observation relay, parent-death cleanup, and fail-closed inspection.
