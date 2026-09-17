@@ -104,6 +104,17 @@ Live execution challenged four boundaries that deterministic doubles had not ful
 
 Earlier process acceptance also added explicit Feature protected paths and aligned dotted expanded-node IDs with the artifact grammar.
 
+The consolidated main-targeting review then exposed three implementation boundaries and one test race:
+
+- Linux public lease identity no longer depends on a positive process-group field. Process-group signaling still requires separate positive authenticated evidence and fails closed without it.
+- Persisted graph-expansion validation stops at the first schema violation, and filesystem artifacts enforce the same 16 MiB ceiling on write and bounded read.
+- The live protected-input audit and artifact store now use the shared path-policy capabilities instead of performing their own caller-derived reads.
+- The execution-host test that polls an atomically replaced manifest treats only `PrivatePathError.reason === "changed"` as “not observed yet”; every other read failure still fails the test. This removes the Linux race without rerunning or weakening the assertion.
+
 ## Repository gates
 
-The implementation candidate passes the local test suite, typecheck, ESLint/JSDoc, formatting, contributor hygiene, whole-repository and strict-production dead-code analysis, generated API-documentation check, deterministic defined-SDLC matrix, and both live audits. The final main-targeting pull request records the required Linux and macOS CI, DCO, dependency-review, and CodeQL results before merge.
+Implementation candidate `2f66a9e3e64cc1006efdb35d2ae68dccdf3b656f` passes 59 test files and 342 tests locally, typecheck, ESLint/JSDoc, formatting, contributor hygiene, whole-repository and strict-production dead-code analysis, generated API-documentation review, the deterministic defined-SDLC matrix, and both live audits.
+
+The same candidate passed the [Linux and macOS workflow](https://github.com/gsornsen/anastom/actions/runs/35207386457), [CodeQL analysis](https://github.com/gsornsen/anastom/actions/runs/35207383231), [CodeQL pull-request gate](https://github.com/gsornsen/anastom/runs/105156694908), [DCO](https://github.com/gsornsen/anastom/actions/runs/35207386465), and [dependency review](https://github.com/gsornsen/anastom/actions/runs/35207386443). CodeQL alerts 47–49 were fixed in code through bounded artifact I/O, shared path-policy use, and fail-fast expansion validation. Alert 20 was individually dismissed as a false positive at the one deliberate local operator-selected root boundary: child inputs still pass through lexical and canonical containment, symlink containment, and type checks; a remote caller must authorize the root. The query remains enabled, and the rationale is recorded in [ADR 0016](adr/0016-path-policy-after-third-adapter.md).
+
+The work was developed as focused dependent pull requests, then consolidated into the single main-targeting feature branch only after deterministic and live evidence was complete. Superseded remote branches and pull requests were closed after consolidation.
