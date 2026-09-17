@@ -12,6 +12,46 @@ interface PackageMetadata {
   private: boolean;
 }
 
+const milestoneLabel = /\bM[0-9]+(?:\.[0-9]+)?\b/i;
+const sourceExtension = /\.(?:[cm]?[jt]sx?|json|ya?ml)$/;
+
+function sourceFiles(directory: string): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...sourceFiles(path));
+    } else if (entry.isFile() && sourceExtension.test(entry.name)) {
+      files.push(path);
+    }
+  }
+  return files;
+}
+
+function checkDurableSourceLanguage(root: string, packageDirectory: string): void {
+  const sourceRoot = join(root, "packages", packageDirectory, "src");
+  if (!existsSync(sourceRoot)) {
+    return;
+  }
+  for (const path of sourceFiles(sourceRoot)) {
+    const relativePath = path.slice(root.length + 1);
+    const filenameMatch = milestoneLabel.exec(relativePath);
+    if (filenameMatch) {
+      throw new Error(
+        `${relativePath} uses planning label ${filenameMatch[0]}; use a durable capability name`,
+      );
+    }
+    for (const [index, line] of readFileSync(path, "utf8").split(/\r?\n/).entries()) {
+      const match = milestoneLabel.exec(line);
+      if (match) {
+        throw new Error(
+          `${relativePath}:${index + 1} uses planning label ${match[0]}; describe the durable behavior instead`,
+        );
+      }
+    }
+  }
+}
+
 function isCanonicalVersion(value: unknown): value is string {
   return (
     typeof value === "string" && /^[0-9]/.test(value) && !/\s/.test(value) && valid(value) !== null
@@ -96,6 +136,7 @@ export function checkHygiene(root: string, base: string): void {
         throw new Error(`Package ${metadata.name} needs a useful ${document}`);
       }
     }
+    checkDurableSourceLanguage(root, directory.name);
     packages.set(directory.name, metadata);
   }
   const files = changedFiles(root, base);
@@ -149,7 +190,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const base = process.env.ANASTOM_HYGIENE_BASE ?? "origin/main";
   try {
     checkHygiene(process.cwd(), base);
-    console.log("Package documentation, SemVer, and release plans are valid.");
+    console.log("Package source language, documentation, SemVer, and release plans are valid.");
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

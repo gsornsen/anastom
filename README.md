@@ -6,7 +6,7 @@ Anastom is building a local-first, vendor-neutral control plane for software-eng
 
 The goal is to make work that spans hours or days understandable, bounded, and recoverable, even as models and coding tools change.
 
-**Current stage: M2.5 is complete, and the full M3 durable-execution implementation is in an unmerged review stack.** Anastom can run the same strict Markdown Task through Pi, an exact-pinned Codex CLI worker, or an attested Claude Code CLI worker; check the selected runtime's capabilities before work starts; independently verify the result; and replay public identity and available token observations from durable history. The unchanged endpoint Task passed through all three owner-authenticated harnesses. The M3 stack adds credential-free runtime reconstruction descriptors, exact recovery event/reducer contracts, private operational-state paths, production workspace checkpoints, a fenced durable store, a shared POSIX execution supervisor, a vendor-neutral recovery coordinator, CLI `pause` / `cancel` / `resume`, and deterministic crash/restart acceptance. The local process-level matrix passes; whole-stack owner acceptance and final-code remote checks remain before M3 is complete. See the [M3 implementation evidence](docs/M3_EVIDENCE.md), [M2 completion evidence](docs/M2_EVIDENCE.md), [M2.5 completion evidence](docs/M2_5_EVIDENCE.md), and [M1 compatibility baseline](docs/M1_EVIDENCE.md).
+**Current stage: M2.5 is complete, and the full M3 durable-execution implementation is in unmerged PR #24 for owner review.** Anastom can run the same strict Markdown Task through Pi, an exact-pinned Codex CLI worker, or an attested Claude Code CLI worker; check the selected runtime's capabilities before work starts; independently verify the result; and replay public identity and available token observations from durable history. The unchanged endpoint Task passed through all three owner-authenticated harnesses. The M3 work adds credential-free runtime reconstruction descriptors, exact recovery event/reducer contracts, private operational-state paths, production workspace checkpoints, a fenced durable store, a shared POSIX execution supervisor, a vendor-neutral recovery coordinator, CLI `pause` / `cancel` / `resume`, and deterministic crash/restart acceptance. See the [M3 implementation evidence](docs/M3_EVIDENCE.md), [M2 completion evidence](docs/M2_EVIDENCE.md), [M2.5 completion evidence](docs/M2_5_EVIDENCE.md), and [M1 completion evidence](docs/M1_EVIDENCE.md).
 
 The [offline CLI audit](docs/M2_FEASIBILITY.md) led to an [approved discovery/authentication profile](docs/adr/0012-codex-discovery-and-authentication-profile.md). An accumulated-context fixture reproduced native compaction, leading to the [accepted catalog control](docs/adr/0013-codex-client-compaction-profile.md). A managed-policy fixture then found hidden instructions despite native success; [accepted ADR 0014](docs/adr/0014-codex-managed-policy-preflight.md) adds a model-free policy gate before Codex execution. M2.5 added the separately installed Claude Code CLI with explicit subscription/API-key selection and fail-closed native, authentication, and managed-policy checks. This release supports one selected worker and one verifier. The accepted [M3 durability contract](docs/M3_BUILD_BRIEF.md) defines the ownership, orphan, workspace, snapshot, pause, cancel, and resume boundary. [M3 feasibility](docs/M3_FEASIBILITY.md) rejects current handles and direct leader PIDs as recovery identities. Its shared supervisor, SQLite contention, exact workspace, and snapshot-integrity phases now pass on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI. They establish two-phase start authorization, bounded authenticated IPC, fail-closed supervisor loss, fenced/idempotent transactions, canonical workspace identity, snapshot-plus-tail equality, authoritative prefix binding, and corrupt-snapshot fallback. The [M3 production contract](docs/M3_PRODUCTION_CONTRACT.md) defines the records, package APIs, path boundary, state transitions, transaction order, and compatibility rules now guiding the stacked implementation.
 
@@ -55,17 +55,17 @@ The TypeScript pnpm workspace supports:
 - selected-runtime capability preflight before attempt start, with durable accepted snapshots;
 - configured identity provenance and available attempt-scoped partial token observations;
 - bounded credential-free Pi, Codex, and Claude Code descriptors with exact reconstruction codecs;
-- exact M3 prepare/authorize, control, cleanup, orphan, typed pause, and recovery-blocked event contracts, with legacy history compatibility;
+- exact prepare/authorize, control, cleanup, orphan, typed pause, and recovery-blocked event contracts for durable Task execution;
 - fixed-segment private operational-state paths plus exact double-captured workspace checkpoints with bounded diff and ignored-content evidence;
 - fenced durable-run storage plus a shared two-phase POSIX execution host and vendor-neutral coordinator with heartbeat, operator controls, exact orphan/workspace reconciliation, bounded retries, parent-death cleanup, and fail-closed supervisor-loss handling;
-- an M3 CLI composition root for Pi, Codex, and Claude Code, with exact descriptor reconstruction, `pause` / `cancel` / `resume`, lease and pending-control inspection, snapshot provenance, typed ownership refusal, and fail-closed legacy resume;
+- a durable CLI composition root for Pi, Codex, and Claude Code, with exact descriptor reconstruction, `pause` / `cancel` / `resume`, lease and pending-control inspection, snapshot provenance, typed ownership refusal, and fail-closed corrupt-state handling;
 - owned Git worktrees retained for review, with base commit, final head, and diff capture;
 - bounded command execution with separate stdout/stderr artifacts and typed failures;
 - canonical context artifacts, structured reports, public tool summaries, and SHA-256 digests;
 - typed append-only events, SQLite persistence, and inspection from later processes; and
 - CLI commands to validate, render a graph, run, inspect, show status, pause, cancel, and resume.
 
-Markdown task runs persist under the target repository's ignored `.anastom/` directory. The original YAML fake demo retains M0's process-local persistence. A worker report describes the change; the control plane accepts it only after the declared command exits successfully.
+Markdown Task runs persist under the target repository's ignored `.anastom/` directory. The YAML fake demo uses process-local persistence. A worker report describes the change; the control plane accepts it only after the declared command exits successfully.
 
 Packages have documented APIs and their own READMEs/changelogs. Prettier, ESLint/JSDoc, contributor hygiene checks, and reviewed SemVer release plans establish the development baseline. SQLite uses versioned, validated migrations with transactional failure rollback. Fake scenarios can reference separate source files for readable diffs and IDE support. See the [engineering standards](docs/ENGINEERING.md) for development, migration, and CI practices.
 
@@ -98,17 +98,13 @@ pnpm format:check
 pnpm hygiene
 ```
 
-To exercise M1 without a model, create a temporary copy of the dependency-free HTTP fixture and use its explicit script:
+To exercise durable crash/restart behavior without a model or provider credentials, run:
 
 ```bash
-fixture="$(pnpm exec tsx scripts/create-endpoint-fixture.ts)"
-pnpm anastom run examples/demo-repos/health-endpoint/tasks/add-endpoint.md \
-  --runtime fake --fake-scenario examples/fake/health-endpoint.yaml --repo "$fixture"
-pnpm anastom status <printed-run-id> --state-dir "$fixture/.anastom"
-pnpm anastom inspect <printed-run-id> --state-dir "$fixture/.anastom"
+pnpm verify:m3
 ```
 
-The demo implements `GET /health`, runs the fixture's acceptance tests, and leaves the source checkout unchanged. The printed worktree and artifact paths remain available for review. The same Task can be run on separate fresh fixtures through `--runtime pi` or `--runtime codex --provider openai --model YOUR_CODEX_MODEL`; Codex also accepts `--reasoning-effort medium`. A third source adapter selects an independently installed Claude Code CLI with `--runtime claude-code --provider anthropic --model YOUR_CLAUDE_MODEL --auth-source subscription|api-key`. Real-runtime runs in the M3 review stack persist reconstructable configuration and accept `pause`, `cancel`, and `resume` with the printed run ID and state directory. Authenticate each selected CLI in your own terminal, and keep credentials out of Task files. All three adapters have completed their portability milestone demonstrations. Run `pnpm verify:m3` for the credential-free crash/restart matrix and see the [M3 evidence](docs/M3_EVIDENCE.md), [M1 demo guide](docs/M1_DEMO.md), [M2 evidence](docs/M2_EVIDENCE.md), [M2.5 evidence](docs/M2_5_EVIDENCE.md), and [Claude Code package guide](packages/runtime-claude-code/README.md) for setup, boundaries, and inspection.
+The matrix implements `GET /health`, kills the coordinator at controlled process boundaries, resumes safely, runs the fixture's acceptance tests, and audits the retained worktree and artifacts. To make a live provider-backed run on a fresh fixture, use `--runtime pi`, `--runtime codex --provider openai --model YOUR_CODEX_MODEL`, or `--runtime claude-code --provider anthropic --model YOUR_CLAUDE_MODEL --auth-source subscription|api-key`; Codex also accepts `--reasoning-effort medium`. These runs persist reconstructable configuration and accept `pause`, `cancel`, and `resume` with the printed run ID and state directory. Authenticate each selected CLI in your own terminal, and keep credentials out of Task files. See the [M3 evidence](docs/M3_EVIDENCE.md), [M1 demo guide](docs/M1_DEMO.md), [M2 evidence](docs/M2_EVIDENCE.md), [M2.5 evidence](docs/M2_5_EVIDENCE.md), and [Claude Code package guide](packages/runtime-claude-code/README.md) for setup, boundaries, and inspection.
 
 ## Roadmap
 

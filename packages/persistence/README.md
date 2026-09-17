@@ -4,13 +4,13 @@ Persist immutable workflow definitions, ordered events, and filesystem evidence 
 
 ## Public API
 
-`SqliteRunPersistence` preserves the M1/M2 atomic-create and optimistic-append interface. `SqliteDurableRunStore` implements the separate M3 contract: atomic owned creation, 15-second leases, exact expired-owner takeover, monotonic fencing, idempotent event batches, deduplicated pause/cancel requests, rolling event integrity, and rebuildable snapshots. Both constructors validate and apply versioned migrations. `SqliteDurableRunStore` expects its database's parent directory to exist; production callers authorize and create that private state root through `@anastom/path-policy` before opening the store. `FileArtifactStore` creates artifact parents through the fixed-segment private-state root, atomically publishes synced immutable evidence without replacement, and verifies content digests on read, rejecting symlinked run-owned artifact parents and nonordinary artifact files.
+`SqliteDurableRunStore` provides atomic owned creation, 15-second leases, exact expired-owner takeover, monotonic fencing, idempotent event batches, deduplicated pause/cancel requests, rolling event integrity, and rebuildable snapshots. It expects the database parent to exist; production callers authorize and create that private state root through `@anastom/path-policy` before opening the store. `FileArtifactStore` creates artifact parents through the fixed-segment private-state root, atomically publishes synced immutable evidence without replacement, and verifies content digests on read, rejecting symlinked run-owned artifact parents and nonordinary artifact files.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api persistence`; output is in `.generated/api/persistence/` and is not committed.
 
 ## Boundaries and invariants
 
-SQLite uses foreign keys, immediate write transactions, WAL, a five-second busy timeout, and append-only triggers. The M3 store validates the current unexpired fence before idempotency lookup, assigns transaction timestamps internally, acknowledges a control only through its exact immutable observation event, and reports operational conflicts through stable `RunStoreError.code` values. Snapshot candidates are bounded disposable caches; invalid candidates fall back to authoritative full replay. Legacy event bytes remain unchanged, and the first later M3 append extends a rolling digest calculated from those exact bytes. `migrations/` contains immutable numbered SQL and a manifest; a checksummed journal plus user_version track applied steps. Failed upgrades roll back DDL and the journal. The original unversioned store is adopted only when its full schema matches migration one. Drift, gaps, newer versions, invalid definitions, and corrupt authoritative evidence fail closed. Back up with SQLite's backup facilities before upgrades; automatic destructive downgrades are excluded.
+SQLite uses foreign keys, immediate write transactions, WAL, a five-second busy timeout, and append-only triggers. The store validates the current unexpired fence before idempotency lookup, assigns transaction timestamps internally, acknowledges a control only through its exact immutable observation event, and reports operational conflicts through stable `RunStoreError.code` values. Snapshot candidates are bounded disposable caches; invalid candidates fall back to authoritative full replay. Every owned event append extends a rolling digest in the same transaction. `migrations/` contains numbered SQL and a manifest; a checksummed journal plus `user_version` track applied steps. Failed upgrades roll back DDL and the journal. A nonempty database without migration history, drift, gaps, newer versions, invalid definitions, and corrupt authoritative evidence fail closed. Back up with SQLite's backup facilities before upgrades; automatic destructive downgrades are excluded.
 
 ## Development
 
@@ -27,6 +27,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker task execution is delivered. The M3 durable store, execution host, and engine recovery coordinator are implemented and model-free tested in the review stack, but the current CLI does not compose them yet. Parallel graphs, approvals, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
+The CLI composes this store for recoverable Pi, Codex, and Claude Code Task execution. The process-local YAML workflow path does not use SQLite. Parallel graphs, approvals, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
 
 License: [AGPL-3.0-only](../../LICENSE).

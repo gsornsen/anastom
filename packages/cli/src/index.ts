@@ -10,18 +10,16 @@ import {
   WorkflowEngine,
   renderRunStatus,
   renderWorkflowGraph,
-  renderRunInspection,
   type RunPersistence,
   type RunState,
 } from "@anastom/engine";
 import { FakeRuntimeAdapter, loadFakeScenario } from "@anastom/runtime-fake";
-import { FileArtifactStore, SqliteRunPersistence } from "@anastom/persistence";
-import { GitWorkspaceManager, resolveGitRepository, assertRunId } from "@anastom/workspaces";
+import { resolveGitRepository, assertRunId } from "@anastom/workspaces";
 import { PiRuntimeAdapter } from "@anastom/runtime-pi";
 import { CodexRuntimeAdapter } from "@anastom/runtime-codex";
 import { ClaudeCodeRuntimeAdapter, type ClaudeAuthSource } from "@anastom/runtime-claude-code";
-import { probeRuntime, RuntimePreflightError } from "@anastom/runtime-contract";
-import type { DurableRuntimeAdapter, RuntimeAdapter } from "@anastom/runtime-contract";
+import { RuntimePreflightError } from "@anastom/runtime-contract";
+import type { DurableRuntimeAdapter } from "@anastom/runtime-contract";
 
 import {
   inspectDurableRun,
@@ -61,7 +59,7 @@ function usage(): string {
     "  anastom graph <workflow>",
     "  anastom run <workflow> --fake-scenario <file>",
     "  anastom inspect <run>",
-    "  anastom run <task.md> --runtime pi|codex|claude-code|fake [--repo <path>] [--provider <id> --model <id>] [--auth-source subscription|api-key] [--reasoning-effort <level>] [--fake-scenario <file>]",
+    "  anastom run <task.md> --runtime pi|codex|claude-code [--repo <path>] [--provider <id> --model <id>] [--auth-source subscription|api-key] [--reasoning-effort <level>]",
     "  anastom status <run> [--state-dir <path>]",
     "  anastom inspect <run> [--state-dir <path>] [--json]",
     "  anastom pause <run> [--state-dir <path>] [--operation-id <uuid>]",
@@ -100,7 +98,7 @@ function loadTarget(file: string) {
     : loadWorkflowWithinRoot(root, file);
 }
 
-type TaskRuntimeId = "pi" | "fake" | "codex" | "claude-code";
+type TaskRuntimeId = "pi" | "codex" | "claude-code";
 const reasoningLevels = ["low", "medium", "high", "xhigh", "max"] as const;
 
 function checkedReasoningEffort(
@@ -140,23 +138,12 @@ function assertClaudeAuthSelection(
 
 function assertTaskSelection(selection: {
   runtimeId: TaskRuntimeId;
-  scenario?: string;
   provider?: string;
   model?: string;
-  reasoningEffort?: string;
   authSource?: string;
 }): void {
-  const { runtimeId, scenario, provider, model, reasoningEffort, authSource } = selection;
-  if (runtimeId === "fake" && !scenario) {
-    throw new CliUsageError("Fake task execution requires an explicit --fake-scenario <file>");
-  }
-  if (runtimeId !== "fake" && scenario) {
-    throw new CliUsageError("--fake-scenario is only valid for fake execution");
-  }
-  if (
-    Boolean(provider) !== Boolean(model) ||
-    (runtimeId === "fake" && (provider || model || reasoningEffort || authSource))
-  ) {
+  const { runtimeId, provider, model, authSource } = selection;
+  if (Boolean(provider) !== Boolean(model)) {
     throw new CliUsageError("--provider and --model must be specified together for real runtimes");
   }
   if (runtimeId === "codex" && (!provider || !model)) {
@@ -174,7 +161,6 @@ function assertTaskSelection(selection: {
 function parseTaskOptions(args: readonly string[]): {
   opts: Record<string, string | true>;
   runtimeId: TaskRuntimeId;
-  scenario?: string;
   provider?: string;
   model?: string;
   reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max";
@@ -184,31 +170,23 @@ function parseTaskOptions(args: readonly string[]): {
     "--runtime",
     "--repo",
     "--state-dir",
-    "--fake-scenario",
     "--provider",
     "--model",
     "--reasoning-effort",
     "--auth-source",
   ]);
   const runtimeId = stringFlag(opts, "--runtime");
-  if (
-    runtimeId !== "pi" &&
-    runtimeId !== "fake" &&
-    runtimeId !== "codex" &&
-    runtimeId !== "claude-code"
-  ) {
-    throw new CliUsageError("Task run requires --runtime pi, codex, claude-code or fake");
+  if (runtimeId !== "pi" && runtimeId !== "codex" && runtimeId !== "claude-code") {
+    throw new CliUsageError("Task run requires --runtime pi, codex or claude-code");
   }
-  const scenario = stringFlag(opts, "--fake-scenario");
   const provider = stringFlag(opts, "--provider"),
     model = stringFlag(opts, "--model");
   const reasoningEffort = checkedReasoningEffort(stringFlag(opts, "--reasoning-effort"), runtimeId);
   const authSource = stringFlag(opts, "--auth-source");
-  assertTaskSelection({ runtimeId, scenario, provider, model, reasoningEffort, authSource });
+  assertTaskSelection({ runtimeId, provider, model, authSource });
   return {
     opts,
     runtimeId,
-    scenario,
     provider,
     model,
     ...(reasoningEffort ? { reasoningEffort } : {}),
@@ -218,10 +196,7 @@ function parseTaskOptions(args: readonly string[]): {
 
 async function selectedTaskRuntime(
   selection: ReturnType<typeof parseTaskOptions>,
-): Promise<RuntimeAdapter> {
-  if (selection.runtimeId === "fake") {
-    return new FakeRuntimeAdapter(await loadFakeScenario(selection.scenario as string));
-  }
+): Promise<DurableRuntimeAdapter> {
   if (selection.runtimeId === "pi") {
     return new PiRuntimeAdapter({ provider: selection.provider, model: selection.model });
   }
@@ -241,15 +216,9 @@ async function selectedTaskRuntime(
 
 async function runTask(target: string, args: readonly string[], io: CliIo): Promise<number> {
   const selection = parseTaskOptions(args);
-  if (selection.runtimeId === "fake") {
-    return runLegacyTask(target, selection, io);
-  }
   const opts = selection.opts;
   const workflow = await loadTaskWithinRoot(process.cwd(), target);
   const runtime = await selectedTaskRuntime(selection);
-  if (!isDurableRuntime(runtime)) {
-    throw new Error("Selected production runtime cannot produce durable configuration");
-  }
   const descriptor = await runtime.descriptor();
   const { repoRoot } = await resolveGitRepository(stringFlag(opts, "--repo") ?? process.cwd());
   const stateDir = resolve(stringFlag(opts, "--state-dir") ?? resolve(repoRoot, ".anastom"));
@@ -276,55 +245,6 @@ async function runTask(target: string, args: readonly string[], io: CliIo): Prom
   } finally {
     services.store.close();
   }
-}
-
-async function runLegacyTask(
-  target: string,
-  selection: ReturnType<typeof parseTaskOptions>,
-  io: CliIo,
-): Promise<number> {
-  const workflow = await loadTaskWithinRoot(process.cwd(), target);
-  const runtime = await selectedTaskRuntime(selection);
-  const { repoRoot } = await resolveGitRepository(
-    stringFlag(selection.opts, "--repo") ?? process.cwd(),
-  );
-  const stateDir = resolve(
-    stringFlag(selection.opts, "--state-dir") ?? resolve(repoRoot, ".anastom"),
-  );
-  const manager = new GitWorkspaceManager(stateDir);
-  const runId = randomUUID();
-  const mutation = workflow.nodes.implement?.mutation;
-  if (mutation !== "readonly" && mutation !== "isolated") {
-    throw new Error("Task requires a filesystem mutation mode");
-  }
-  const runtimeNegotiation = await probeRuntime(runtime, mutation);
-  const workspace = await manager.create(repoRoot, runId, mutation);
-  const persistence = new SqliteRunPersistence(resolve(stateDir, "anastom.sqlite"));
-  try {
-    const engine = new WorkflowEngine({
-      runtime,
-      persistence,
-      executionMode: "worker",
-      artifacts: new FileArtifactStore(stateDir),
-      captureWorkspace: (ref) => manager.capture(ref),
-    });
-    await engine.createRun(workflow, { runId, workspace, runtimeNegotiation });
-    io.stdout(
-      "Run " +
-        runId +
-        " created\nWorkspace: " +
-        (workspace.mode === "memory" ? "memory" : workspace.path),
-    );
-    const state = await engine.runToCompletion(runId);
-    io.stdout(renderRunInspection(state, workflow, await engine.events(runId)));
-    return state.status === "succeeded" ? 0 : 1;
-  } finally {
-    persistence.close();
-  }
-}
-
-function isDurableRuntime(runtime: RuntimeAdapter): runtime is DurableRuntimeAdapter {
-  return "descriptor" in runtime && typeof runtime.descriptor === "function";
 }
 
 async function durableInspect(
@@ -576,8 +496,7 @@ async function inspectProcessLocalOrDurable(
 
 function reportCliError(error: unknown, io: CliIo): number {
   const invalidStore =
-    error instanceof RunStoreError &&
-    ["not-found", "unsupported-history", "corrupt-store"].includes(error.code);
+    error instanceof RunStoreError && ["not-found", "corrupt-store"].includes(error.code);
   if (error instanceof CliUsageError || error instanceof RunNotFoundError || invalidStore) {
     io.stderr(error instanceof Error ? error.message : String(error));
     return 2;

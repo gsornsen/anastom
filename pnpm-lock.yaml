@@ -155,10 +155,6 @@ importers:
       '@anastom/runtime-contract':
         specifier: workspace:*
         version: link:../runtime-contract
-    devDependencies:
-      '@anastom/runtime-fake':
-        specifier: workspace:*
-        version: link:../runtime-fake
 
   packages/runtime-claude-code:
     dependencies:

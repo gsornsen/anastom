@@ -18,7 +18,7 @@ Private run records use fixed segments under `PrivatePathRoot`, modes `0700`/`06
 
 The supervisor keeps one request active and queues at most eight, accepts one exact length-prefixed frame per connection, compares capabilities in constant time after length validation, retains at most 256 public observations with log-drop accounting, and caps terminal records at 4 MiB. Coordinator-pipe loss triggers cleanup without waiting for lease expiry. An absent supervisor in `starting` or `active`, an invalid record, or unconfirmed cleanup produces `unknown`; fencing or a PID alone never proves absence.
 
-This is process ownership infrastructure, not the M3 recovery coordinator. The current CLI does not route Task execution through it yet. Provider-session adoption, remote workers, Windows named pipes, force takeover, and distributed scheduling remain outside M3.
+This package owns process supervision; the engine coordinator owns recovery policy. The CLI routes Pi, Codex, Claude Code, and verifier processes through this boundary for recoverable Task runs. Provider-session adoption, remote workers, Windows named pipes, force takeover, and distributed scheduling remain outside the current scope.
 
 ## Development
 

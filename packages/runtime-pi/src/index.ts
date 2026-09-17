@@ -522,7 +522,7 @@ export class PiRuntimeAdapter implements DurableRuntimeAdapter {
 export { parsePiRuntimeDescriptor } from "./descriptor.js";
 export type { PiRuntimeDescriptor } from "./descriptor.js";
 
-/** Exact codec used by the M3 composition root to reconstruct Pi without ambient defaults. */
+/** Exact codec used to reconstruct Pi without relying on unrecorded ambient defaults. */
 export const piRuntimeDescriptorCodec: RuntimeDescriptorCodec<PiRuntimeDescriptor> = {
   runtimeId: "pi",
   parse: parsePiRuntimeDescriptor,

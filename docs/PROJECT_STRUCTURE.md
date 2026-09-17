@@ -4,9 +4,9 @@
 
 Use a TypeScript monorepo.
 
-The implemented M1 workspace contains eight packages: `core`, `engine`, `runtime-contract`, `runtime-fake`, `runtime-pi`, `persistence`, `workspaces`, and `cli`. Each package has a README and CHANGELOG. `core/schemas/` holds versioned authored/normalized workflow, task, and result contracts; `runtime-fake/schemas/` holds the scenario contract. The context builder and deterministic command executor remain in `engine`; SQLite migrations and filesystem artifact storage live in `persistence`. The controlled HTTP repository is in `examples/demo-repos/health-endpoint/`, with a copy/setup helper in `scripts/create-endpoint-fixture.ts`. See [engineering standards](ENGINEERING.md) for enforced development and package conventions.
+The implemented workspace contains twelve packages: `core`, `engine`, `execution-host`, `path-policy`, `persistence`, `runtime-claude-code`, `runtime-codex`, `runtime-contract`, `runtime-fake`, `runtime-pi`, `workspaces`, and `cli`. Each package has a README and CHANGELOG. `core/schemas/` holds versioned authored and normalized workflow, Task, and result contracts; runtime packages own their specific configuration or fixture schemas. The engine owns deterministic policy and durable orchestration interfaces, while persistence, process supervision, paths, workspaces, and runtime adapters remain separate implementations. The controlled HTTP repository is in `examples/demo-repos/health-endpoint/`, with a copy/setup helper in `scripts/create-endpoint-fixture.ts`. See [engineering standards](ENGINEERING.md) for enforced development and package conventions.
 
-The broader tree below is design intent. Routing, telemetry, other adapters, generalized methodologies, and recovery packages have not been scaffolded for M1.
+The broader tree below records early design intent rather than the literal current layout. Routing, telemetry, additional adapters, and generalized methodologies remain planned; durable recovery is implemented across the existing engine, execution-host, persistence, path-policy, workspace, runtime, and CLI packages.
 
 A good initial structure:
 

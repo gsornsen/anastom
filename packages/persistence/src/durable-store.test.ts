@@ -20,7 +20,6 @@ import {
 } from "@anastom/engine";
 
 import { SqliteDurableRunStore, createSqliteDurableRunStoreForTesting } from "./durable-store.js";
-import { SqliteRunPersistence } from "./index.js";
 
 const roots: string[] = [];
 const executeFile = promisify(execFile);
@@ -326,7 +325,7 @@ describe.each(factories)("$name durable run store", (factory) => {
   });
 });
 
-describe("SQLite durable compatibility and corruption handling", () => {
+describe("SQLite durable corruption and contention handling", () => {
   async function databasePath(): Promise<string> {
     const root = await mkdtemp(join(tmpdir(), "anastom-durable-store-"));
     roots.push(root);
@@ -346,51 +345,23 @@ describe("SQLite durable compatibility and corruption handling", () => {
     store.close();
   });
 
-  it("upgrades legacy histories without rewriting bytes and extends their exact digest chain", async () => {
+  it("rejects a durable run whose ownership record is missing", async () => {
     const path = await databasePath();
-    const oldStore = new SqliteRunPersistence(path);
-    const events = initialEvents("legacy");
-    await oldStore.create("legacy", { workflow, events });
-    oldStore.close();
-    const before = new DatabaseSync(path);
-    const eventBytes = before
-      .prepare("SELECT event_json FROM events WHERE run_id='legacy' ORDER BY sequence")
-      .all();
-    before.close();
-
-    let now = 2_000;
-    const store = createSqliteDurableRunStoreForTesting(path, () => now);
-    const lease = await store.acquireReleased({
-      runId: "legacy",
-      ownerId: ownerOneId,
-      owner: ownerOne,
-    });
-    const next: RunEvent = {
-      type: "ControlRequestObserved",
-      runId: "legacy",
-      sequence: 3,
-      operationId: "legacy-control",
-      action: "pause",
-      recordedAtMs: 1,
-    };
-    await store.commit({
-      lease,
-      operationId: "legacy-append",
-      expectedSequence: 2,
-      events: [next],
-    });
-    store.close();
-
+    const store = new SqliteDurableRunStore(path);
+    const owned = await store.createOwned(creation("missing-ownership"));
+    await store.release(owned.lease);
     const raw = new DatabaseSync(path);
-    expect(
-      raw.prepare("SELECT event_json FROM events WHERE run_id='legacy' AND sequence<=2").all(),
-    ).toEqual(eventBytes);
-    expect(raw.prepare("SELECT sequence FROM event_integrity WHERE run_id='legacy'").all()).toEqual(
-      [{ sequence: 3 }],
-    );
-    expect(raw.prepare("PRAGMA user_version").get()?.user_version).toBe(2);
+    raw.exec("DELETE FROM run_leases WHERE run_id='missing-ownership'");
     raw.close();
-    now += 1;
+
+    await expect(
+      store.acquireReleased({
+        runId: "missing-ownership",
+        ownerId: ownerTwoId,
+        owner: ownerTwo,
+      }),
+    ).rejects.toSatisfy(expectCode("corrupt-store"));
+    store.close();
   });
 
   it("serializes cross-process lease contenders and replays one physical mutation", async () => {

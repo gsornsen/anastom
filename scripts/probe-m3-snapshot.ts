@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -9,7 +9,6 @@ import {
   type RunEvent,
   type RunEventPayload,
 } from "../packages/engine/src/index.js";
-import { SqliteRunPersistence } from "../packages/persistence/src/index.js";
 import type { RuntimeNegotiation } from "../packages/runtime-contract/src/index.js";
 import {
   createM3Snapshot,
@@ -463,32 +462,31 @@ function buildCompatibilityEvidence(
 }
 
 async function persistFixtures(path: string, fixtures: LifecycleFixture[]): Promise<void> {
-  const store = new SqliteRunPersistence(path);
-  try {
-    for (const value of fixtures) {
-      await store.create(value.runId, { workflow: value.workflow, events: value.events });
-    }
-  } finally {
-    store.close();
-  }
+  await writeFile(
+    path,
+    canonicalJson(fixtures.map(({ runId, workflow, events }) => ({ runId, workflow, events }))),
+  );
 }
 
 async function reopenFixtures(
   path: string,
   fixtures: LifecycleFixture[],
 ): Promise<Array<{ workflow: WorkflowDefinition; events: RunEvent[] } | null>> {
-  const store = new SqliteRunPersistence(path);
-  try {
-    return await Promise.all(fixtures.map(({ runId }) => store.load(runId)));
-  } finally {
-    store.close();
-  }
+  const stored = JSON.parse(await readFile(path, "utf8")) as Array<{
+    runId: string;
+    workflow: WorkflowDefinition;
+    events: RunEvent[];
+  }>;
+  return fixtures.map(({ runId }) => {
+    const record = stored.find((candidate) => candidate.runId === runId);
+    return record ? { workflow: record.workflow, events: record.events } : null;
+  });
 }
 
 /** Run snapshot/tail equality and fail-safe fallback against reopened current histories. */
 export async function runM3SnapshotProbe(): Promise<M3SnapshotEvidence> {
   const root = await mkdtemp(join(tmpdir(), "anastom-m3-snapshot-"));
-  const path = join(root, "runs.sqlite");
+  const path = join(root, "runs.json");
   const fixtures = lifecycleFixtures();
   try {
     await persistFixtures(path, fixtures);

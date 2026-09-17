@@ -4,17 +4,19 @@ These standards apply to existing code and every new pull request. They are main
 
 ## Readability and API discovery
 
-Use descriptive capability names in production code, fixtures, tests, and CI. Names such as `health-endpoint`, `Durable task execution`, and `macOS filesystem and process portability` remain useful beyond a planning milestone. Historical build briefs and milestone evidence keep their milestone identities.
+Use descriptive capability names in production code, fixtures, tests, and CI. Names such as `health-endpoint`, `Durable task execution`, and `macOS filesystem and process portability` remain useful beyond a planning milestone. Package source, comments, JSDoc, identifiers, filenames, fixture values, and test names must stand on their own without labels such as `M1`, `M2`, or `M3`. Historical roadmaps, build briefs, evidence, retrospectives, ADR context, and changelog entries keep milestone identities when they explain project history.
 
 Prefer one statement per line, named options over long positional argument lists, explicit control flow, and named helpers for separate decisions or output sections. Prettier owns formatting. ESLint enforces braces, no nested ternaries, at most four nested blocks, three nested callbacks, four parameters, and modified cyclomatic complexity at most twenty. The modified measure counts a switch as one branch so exhaustive typed event dispatch remains readable without an arbitrary handler framework. These are review guardrails, not a reason to split coherent logic into meaningless functions.
 
-Public functions, classes, methods, interfaces, and type aliases need useful JSDoc. Describe purpose, side effects, ownership, defaults, invariants, errors, and security boundaries where they affect callers. Use `@remarks`, `@throws`, `@returns`, and examples when helpful; TypeScript owns type information, so avoid redundant JSDoc types. Private helpers need documentation when their rationale or behavior is not evident from their name. Documentation must explain the behavior, not paraphrase the identifier.
+Public functions, classes, methods, interfaces, type aliases, exported constants, and exported object capabilities need useful JSDoc. Describe purpose, side effects, ownership, defaults, invariants, errors, and security boundaries where they affect callers. Use `@remarks`, `@throws`, `@returns`, and examples when helpful; TypeScript owns type information, so avoid redundant JSDoc types. Private helpers need documentation when their rationale or behavior is not evident from their name. Documentation must explain the behavior, not paraphrase the identifier.
 
 ESLint requires a description on every JSDoc block, including classes, interfaces, type aliases, and constants. Reviewers assess whether that description is useful; the lint rule catches empty documentation.
 
 Every workspace package has a README and CHANGELOG. Package READMEs describe purpose, public entry point, supported behavior, boundaries, and development commands. Update them when their contract changes. Optional `pnpm docs:api <package>` generates HTML from exported TypeScript and JSDoc under `.generated/api/<package>/`; omit the package to generate all workspace packages. Generated documentation stays untracked and is not published automatically. `pnpm docs:api core` is a useful API review check when changing core contracts.
 
-Standard ESLint rules and the JSDoc plugin cover current readability needs. The repository-specific `pnpm hygiene` gate checks package metadata, documentation, and release plans. Add a custom ESLint rule only for a concrete recurring AST-level mistake that existing rules cannot express; include positive and negative cases. Avoid maintaining custom duplicates of standard checks.
+Standard ESLint rules and the JSDoc plugin cover current readability needs. The repository-specific `pnpm hygiene` gate checks package metadata, documentation, release plans, and milestone-independent package source language. Add a custom ESLint rule only for a concrete recurring AST-level mistake that existing rules cannot express; include positive and negative cases. Avoid maintaining custom duplicates of standard checks.
+
+The hygiene gate is structural. It does not decide whether prose or JSDoc is accurate and useful, whether a test protects meaningful behavior, whether a proposed SemVer level matches the contract change, or whether a migration may be edited after release. ESLint, TypeDoc, focused behavior checks, version history, and reviewer judgment own those questions. Root README and changelog accuracy remain pull-request requirements rather than filename-change quotas.
 
 Executable process doubles live in checked-in files. The `anastom/no-inline-scripts` ESLint rule rejects script shebangs embedded in strings and source passed through interpreter evaluation flags. Its file-backed positive and negative AST fixtures run as part of `pnpm lint`; ordinary paths and messages remain allowed.
 
@@ -22,11 +24,13 @@ Executable process doubles live in checked-in files. The `anastom/no-inline-scri
 
 Name tests for observable behavior and the failure being protected against. Explain non-obvious fixture starting conditions, then keep setup, execution, and assertions easy to distinguish. Use typed transport shapes and named helpers such as `createdRunId`, `inspectInNewProcess`, and `evidence`, rather than dense casts, nested regular expressions, or unexplained non-null assertions.
 
-The HTTP fixture starts with a server that returns 404 and a failing health acceptance test. The fake scenario supplies the endpoint implementation from a separate JavaScript file. The engine's verifier runs the fixture tests independently. Durable CLI tests launch the actual CLI in later processes so process-local memory cannot satisfy persistence assertions. Shared fixture setup lives in `packages/engine/src/testing/fixture.ts`; it is test support, not a package export.
+The HTTP fixture starts with a server that returns 404 and a failing health acceptance test. Deterministic acceptance support supplies the endpoint implementation from a separate JavaScript file. The engine's verifier runs the fixture tests independently. Process-level durable acceptance launches the actual CLI in later processes so process-local memory cannot satisfy persistence assertions. Shared fixture setup lives in `packages/engine/src/testing/fixture.ts`; it is test support, not a package export.
 
-Tests should protect observable behavior and material failure paths. Add meaningful migration, confinement, validation, cancellation, and compatibility tests when changing those boundaries. Avoid tests that merely assert formatting or repeat implementation details. Run focused checks while iterating; run the complete required checks before requesting review.
+Tests should protect observable behavior and material failure paths. Add meaningful migration, confinement, validation, cancellation, and supported-compatibility tests when changing those boundaries. Avoid tests that merely assert formatting or repeat implementation details. Run focused checks while iterating; run the complete required checks before requesting review.
 
 ## Versioning and compatibility
+
+Before the first supported release, replace superseded internal APIs and data paths directly. Delete transitional wrappers, duplicate implementations, and compatibility-only tests once all current call sites migrate. Retain compatibility code only for a current supported caller, an already released contract, or user data the project has committed to preserve; name that concrete boundary instead of calling it merely “legacy.” Record the decision when compatibility has a material maintenance cost.
 
 Use SemVer for every package. Add a new Changeset to the PR for changed package code or contracts, selecting patch for compatible fixes, minor for compatible additions, and major for incompatible public APIs. Explain compatibility for persisted data and IR/schema versions separately. Initial private development manifests remain 0.0.0; this PR plans the initial 0.1.0 feature release. A SemVer plan is reviewed before it becomes a release.
 
@@ -38,7 +42,7 @@ Versioned JSON Schemas are committed assets. Changing an unreleased schema is pe
 
 ## SQLite migrations and recovery
 
-Numbered SQL and `migrations/manifest.json` define immutable schema history. A checksummed `schema_migrations` journal and SQLite `user_version` track applied steps. Startup validates known schema objects, foreign keys, integrity, and applied checksums before executing pending migrations under one immediate transaction. Any failure rolls back all pending DDL and journal entries. Existing workflow and event bytes are never rewritten during adoption of the original unversioned database.
+Numbered SQL and `migrations/manifest.json` define immutable schema history after the first supported release. Before that release, consolidate the initial schema instead of accumulating migrations for unreleased compatibility. A checksummed `schema_migrations` journal and SQLite `user_version` track applied steps. Startup validates known schema objects, foreign keys, integrity, and applied checksums before executing pending migrations under one immediate transaction. Any failure rolls back all pending DDL and journal entries. A nonempty database without migration history fails closed.
 
 Before a schema upgrade, make a consistent SQLite backup using SQLite's backup facilities or stop writers before copying the database and its WAL. Test the upgrade against representative evidence. A database from a newer application, a missing migration, altered checksum, or schema drift fails closed. Restore a verified backup or use an application compatible with that schema; automatic destructive down migrations would endanger retained run evidence and are excluded.
 
@@ -54,7 +58,7 @@ Run and Pi execution IDs use [`node:crypto.randomUUID()`](https://nodejs.org/doc
 | TypeScript          | Type and package-boundary compatibility                                            | Required Linux job |
 | ESLint + JSDoc      | Readability and typed correctness                                                  | Required Linux job |
 | Prettier            | Consistent formatting across TS, JS, JSON, YAML, and Markdown                      | Required Linux job |
-| Hygiene gate        | Package docs, metadata, and reviewed SemVer plans                                  | Required Linux job |
+| Hygiene gate        | Package source terminology, docs, metadata, and reviewed SemVer plans              | Required Linux job |
 | YAML CLI demo       | Source CLI launcher smoke check and original workflow compatibility                | Required Linux job |
 | macOS focused tests | Platform-dependent Git, SQLite, path, and process termination behavior             | Separate macOS job |
 | Dependency review   | New dependency vulnerabilities and license review signal                           | PR workflow        |

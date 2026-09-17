@@ -14,7 +14,7 @@ The model-free feasibility slices established the implementation gates. Their li
 | [#25](https://github.com/gsornsen/anastom/pull/25) | Two-phase supervisor protocol, authenticated bounded IPC, cleanup, supervisor-loss refusal, and start-window crash |
 | [#26](https://github.com/gsornsen/anastom/pull/26) | Multi-process SQLite leases, monotonic fences, idempotent mutations, controls, and transaction rollback            |
 | [#27](https://github.com/gsornsen/anastom/pull/27) | Exact Git workspace content and ownership checkpoints                                                              |
-| [#28](https://github.com/gsornsen/anastom/pull/28) | Snapshot-plus-tail equality, prefix binding, corrupt-cache fallback, and legacy lifecycle shapes                   |
+| [#28](https://github.com/gsornsen/anastom/pull/28) | Snapshot-plus-tail equality, prefix binding, corrupt-cache fallback, and baseline lifecycle shapes                 |
 
 The production work was reviewed in linear slices for schemas/contracts, private paths and workspaces, the durable store, shared execution host, engine recovery coordinator, CLI composition, and acceptance. PRs #25 through #36 now resolve into PR #24's single feature branch so the owner can review and accept one main-targeting diff.
 
@@ -81,14 +81,16 @@ Before fault injection, the clean execution loader selected `snapshot-tail` and 
 
 The clean run referenced 12 artifacts. The audit reopens every artifact through `FileArtifactStore`, verifies existence, ordinary-file and nonsymlink type, current-user ownership, mode `0600`, exact size, and SHA-256 digest. It verifies the command node passed and the retained Git diff names only `server.mjs`. Public JSON inspection contains no `PRIVATE_SENTINEL`, credentials, prompts, reasoning, private tool bodies, or raw provider errors. The owned worktree remains intact until all evidence is collected; the acceptance command then removes its disposable fixture repository.
 
-## Compatibility and scope
+## Pre-release baseline and scope
 
-The full deterministic suite retains the pre-M3 compatibility matrix:
+Anastom has no external users, supported release, or retained user database. The implementation therefore establishes one durable baseline instead of preserving transitional development paths:
 
-- old M1/M2/M2.5 histories remain readable through later-process status and inspection;
-- migration tests preserve existing workflow and event bytes while adding M3 tables;
-- snapshots are optional caches and old histories without them use full replay;
-- unfinished legacy history without a runtime descriptor or execution reference becomes typed `history-incompatible` and never guesses old CLI flags;
+- migration one creates the complete durable schema and rejects nonempty unjournaled databases;
+- the superseded `SqliteRunPersistence` adapter and fake Markdown Task path are removed;
+- current Task creation records its runtime descriptor, ownership, event integrity, and initial snapshot atomically;
+- missing descriptor, lease, or owned-execution records are corrupt durable state and never cause guessed runtime flags;
+- snapshots remain disposable caches, and invalid candidates fall back to authoritative full replay;
+- baseline process-local lifecycle shapes remain available to deterministic YAML workflows and snapshot feasibility fixtures;
 - Pi, Codex, and Claude Code descriptors round-trip only their exact credential-free reconstruction fields;
 - the runtime conformance suites use no provider calls or credential-store reads.
 
@@ -102,7 +104,7 @@ Local final-code validation completed on the acceptance candidate:
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `pnpm verify:m3`                    | Passed; exact results above                                                                          |
 | Focused M3 Vitest boundary          | Passed, 1/1 test                                                                                     |
-| `pnpm test`                         | Passed, 48/48 files and 302/302 tests                                                                |
+| `pnpm test`                         | Passed, 48/48 files and 285/285 tests                                                                |
 | `pnpm typecheck`                    | Passed                                                                                               |
 | `pnpm lint`                         | Passed, including the custom no-inline-script rule                                                   |
 | `pnpm format` / `pnpm format:check` | Passed                                                                                               |
@@ -110,7 +112,7 @@ Local final-code validation completed on the acceptance candidate:
 | `pnpm docs:api`                     | Passed for all 12 packages; generated output reviewed and left uncommitted                           |
 | Package builds                      | No separate package build scripts exist; repository-wide TypeScript validation is the build boundary |
 
-On the combined code candidate `779ca38`, Linux and macOS CI, dependency review, DCO, CodeQL analysis, and the CodeQL policy gate passed. The fresh CodeQL scan closed 15 findings through code changes: test fixtures now use the shared private-path capability, the SQLite store requires a caller-authorized existing parent, persisted-event dispatch uses fixed method selection, inherited object keys are rejected, and public validation stops at its first error.
+On the earlier consolidated candidate `779ca38`, Linux and macOS CI, dependency review, DCO, CodeQL analysis, and the CodeQL policy gate passed. The fresh CodeQL scan closed 15 findings through code changes: test fixtures now use the shared private-path capability, the SQLite store requires a caller-authorized existing parent, persisted-event dispatch uses fixed method selection, inherited object keys are rejected, and public validation stops at its first error. The current cleanup candidate still requires its own remote checks.
 
 CodeQL alert 41 (`js/path-injection`) was individually assessed as a false positive at the private-root trust boundary. A local operator explicitly authorizes the state-root path; `ensurePrivatePathRoot()` canonicalizes its existing parent, fixes the leaf, rejects symlinks and non-directories, requires current-user ownership, tightens mode to `0700`, verifies the canonical result, and returns a capability whose child operations accept validated fixed segments and revalidate parents. A future remote caller must authorize the root before invoking this API. The narrow dismissal and rationale are recorded in GitHub; the path-injection query remains enabled.
 

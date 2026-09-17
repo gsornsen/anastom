@@ -88,7 +88,7 @@ describe("Markdown task descriptor", () => {
   });
   it("preserves workflow syntax while enforcing execution field ownership", async () => {
     const base =
-      "apiVersion: anastom.dev/v1alpha1\nkind: Workflow\nmetadata: {id: test/m1, version: 0.1.0}\ninputs: {}\nnodes:\n  work: {kind: command, output: {schema: out.json}}";
+      "apiVersion: anastom.dev/v1alpha1\nkind: Workflow\nmetadata: {id: test/task-compile, version: 0.1.0}\ninputs: {}\nnodes:\n  work: {kind: command, output: {schema: out.json}}";
     expect(parseWorkflowYaml(base).nodes.work?.command).toBeUndefined();
     expect(() =>
       parseWorkflowYaml(base.replace("kind: command", "kind: command, needs: [constructor]")),

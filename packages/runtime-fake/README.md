@@ -10,7 +10,7 @@ The documented entry point is [src/index.ts](src/index.ts). Generate optional HT
 
 ## Boundaries and invariants
 
-File changes require an isolated workspace and explicit mutation authorization. A `fromFile` source resolves relative to the scenario directory through the shared existing-child policy. Relative traversal and symlink targets outside the canonical scenario directory are rejected; an internal symlink target is allowed. File references must be loaded before constructing executable scenarios. Requests, scripts, and collected results are defensively copied so callers cannot alter in-flight or terminal outcomes. Fake declares all three workspace modes for its deterministic M0-compatible execution; it reports no provider token usage. Fake handles are process-local; no recovery is provided.
+File changes require an isolated workspace and explicit mutation authorization. A `fromFile` source resolves relative to the scenario directory through the shared existing-child policy. Relative traversal and symlink targets outside the canonical scenario directory are rejected; an internal symlink target is allowed. File references must be loaded before constructing executable scenarios. Requests, scripts, and collected results are defensively copied so callers cannot alter in-flight or terminal outcomes. Fake declares all three workspace modes for deterministic workflow execution and reports no provider token usage. Fake handles are process-local; no recovery is provided.
 
 ## Development
 

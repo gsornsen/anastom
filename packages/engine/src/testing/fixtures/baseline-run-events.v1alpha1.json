@@ -37,7 +37,7 @@
     "sequence": 5,
     "nodeId": "work",
     "attempt": 1,
-    "event": { "type": "metadata", "provider": "anthropic", "model": "legacy" }
+    "event": { "type": "metadata", "provider": "anthropic", "model": "baseline" }
   },
   {
     "type": "AttemptSucceeded",

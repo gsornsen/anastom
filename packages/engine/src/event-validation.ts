@@ -154,10 +154,6 @@ const recoveryBlockReason = {
       },
     }),
     object({ kind: { const: "cleanup-unknown" }, executionId: identifier }),
-    object({
-      kind: { const: "history-incompatible" },
-      detail: { enum: ["missing-descriptor", "missing-execution-ref"] },
-    }),
   ],
 };
 const node = { nodeId: str };

@@ -24,12 +24,19 @@ import {
 
 import type { PrivateProcessIdentity } from "./process.js";
 
+/** Version tag required on every persisted supervisor record and IPC frame. */
 export const EXECUTION_PROTOCOL_VERSION = "anastom.dev/execution-supervisor/v1alpha1" as const;
+/** Maximum bytes accepted for one authenticated supervisor request or response frame. */
 export const EXECUTION_SOCKET_FRAME_MAX_BYTES = 1024 * 1024;
+/** Maximum bytes accepted from the coordinator when launching a supervisor. */
 export const EXECUTION_LAUNCH_FRAME_MAX_BYTES = 4 * 1024 * 1024;
+/** Maximum bytes accepted for a private execution manifest or control record. */
 export const EXECUTION_PRIVATE_RECORD_MAX_BYTES = 64 * 1024;
+/** Maximum bytes retained for the authenticated terminal execution record. */
 export const EXECUTION_TERMINAL_MAX_BYTES = 4 * 1024 * 1024;
+/** Maximum time allowed to establish and complete one local supervisor request. */
 export const EXECUTION_CONNECTION_TIMEOUT_MS = 5_000;
+/** Maximum bytes accepted for the runtime-host readiness frame. */
 export const EXECUTION_READY_FRAME_MAX_BYTES = 256;
 
 /** Fixed readiness proof emitted before the runtime host accepts launch input. */

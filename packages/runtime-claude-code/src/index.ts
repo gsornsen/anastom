@@ -346,7 +346,7 @@ export type { ClaudeAuthSource } from "./auth.js";
 export { parseClaudeCodeRuntimeDescriptor } from "./descriptor.js";
 export type { ClaudeCodeRuntimeDescriptor } from "./descriptor.js";
 
-/** Exact codec used by the M3 composition root to reconstruct Claude Code safely. */
+/** Exact codec used to reconstruct Claude Code without persisting credentials or private settings. */
 export const claudeCodeRuntimeDescriptorCodec: RuntimeDescriptorCodec<ClaudeCodeRuntimeDescriptor> =
   {
     runtimeId: "claude-code",

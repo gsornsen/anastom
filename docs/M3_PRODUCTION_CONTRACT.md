@@ -2,7 +2,7 @@
 
 ## Status and review boundary
 
-This is the accepted production contract requested after the five M3 feasibility phases. The owner authorized a stacked implementation against it, with final acceptance and merge deferred until review of the complete stack. The production stack through CLI composition and deterministic local process-level acceptance is implemented in the review stack; [M3 evidence](M3_EVIDENCE.md) records the results. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Implementation must preserve these names, ownership boundaries, state transitions, and compatibility rules unless new evidence first amends this contract and the build brief.
+This is the accepted production contract requested after the five M3 feasibility phases. The owner authorized a stacked implementation against it, with final acceptance and merge deferred until review of the complete stack. The production stack through CLI composition and deterministic local process-level acceptance is implemented in the review stack; [M3 evidence](M3_EVIDENCE.md) records the results. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Implementation must preserve these names, ownership boundaries, state transitions, and pre-release baseline rules unless new evidence first amends this contract and the build brief.
 
 The proposal covers local Linux and macOS Task runs. It does not add provider-session adoption, remote workers, parallel scheduling, force takeover, automatic worktree repair, or exactly-once external effects.
 
@@ -343,7 +343,7 @@ export interface ControlReceipt extends ControlRequest {
 }
 ```
 
-`createOwned` atomically inserts the immutable definition, initial events, generation-one lease, event integrity, mutation receipt, and initial snapshot. `acquireReleased` handles a released lease or a legacy run without a lease. It never takes an expired unreleased lease. `takeoverExpired` accepts only an exact previously inspected lease plus an `absent` observation made no earlier than that lease's expiry and no later than the transaction clock. It rechecks the owner, generation, expiry, release state, and observation timing inside `BEGIN IMMEDIATE`.
+`createOwned` atomically inserts the immutable definition, initial events, generation-one lease, event integrity, mutation receipt, and initial snapshot. `acquireReleased` handles only an explicitly released lease. A missing lease is corrupt durable state. It never takes an expired unreleased lease. `takeoverExpired` accepts only an exact previously inspected lease plus an `absent` observation made no earlier than that lease's expiry and no later than the transaction clock. It rechecks the owner, generation, expiry, release state, and observation timing inside `BEGIN IMMEDIATE`.
 
 `commit` validates the unexpired fence before looking up the mutation ID. It then returns an existing same-payload receipt, rejects a changed payload, compares the expected sequence, validates and appends the complete event batch, records event integrity, optionally writes a snapshot, and acknowledges a matching control request in one transaction. The payload digest is computed internally from the canonical expected sequence, events, handled control ID, and snapshot identity fields: version, reducer version, run ID, definition digest, sequence, state digest, and event-prefix digest. `stateJson` is represented by its validated `stateDigest` rather than duplicated in the idempotency payload.
 
@@ -359,7 +359,6 @@ export class RunStoreError extends Error {
     | "idempotency-conflict"
     | "control-conflict"
     | "busy"
-    | "unsupported-history"
     | "corrupt-store";
 }
 ```
@@ -406,7 +405,7 @@ After authorization, the supervisor starts the hidden CLI runtime-host as a new 
 
 ### Event additions
 
-Old event names and reducers remain readable. New M3 runs use these exact additions:
+The process-local workflow engine retains its lifecycle event shapes. Durable runs use these exact additions:
 
 ```ts
 type M3RunEventPayload =
@@ -463,7 +462,7 @@ type RevisedM3LifecyclePayload =
   | { type: "RunCancelled"; operationId: string; reason: string };
 ```
 
-`AttemptStatus` adds `prepared` and `orphaned`; `RunStatus` adds `recovery-blocked`. `NodePaused` may follow a cancelled or orphaned current attempt. Legacy lifecycle events without the M3 fields retain their original reducer meaning. `RunResumed` is valid from `paused` or `recovery-blocked` only after the recovery batch has made every affected node schedulable or safely paused.
+`AttemptStatus` adds `prepared` and `orphaned`; `RunStatus` adds `recovery-blocked`. `NodePaused` may follow a cancelled or orphaned current attempt. Process-local lifecycle events without durable fields retain their reducer meaning. `RunResumed` is valid from `paused` or `recovery-blocked` only after the recovery batch has made every affected node schedulable or safely paused.
 
 ```ts
 export type RecoveryBlockReason =
@@ -472,8 +471,7 @@ export type RecoveryBlockReason =
       executionId: string;
       detail: Extract<ExecutionObservation, { state: "unknown" }>["reason"];
     }
-  | { kind: "cleanup-unknown"; executionId: string }
-  | { kind: "history-incompatible"; detail: "missing-descriptor" | "missing-execution-ref" };
+  | { kind: "cleanup-unknown"; executionId: string };
 
 export type PauseReason =
   | { kind: "operator"; operationId: string }
@@ -508,14 +506,14 @@ export interface DurableRunInspection {
 
 ## SQLite schema and transaction rules
 
-M3 adds one immutable migration. Existing `runs` and `events` rows and their JSON bytes are not rewritten.
+The first supported release creates the complete durable schema in migration one. Before that release, superseded development schemas are recreated instead of accumulating compatibility migrations.
 
 | Table              | Key and purpose                                                                                                                              |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `run_leases`       | One mutable row per run: owner identity, generation, database-assigned times, expiry, and release flag.                                      |
 | `run_mutations`    | `(run_id, operation_id)` immutable payload digest and committed sequence range.                                                              |
 | `control_requests` | `(run_id, operation_id)` action and database-assigned time; optional acknowledged event sequence is a derived index checked against history. |
-| `event_integrity`  | `(run_id, sequence)` event-byte digest and rolling history digest for M3-written events.                                                     |
+| `event_integrity`  | `(run_id, sequence)` event-byte digest and rolling history digest for every durable event.                                                   |
 | `run_snapshots`    | `(run_id, sequence, reducer_version)` rebuildable cache bytes and digests.                                                                   |
 
 Foreign keys point to `runs` or `events`. Generation, sequence, duration, byte-count, and time fields have positive integer checks. Action and state fields use closed SQL checks. Mutation rows, integrity rows, and their referenced events cannot be updated or deleted. Snapshot rows may be replaced only by a current fenced mutation because they are caches. Control acknowledgement may advance once from null to the sequence of a matching persisted event; the event remains the semantic authority.
@@ -577,7 +575,7 @@ Hi = SHA256(canonicalJson({
 }))
 ```
 
-Every M3 event insert writes `event_integrity` in the same transaction. For a legacy prefix without integrity rows, the loader reads and validates those exact stored events to calculate the missing chain. The first later M3 event records the resulting cumulative digest without modifying legacy rows. A snapshot may use a stored cumulative digest only when integrity coverage is contiguous from sequence one to its prefix. Otherwise it recomputes the prefix from authoritative event bytes.
+Every durable event insert writes `event_integrity` in the same transaction. A snapshot may use a stored cumulative digest only when integrity coverage is contiguous from sequence one to its prefix. Missing or broken coverage is corrupt durable state and fails closed.
 
 The complete-history loader always parses and validates every event. The execution loader may trust a transactionally written covered prefix and parse only the tail. Direct administrator rewriting of both immutable history and integrity records remains outside the threat model; schema drift, broken chains, malformed tails, and ordinary corruption fail closed.
 
@@ -712,18 +710,18 @@ anastom resume <run> [--state-dir <path>] [--operation-id <uuid>]
 
 Generated operation IDs are printed before the first mutation so an interrupted caller can retry them. Exit `0` means the requested terminal state was reached or already held. Exit `1` means the request was accepted but remains pending, or safe progress is blocked; output includes the operation ID and typed reason. Exit `2` remains invalid usage, missing run, or invalid stored input. Diagnostics remain credential-free.
 
-`run` records the descriptor before attempt one. Existing M1/M2/M2.5 runs remain fully inspectable. Resume of an old history without a descriptor or execution reference fails closed as `history-incompatible`; it never guesses the original flags. The implementation includes fixture databases for each pre-M3 shape.
+`run` records the descriptor and ownership evidence atomically before attempt one. Resume never guesses missing runtime or execution flags; incomplete records fail as corrupt durable state. Superseded development databases from before the first supported release are not compatibility inputs.
 
 ## Implementation slices after approval
 
 Each slice is a separately reviewable stacked PR. Later slices remain based on the preceding approved contract branch so the whole stack can ultimately merge through PR #24 in order.
 
-1. Runtime descriptors, event/reducer additions, exact JSON schemas, compatibility fixtures, and Changesets.
+1. Runtime descriptors, event/reducer additions, exact JSON schemas, conformance fixtures, and Changesets.
 2. `PrivatePathRoot`, workspace checkpoint production code, and focused caller migrations.
 3. Durable store migration, lease/fence/idempotency/control transactions, event integrity, and snapshot loader.
 4. `@anastom/execution-host`, hidden fixture host, and model-free conformance for all four execution owners.
 5. Engine start, heartbeat, control, orphan, workspace, and recovery state machines. **Implemented in the review stack.**
-6. CLI commands, runtime registry, inspection output, and old-history refusal behavior. **Implemented in the review stack.**
+6. CLI commands, runtime registry, inspection output, and corrupt-state refusal behavior. **Implemented in the review stack.**
 7. Process-level M3 acceptance and `docs/M3_EVIDENCE.md`. **Implemented and passing locally in the review stack.**
 
 Every code/contract slice carries reviewed package Changesets and updates affected package READMEs/changelogs. No slice uses a real model. A contradiction found during implementation stops the affected slice and updates this proposal, ADR 0018, and the build brief before the API changes.

@@ -106,7 +106,7 @@ type StoreClock = () => number;
 const DEFAULT_BUSY_TIMEOUT_MS = 5_000;
 type BusyTimeoutMs = 0 | typeof DEFAULT_BUSY_TIMEOUT_MS;
 
-/** SQLite implementation of the fenced M3 durable run-store contract. */
+/** SQLite implementation of the fenced durable run-store contract. */
 export class SqliteDurableRunStore implements DurableRunStore {
   private readonly db: DatabaseSync;
   private readonly injectedClock?: StoreClock;
@@ -239,7 +239,7 @@ export class SqliteDurableRunStore implements DurableRunStore {
     }
   }
 
-  /** Acquire a released lease or add generation one to a legacy run without ownership. */
+  /** Acquire an explicitly released lease. */
   async acquireReleased(input: AcquireReleasedRun): Promise<RunLeaseToken> {
     validateAcquisition(input);
     return this.writeTransaction(() => {
@@ -247,26 +247,23 @@ export class SqliteDurableRunStore implements DurableRunStore {
         throw new RunStoreError("not-found", `Run ${input.runId} was not found`);
       }
       const existing = this.readLease(input.runId);
-      if (existing && !existing.released) {
+      if (!existing) {
+        throw new RunStoreError("corrupt-store", `Run ${input.runId} has no ownership record`);
+      }
+      if (!existing.released) {
         throw new RunStoreError("ownership-conflict", `Run ${input.runId} is still owned`);
       }
       const now = this.now();
-      const generation = nextGeneration(existing?.generation ?? 0);
+      const generation = nextGeneration(existing.generation);
       const ownerJson = canonicalJson(input.owner);
       this.db
         .prepare(
-          `INSERT INTO run_leases(
-             run_id,owner_id,owner_json,owner_digest,generation,
-             acquired_at_ms,renewed_at_ms,expires_at_ms,released
-           ) VALUES(?,?,?,?,?,?,?,?,0)
-           ON CONFLICT(run_id) DO UPDATE SET
-             owner_id=excluded.owner_id, owner_json=excluded.owner_json,
-             owner_digest=excluded.owner_digest, generation=excluded.generation,
-             acquired_at_ms=excluded.acquired_at_ms, renewed_at_ms=excluded.renewed_at_ms,
-             expires_at_ms=excluded.expires_at_ms, released=0`,
+          `UPDATE run_leases SET
+             owner_id=?, owner_json=?, owner_digest=?, generation=?,
+             acquired_at_ms=?, renewed_at_ms=?, expires_at_ms=?, released=0
+           WHERE run_id=?`,
         )
         .run(
-          input.runId,
           input.ownerId,
           ownerJson,
           digestBytes(ownerJson),
@@ -274,6 +271,7 @@ export class SqliteDurableRunStore implements DurableRunStore {
           now,
           now,
           leaseExpiry(now),
+          input.runId,
         );
       return { runId: input.runId, ownerId: input.ownerId, generation };
     });

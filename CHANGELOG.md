@@ -9,12 +9,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 ### Added
 
 - Add the seventh stacked M3 production slice: deterministic separate-process crash/restart acceptance for clean, dirty-workspace, and unknown-execution recovery; pre-expiry ownership refusal; stale-fence and duplicate-operation checks; snapshot-corruption fallback; artifact and source-worktree audits; and `docs/M3_EVIDENCE.md`.
-- Add the sixth stacked M3 production slice: CLI composition for exact Pi, Codex, and Claude Code descriptors; an isolated runtime-host entry point; durable `pause`, `cancel`, and `resume`; operational status/inspection; stable exit behavior; and fail-closed legacy resume.
+- Add the sixth stacked M3 production slice: CLI composition for exact Pi, Codex, and Claude Code descriptors; an isolated runtime-host entry point; durable `pause`, `cancel`, and `resume`; operational status/inspection; stable exit behavior; and fail-closed corrupt-state handling.
 - Add the fifth stacked M3 production slice: a vendor-neutral durable coordinator with five-second heartbeat, fenced two-phase start order, exact runtime/command ownership, control polling and restart continuation, orphan/workspace reconciliation, attempt-budget enforcement, snapshot boundaries, and typed ownership refusal.
 - Add the fourth stacked M3 production slice: an engine-owned execution-host contract and shared POSIX supervisor with digest-bound private control records, explicit pre-launch readiness, bounded authenticated IPC, runtime/command isolation, parent-death cleanup, fail-closed loss inspection, and model-free coverage for all four current execution owners.
-- Add the third stacked M3 production slice: an engine-owned durable-store contract and matching in-memory/SQLite implementations with leases, monotonic fences, idempotent batches, controls, rolling integrity, rebuildable snapshots, stable errors, and byte-preserving legacy migration.
+- Add the third stacked M3 production slice: an engine-owned durable-store contract and matching in-memory/SQLite implementations with leases, monotonic fences, idempotent batches, controls, rolling integrity, rebuildable snapshots, stable errors, and a complete initial schema.
 - Add the second stacked M3 production slice: a fixed-segment private-state root, exact workspace-checkpoint validation, double-captured Git/content/ownership evidence, bounded streamed ignored-content hashing, and focused workspace/artifact path migrations.
-- Begin the stacked M3 production implementation with bounded credential-free runtime descriptors and exact Pi, Codex, and Claude Code reconstruction codecs. Add prepare/authorize, control, cleanup, orphan, typed pause, and recovery-blocked event/reducer contracts for runtime and command attempts while preserving legacy event replay.
+- Begin the stacked M3 production implementation with bounded credential-free runtime descriptors and exact Pi, Codex, and Claude Code reconstruction codecs. Add prepare/authorize, control, cleanup, orphan, typed pause, and recovery-blocked event/reducer contracts for runtime and command attempts while retaining process-local workflow event behavior.
 - Propose the exact M3 production contract after all five feasibility phases: package ownership, sanitized runtime descriptors, two-stage execution references, engine-owned durable-store and execution-host interfaces, typed recovery events, rolling event integrity, bounded supervisor records, and a private-state-root path capability. ADR 0018 keeps the proposal review-gated before implementation.
 - Add a model-free M3 snapshot probe with a checked-in folded-state schema, exact workflow/event-prefix/state digest binding, snapshot-plus-tail equality across reopened lifecycle histories, newest-compatible selection, corrupt-snapshot fallback, and rejection of corrupt authoritative events. The matrix passes on Linux and macOS; exact persistence APIs remain for separate review.
 - Add a model-free M3 exact-workspace checkpoint probe covering committed, tracked, staged, untracked, binary, symlink, ignored-file/directory, `HEAD`, and canonical ownership changes while preserving the user's staging index. The matrix passes on Linux and macOS; exact public M3 APIs remain unfrozen.
@@ -35,7 +35,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 - M1 retrospective and proposed M2 portable-worker build contract covering Codex integration, selected-runtime capability preflight, shared conformance, token observations, feasibility gates, and completion evidence.
 - Prettier formatting and editor defaults, public API JSDoc enforcement with required descriptions across functions, classes, and types, readability/complexity limits, package documentation, optional TypeDoc generation, and contributor hygiene checks.
 - Changesets release planning for all eight private packages, with CI validation and a reviewed manual versioning process.
-- Versioned SQLite migrations with checksummed history, schema validation, atomic failure rollback, and safe adoption of existing unversioned stores.
+- Versioned SQLite migrations with checksummed history, schema validation, atomic failure rollback, and rejection of unjournaled existing schemas.
 - Confined file references for fake workspace changes and tests for unsafe pointers, schema summaries, migration failures, and hygiene gate failures.
 
 - M0 TypeScript workspace with a validated Workflow IR.
@@ -58,6 +58,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Changed
 
+- Make package source, comments, JSDoc, identifiers, fixtures, and test names independent of project milestone labels; enforce the rule in `pnpm hygiene`. Remove the superseded fake Markdown Task path, `SqliteRunPersistence`, historical-resume variants, and compatibility-only tests before the first supported release; consolidate the durable store as the initial migration.
 - Accepted the M2 Codex CLI design; tracked blocked SDK reconsideration and added M2.5 Claude Code support after M2, with subscription authentication to be investigated during design.
 - Replaced milestone-based executable fixture and CI names with capability names, and removed duplicated durable demo coverage from CI.
 - Refactored inspection, engine execution, and event transitions into readable stages and rewrote durable CLI tests around contributor-facing behavior.

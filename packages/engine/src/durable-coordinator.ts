@@ -31,6 +31,7 @@ import { buildContext } from "./context.js";
 import {
   createRunSnapshot,
   assertLocalProcessIdentity,
+  RunStoreError,
   type ControlReceipt,
   type ControlRequest,
   type DurableRunStore,
@@ -210,7 +211,7 @@ interface CheckpointOptions {
 }
 
 /**
- * Vendor-neutral M3 coordinator for fenced starts, heartbeat, controls, and crash recovery.
+ * Vendor-neutral coordinator for fenced starts, heartbeat, controls, and crash recovery.
  * It never imports SQLite, a concrete runtime, or a concrete workspace implementation.
  */
 export class DurableRunCoordinator {
@@ -276,9 +277,10 @@ export class DurableRunCoordinator {
     if (isTerminalRun(loaded.state) || loaded.state.status === "blocked") {
       return loaded.state;
     }
-    const descriptor = loaded.state.runtimeDescriptor
-      ? this.parseDescriptor(loaded.state.runtimeDescriptor)
-      : undefined;
+    if (!loaded.state.runtimeDescriptor) {
+      throw new RunStoreError("corrupt-store", `Run ${runId} has no runtime descriptor`);
+    }
+    const descriptor = this.parseDescriptor(loaded.state.runtimeDescriptor);
     const lease = await this.acquireForRecovery(runId);
     const session = new OwnedRunSession({
       store: this.store,
@@ -374,7 +376,10 @@ export class DurableRunCoordinator {
   private async acquireForRecovery(runId: string): Promise<RunLeaseToken> {
     const acquisition = { runId, ownerId: this.createOwnerId(), owner: this.owner };
     const lease = await this.store.inspectLease(runId);
-    if (!lease || lease.released) {
+    if (!lease) {
+      throw new RunStoreError("corrupt-store", `Run ${runId} has no ownership record`);
+    }
+    if (lease.released) {
       return this.store.acquireReleased(acquisition);
     }
     const observation = await this.observeProcess(lease.owner);
@@ -397,12 +402,9 @@ export class DurableRunCoordinator {
   private async coordinateRecovered(
     session: OwnedRunSession,
     events: readonly RunEvent[],
-    descriptor: RuntimeDescriptor | undefined,
+    descriptor: RuntimeDescriptor,
     operationId: string,
   ): Promise<RunState> {
-    if (!descriptor) {
-      return this.blockHistory(session, operationId, "missing-descriptor");
-    }
     const outstanding = outstandingObservedControl(events);
     const pending = outstanding ?? (await this.store.pendingControls(session.lease.runId, 1))[0];
     const active = currentOwnedAttempt(session.state);
@@ -411,7 +413,10 @@ export class DurableRunCoordinator {
         !active.attempt.executionPlan ||
         (active.attempt.status === "running" && !active.attempt.execution)
       ) {
-        return this.blockHistory(session, operationId, "missing-execution-ref");
+        throw new RunStoreError(
+          "corrupt-store",
+          `Run ${session.lease.runId} has incomplete execution ownership evidence`,
+        );
       }
       await this.reconcileOwnedAttempt(session, {
         nodeId: active.nodeId,
@@ -1100,8 +1105,10 @@ export class DurableRunCoordinator {
     }
     const workspace = session.state.workspace;
     if (!workspace || workspace.mode === "memory" || !attempt.workspaceCheckpoint) {
-      await this.blockHistory(session, operationId, "missing-execution-ref");
-      return;
+      throw new RunStoreError(
+        "corrupt-store",
+        `Run ${session.lease.runId} has incomplete workspace recovery evidence`,
+      );
     }
     const observed = await this.captureCheckpoint(session, {
       workspace,
@@ -1364,26 +1371,6 @@ export class DurableRunCoordinator {
             executionId: plan.executionId,
             detail: observation.reason,
           },
-        },
-      ],
-      { snapshot: true },
-    );
-  }
-
-  private async blockHistory(
-    session: OwnedRunSession,
-    operationId: string,
-    detail: "missing-descriptor" | "missing-execution-ref",
-  ): Promise<RunState> {
-    if (session.state.status === "recovery-blocked") {
-      return session.state;
-    }
-    return session.commit(
-      [
-        {
-          type: "RunRecoveryBlocked",
-          operationId,
-          reason: { kind: "history-incompatible", detail },
         },
       ],
       { snapshot: true },

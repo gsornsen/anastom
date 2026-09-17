@@ -6,7 +6,6 @@ import { resolve, join } from "node:path";
 const exec = promisify(execFile);
 export const endpointFixtureDirectory = resolve("examples/demo-repos/health-endpoint");
 export const healthEndpointTaskPath = resolve(endpointFixtureDirectory, "tasks/add-endpoint.md");
-export const healthEndpointScenarioPath = resolve("examples/fake/health-endpoint.yaml");
 export async function createEndpointRepository(): Promise<string> {
   const root = await realpath(await mkdtemp(join(tmpdir(), "anastom-endpoint-test-")));
   await cp(endpointFixtureDirectory, root, { recursive: true });

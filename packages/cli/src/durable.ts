@@ -29,7 +29,7 @@ import { durableRuntimeRegistry } from "./runtime-registry.js";
 
 type OwnerState = "live" | "expired" | "released" | "unknown";
 
-/** Read-only M3 state plus mutable local coordination evidence. */
+/** Read-only run state plus mutable local coordination evidence. */
 export interface DurableRunInspection {
   /** Digest of the immutable workflow definition. */
   definitionDigest: string;
@@ -47,7 +47,7 @@ export interface DurableRunInspection {
   events?: RunEvent[];
 }
 
-/** Concrete M3 services owned by one CLI invocation. */
+/** Durable storage, execution, workspace, and runtime services owned by one CLI invocation. */
 export interface DurableCliServices {
   /** Production fenced SQLite store. */
   store: SqliteDurableRunStore;
@@ -63,7 +63,7 @@ export async function openDurableRunStore(stateDir: string): Promise<SqliteDurab
   return new SqliteDurableRunStore(join(state.path, "anastom.sqlite"));
 }
 
-/** Compose production M3 storage, process ownership, workspaces, artifacts, and runtimes. */
+/** Compose production storage, process ownership, workspaces, artifacts, and runtimes. */
 export async function openDurableCliServices(stateDir: string): Promise<DurableCliServices> {
   const state = await ensurePrivatePathRoot(stateDir);
   const store = new SqliteDurableRunStore(join(state.path, "anastom.sqlite"));

@@ -267,7 +267,7 @@ M3 is complete only when one reviewed evidence document records all of the follo
 - snapshot/full-replay equality and corruption fallback;
 - artifact existence, size, digest, ownership, and private-sentinel scan;
 - source-checkout cleanliness and retained worktree evidence;
-- compatibility results for pre-M3 histories;
+- validation that every current durable history starts with descriptor, ownership, integrity, and snapshot evidence;
 - `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, package builds, API-documentation review, and `pnpm hygiene`;
 - Linux and macOS CI, CodeQL, dependency review, DCO, and every other required repository check;
 - reviewed package Changesets and owner acceptance of the implementation and evidence.

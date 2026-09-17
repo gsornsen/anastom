@@ -20,6 +20,7 @@ import type { ExecutionRequest } from "@anastom/runtime-contract";
 
 /** Exact Codex CLI package and native executable release accepted for this adapter profile. */
 export const CODEX_VERSION = "0.154.0";
+/** Fixed worker role instructions supplied separately from the task-specific prompt. */
 export const WORKER_INSTRUCTIONS =
   "You are a bounded software implementer. Follow only the explicit context envelope, operate in its assigned workspace, respect its mutation policy, and return the required JSON report. The control plane owns authoritative verification.";
 const require = createRequire(import.meta.url);

@@ -3,11 +3,8 @@ import { symlink } from "node:fs/promises";
 import { join } from "node:path";
 
 import { loadTaskWithinRoot } from "@anastom/core";
-import { WorkflowEngine } from "@anastom/engine";
 import { localProcessIdentity } from "@anastom/execution-host";
-import { SqliteRunPersistence } from "@anastom/persistence";
 import { parsePiRuntimeDescriptor } from "@anastom/runtime-pi";
-import { FakeRuntimeAdapter } from "@anastom/runtime-fake";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -22,7 +19,6 @@ import { durableRuntimeRegistry } from "./runtime-registry.js";
 const pauseOperation = "11111111-1111-4111-8111-111111111111";
 const cancelOperation = "22222222-2222-4222-8222-222222222222";
 const repeatedCancelOperation = "33333333-3333-4333-8333-333333333333";
-const resumeOperation = "44444444-4444-4444-8444-444444444444";
 const descriptor = parsePiRuntimeDescriptor({
   version: "anastom.dev/runtime-descriptor/v1alpha1",
   runtimeId: "pi",
@@ -57,7 +53,7 @@ async function repository(): Promise<string> {
   return root;
 }
 
-async function seedM3Run(root: string, runId: string): Promise<string> {
+async function seedDurableRun(root: string, runId: string): Promise<string> {
   const workflow = await loadTaskWithinRoot(process.cwd(), healthEndpointTaskPath);
   const stateDir = join(root, ".anastom");
   const services = await openDurableCliServices(stateDir);
@@ -73,7 +69,7 @@ async function seedM3Run(root: string, runId: string): Promise<string> {
   return stateDir;
 }
 
-describe("M3 CLI composition", () => {
+describe("durable CLI controls and inspection", () => {
   it("registers only exact recoverable runtime descriptors", () => {
     expect(durableRuntimeRegistry.parse(descriptor)).toEqual(descriptor);
     expect(() =>
@@ -88,8 +84,8 @@ describe("M3 CLI composition", () => {
 
   it("pauses and cancels a released run while reporting operational state", async () => {
     const root = await repository();
-    const runId = "m3-control";
-    const stateDir = await seedM3Run(root, runId);
+    const runId = "durable-control";
+    const stateDir = await seedDurableRun(root, runId);
     const paused = capture();
     expect(
       await runCli(["pause", runId, "--state-dir", stateDir, "--operation-id", pauseOperation], {
@@ -138,50 +134,10 @@ describe("M3 CLI composition", () => {
     expect(view.events?.length).toBeGreaterThan(0);
   });
 
-  it("fails a legacy unfinished run closed without guessing runtime flags", async () => {
-    const root = await repository();
-    const runId = "legacy-unfinished";
-    const stateDir = join(root, ".anastom");
-    const workflow = await loadTaskWithinRoot(process.cwd(), healthEndpointTaskPath);
-    const persistence = new SqliteRunPersistence(join(stateDir, "anastom.sqlite"));
-    try {
-      const engine = new WorkflowEngine({
-        runtime: new FakeRuntimeAdapter({ nodes: {} }),
-        persistence,
-      });
-      await engine.createRun(workflow, { runId });
-    } finally {
-      persistence.close();
-    }
-
-    const output = capture();
-    expect(
-      await runCli(["resume", runId, "--state-dir", stateDir, "--operation-id", resumeOperation], {
-        io: output.io,
-      }),
-    ).toBe(1);
-    expect(output.stdout[0]).toBe(`Operation: ${resumeOperation}`);
-    expect(output.stdout.join("\n")).toContain("history-incompatible");
-    expect(output.stdout.join("\n")).toContain("missing-descriptor");
-
-    const inspection = capture();
-    expect(
-      await runCli(["inspect", runId, "--state-dir", stateDir, "--json"], {
-        io: inspection.io,
-      }),
-    ).toBe(0);
-    const view = JSON.parse(inspection.stdout[0]!) as DurableRunInspection;
-    expect(view.state.status).toBe("recovery-blocked");
-    expect(view.state.recoveryBlock?.reason).toEqual({
-      kind: "history-incompatible",
-      detail: "missing-descriptor",
-    });
-  });
-
   it("reports a live owner without acquiring or releasing its lease", async () => {
     const root = await repository();
-    const runId = "m3-live-owner";
-    const stateDir = await seedM3Run(root, runId);
+    const runId = "durable-live-owner";
+    const stateDir = await seedDurableRun(root, runId);
     const services = await openDurableCliServices(stateDir);
     const lease = await services.store.acquireReleased({
       runId,
@@ -205,8 +161,8 @@ describe("M3 CLI composition", () => {
 
   it("rejects invalid operation identifiers before changing a run", async () => {
     const root = await repository();
-    const runId = "m3-invalid-operation";
-    const stateDir = await seedM3Run(root, runId);
+    const runId = "durable-invalid-operation";
+    const stateDir = await seedDurableRun(root, runId);
     const output = capture();
     expect(
       await runCli(["pause", runId, "--state-dir", stateDir, "--operation-id", "not-a-uuid"], {
@@ -223,8 +179,8 @@ describe("M3 CLI composition", () => {
 
   it("rejects a symlinked durable state root before opening SQLite", async () => {
     const root = await repository();
-    const runId = "m3-symlinked-state";
-    const stateDir = await seedM3Run(root, runId);
+    const runId = "durable-symlinked-state";
+    const stateDir = await seedDurableRun(root, runId);
     const alias = join(root, ".anastom-alias");
     await symlink(stateDir, alias);
 

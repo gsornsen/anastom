@@ -24,15 +24,17 @@ The proposal makes the following package decisions:
 - add a private-state-root capability to `@anastom/path-policy` while retaining the existing authored-child resolver; and
 - keep `@anastom/cli` as the runtime registry and process composition root.
 
+Before the first supported release, use the complete durable store as migration one and remove the superseded `SqliteRunPersistence` and fake Task execution paths. No external users or retained user databases exist, so preserving those transitional paths would create a compatibility promise without a beneficiary. Deterministic fake YAML workflows keep their process-local engine path. A durable run always has a runtime descriptor, ownership record, execution evidence when active, and rolling integrity from its first event; missing records are corruption rather than a historical format.
+
 The exact public records, event transitions, transaction order, limits, compatibility behavior, CLI syntax, and implementation slices are defined in the proposal. No production API or migration changes in this ADR.
 
 The path supplied to `ensurePrivatePathRoot()` is an explicitly caller-authorized local root, rather than an untrusted child path beneath some other universal root. The function canonicalizes the existing parent, fixes the leaf, rejects symlinks and non-directories, enforces current-user ownership and private permissions, verifies the canonical result, and returns a capability whose descendants use validated fixed segments. Automated or remote callers must authorize the root before invoking this boundary. CodeQL alert 41 was individually dismissed as a false positive with this rationale; the path-injection query remains enabled.
 
 ## Consequences
 
-M3 recovery will have one OS ownership boundary across all current workers and commands. The engine can remain independent from SQLite and vendor runtimes. Durable mutations will carry explicit lease fences and operation IDs. Runs created before M3 will remain inspectable but cannot be resumed when safe reconstruction evidence is absent.
+M3 recovery will have one OS ownership boundary across all current workers and commands. The engine can remain independent from SQLite and vendor runtimes. Durable mutations will carry explicit lease fences and operation IDs. Development databases created by superseded pre-release implementations are not supported inputs; recreate them from the current initial schema.
 
-The new execution-host package and breaking pre-1.0 runtime/store changes will require package documentation, Changesets, compatibility fixtures, generated API review, and model-free cross-platform conformance. Private operational paths gain one shared implementation without turning unrelated path trust domains into a single permissive resolver.
+The new execution-host package and breaking pre-1.0 runtime/store changes require package documentation, Changesets, generated API review, and model-free cross-platform conformance. Private operational paths gain one shared implementation without turning unrelated path trust domains into a single permissive resolver.
 
 ## Rejected shapes
 
@@ -58,4 +60,4 @@ Fencing protects SQLite history only. It cannot stop a surviving agent or comman
 
 ## Review triggers
 
-Revise the production contract and the accepted M3 build brief before implementation if cross-platform production tests cannot preserve two-phase start authorization, if Pi cannot resolve its effective model without a provider call, if private socket placement cannot satisfy the 100-byte bound, if transactionally maintained event integrity cannot retain old histories unchanged, or if the event transitions cannot represent unknown cleanup without permitting another worker.
+Revise the production contract and the accepted M3 build brief before implementation if cross-platform production tests cannot preserve two-phase start authorization, if Pi cannot resolve its effective model without a provider call, if private socket placement cannot satisfy the 100-byte bound, if transactionally maintained event integrity cannot bind every durable event, or if the event transitions cannot represent unknown cleanup without permitting another worker.

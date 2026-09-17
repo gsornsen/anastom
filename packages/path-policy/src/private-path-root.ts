@@ -354,7 +354,7 @@ class PrivatePathRootImplementation implements PrivatePathRoot {
 
 /**
  * Create or validate one canonical current-user-owned private state root.
- * Existing owner-controlled M1 roots are tightened to mode 0700 before use.
+ * Existing owner-controlled roots are tightened to mode 0700 before use.
  */
 export async function ensurePrivatePathRoot(path: string): Promise<PrivatePathRoot> {
   if (!path || path.includes("\0")) {

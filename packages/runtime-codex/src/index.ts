@@ -352,7 +352,7 @@ export { renderCodexPrompt, validateSelection, CODEX_VERSION } from "./profile.j
 export { parseCodexRuntimeDescriptor } from "./descriptor.js";
 export type { CodexRuntimeDescriptor } from "./descriptor.js";
 
-/** Exact codec used by the M3 composition root to reconstruct Codex without private settings. */
+/** Exact codec used to reconstruct Codex without persisting credentials or private settings. */
 export const codexRuntimeDescriptorCodec: RuntimeDescriptorCodec<CodexRuntimeDescriptor> = {
   runtimeId: "codex",
   parse: parseCodexRuntimeDescriptor,

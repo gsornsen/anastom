@@ -45,13 +45,9 @@ export type RecoveryBlockReason =
         | "supervisor-lost"
         | "cleanup-unconfirmed";
     }
-  | { kind: "cleanup-unknown"; executionId: string }
-  | {
-      kind: "history-incompatible";
-      detail: "missing-descriptor" | "missing-execution-ref";
-    };
+  | { kind: "cleanup-unknown"; executionId: string };
 
-/** Typed operator or safety policy reason attached to M3 pause transitions. */
+/** Typed operator or safety-policy evidence attached to pause transitions. */
 export type PauseReason =
   | { kind: "operator"; operationId: string }
   | { kind: "workspace-conflict"; differences: WorkspaceDifference[] }
@@ -717,7 +713,7 @@ function applyAttemptEvent(state: RunState, event: AttemptEvent): void {
   }
 }
 
-/** Apply the M3 prepare, authorize and orphan transitions around owned execution. */
+/** Apply prepare, authorize, and orphan transitions around an owned execution. */
 function applyOwnedAttemptEvent(state: RunState, event: OwnedAttemptEvent): void {
   switch (event.type) {
     case "AttemptPrepared":
@@ -1070,22 +1066,20 @@ function applyRunRecoveryBlocked(
   )) {
     throw new InvalidTransitionError(`RunRecoveryBlocked is invalid in ${state.status} state`);
   }
-  if (event.reason.kind !== "history-incompatible") {
-    const executionId = event.reason.executionId;
-    const attempt = Object.values(state.nodes)
-      .map((node) => node.attempts.at(-1))
-      .find((candidate) => candidate?.executionPlan?.executionId === executionId);
-    if (!attempt) {
-      throw new InvalidTransitionError("Recovery block does not match an owned execution");
-    }
-    if (
-      event.reason.kind === "cleanup-unknown" &&
-      !attempt.cleanup?.some(
-        (cleanup) => cleanup.executionId === executionId && cleanup.outcome === "unknown",
-      )
-    ) {
-      throw new InvalidTransitionError("Cleanup recovery block requires unknown cleanup evidence");
-    }
+  const executionId = event.reason.executionId;
+  const attempt = Object.values(state.nodes)
+    .map((node) => node.attempts.at(-1))
+    .find((candidate) => candidate?.executionPlan?.executionId === executionId);
+  if (!attempt) {
+    throw new InvalidTransitionError("Recovery block does not match an owned execution");
+  }
+  if (
+    event.reason.kind === "cleanup-unknown" &&
+    !attempt.cleanup?.some(
+      (cleanup) => cleanup.executionId === executionId && cleanup.outcome === "unknown",
+    )
+  ) {
+    throw new InvalidTransitionError("Cleanup recovery block requires unknown cleanup evidence");
   }
   state.status = "recovery-blocked";
   state.recoveryBlock = {

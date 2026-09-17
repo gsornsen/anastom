@@ -122,18 +122,21 @@ describe("event transitions", () => {
     ).toThrow("only one final usage");
   });
 
-  it("replays the checked-in legacy history without rewriting its records", async () => {
-    const fixture = new URL("./testing/fixtures/legacy-run-events.v1alpha1.json", import.meta.url);
-    const oldEvents = JSON.parse(await readFile(fixture, "utf8")) as RunEvent[];
-    const bytes = oldEvents.map((event) => JSON.stringify(event));
-    const replayed = replayRun(oldEvents);
+  it("replays the checked-in baseline history without rewriting its records", async () => {
+    const fixture = new URL(
+      "./testing/fixtures/baseline-run-events.v1alpha1.json",
+      import.meta.url,
+    );
+    const baselineEvents = JSON.parse(await readFile(fixture, "utf8")) as RunEvent[];
+    const bytes = baselineEvents.map((event) => JSON.stringify(event));
+    const replayed = replayRun(baselineEvents);
     expect(replayed.status).toBe("succeeded");
     expect(replayed.runtimeNegotiation).toBeUndefined();
     expect(replayed.nodes.work?.attempts[0]?.identity).toEqual([
-      { type: "metadata", provider: "anthropic", model: "legacy" },
+      { type: "metadata", provider: "anthropic", model: "baseline" },
     ]);
     expect(replayed.nodes.work?.attempts[0]?.usage).toBeUndefined();
-    expect(oldEvents.map((event) => JSON.stringify(event))).toEqual(bytes);
+    expect(baselineEvents.map((event) => JSON.stringify(event))).toEqual(bytes);
   });
 
   it("replays prepared execution ownership, orphan recovery and exact control evidence", () => {
@@ -255,7 +258,11 @@ describe("event transitions", () => {
       {
         type: "RunRecoveryBlocked",
         operationId: "resume-2",
-        reason: { kind: "history-incompatible", detail: "missing-execution-ref" },
+        reason: {
+          kind: "execution-unknown",
+          executionId: "execution-1",
+          detail: "supervisor-lost",
+        },
       },
       { type: "RunResumed", operationId: "resume-3" },
     ]);
@@ -272,7 +279,7 @@ describe("event transitions", () => {
     });
   });
 
-  it("keeps legacy lifecycle shapes exact while accepting typed M3 pause reasons", () => {
+  it("keeps baseline lifecycle shapes exact while accepting typed pause reasons", () => {
     const ready = materializeEvents(applyRunEvent(undefined, created), "run", [
       { type: "NodeReady", nodeId: "work", reason: "dependencies-satisfied" },
       {

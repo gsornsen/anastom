@@ -63,14 +63,14 @@ The control plane must not delegate scheduling, retry policy, acceptance decisio
 
 ## Execution ownership
 
-M0 deliberately sends all four node kinds through the fake adapter so the scheduler and transition model can be tested without side effects. Durable Task execution uses separate execution paths:
+Deterministic YAML workflows send all four node kinds through the fake adapter so the scheduler and transition model can be tested without side effects. Durable Task execution uses separate execution paths:
 
-| Node kind  | Current owner                  | Current behavior                                                                                         |
-| ---------- | ------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `agent`    | selected `RuntimeAdapter`      | Pi, Codex, or Claude Code executes one fresh bounded attempt in the assigned workspace.                  |
-| `command`  | control-plane command executor | Spawn an exact argument vector, capture bounded output, and decide success from exit status.             |
-| `verifier` | fake adapter only              | General verifier plugins remain deferred; delivered Task demonstrations verify with a `command` node.    |
-| `gate`     | fake adapter only              | Human approval, machine conditions, and audit remain deferred; M3 proposes operational pause and resume. |
+| Node kind  | Current owner                  | Current behavior                                                                                       |
+| ---------- | ------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `agent`    | selected `RuntimeAdapter`      | Pi, Codex, or Claude Code executes one fresh bounded attempt in the assigned workspace.                |
+| `command`  | control-plane command executor | Spawn an exact argument vector, capture bounded output, and decide success from exit status.           |
+| `verifier` | fake adapter only              | General verifier plugins remain deferred; delivered Task demonstrations verify with a `command` node.  |
+| `gate`     | fake adapter only              | Human approval, machine conditions, and audit remain deferred; pause and resume are operator controls. |
 
 Unsupported executable node kinds must fail before an attempt starts. They must not fall back to another adapter.
 
@@ -195,7 +195,7 @@ A result observed after the timeout may be retained as diagnostic evidence but c
 
 The append-only event stream remains the authoritative transition history. Run state is reconstructed by replaying events in sequence; projections and snapshots are derived data.
 
-The current durable store uses SQLite for two authoritative records:
+The current durable store uses SQLite for immutable definitions and event history:
 
 ```text
 runs(run_id, workflow_digest, workflow_json, created_at)
@@ -206,7 +206,7 @@ events(run_id, sequence, event_type, event_json, recorded_at)
 
 `workflow_json` contains the normalized immutable definition. `workflow_digest` covers a canonical serialization of that definition. Database timestamps support operator inspection; event sequence remains the only transition ordering authority.
 
-Artifact bodies live below a per-run filesystem directory. Their digest and metadata enter the event stream. M0-M2.5 do not add mutable node, attempt, lease, snapshot, evidence, usage, or projection tables. The M3 durable store adds operational lease, idempotency, control-request, event-integrity, and snapshot records while preserving events as the workflow authority. The [M3 build brief](M3_BUILD_BRIEF.md) defines their different trust and lifecycle rules.
+Artifact bodies live below a per-run filesystem directory. Their digest and metadata enter the event stream. The durable store also maintains lease, idempotency-receipt, control-request, event-integrity, and rebuildable snapshot records while preserving events as the workflow authority. The [durable-execution build brief](M3_BUILD_BRIEF.md) defines their different trust and lifecycle rules.
 
 ## Failure semantics
 

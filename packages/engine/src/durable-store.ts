@@ -94,7 +94,7 @@ export interface LoadedRunWithHistory extends LoadedRun {
   events: RunEvent[];
 }
 
-/** Inputs for claiming an explicitly released run or a legacy run without a lease. */
+/** Inputs for claiming an explicitly released run. */
 export interface AcquireReleasedRun {
   runId: string;
   ownerId: string;
@@ -143,7 +143,7 @@ export interface ControlReceipt extends ControlRequest {
   replayed: boolean;
 }
 
-/** Engine-owned durable storage boundary for fenced M3 execution. */
+/** Engine-owned durable storage boundary for fenced execution and recovery. */
 export interface DurableRunStore {
   /** Atomically create immutable history, generation-one ownership, and its initial cache. */
   createOwned(input: CreateOwnedRun): Promise<OwnedRunReceipt>;
@@ -153,7 +153,7 @@ export interface DurableRunStore {
   load(runId: string, mode: "complete-history"): Promise<LoadedRunWithHistory | null>;
   /** Inspect current ownership without changing its lease or contacting the owner process. */
   inspectLease(runId: string): Promise<RunLease | null>;
-  /** Acquire only a released lease or a legacy run that has no lease record. */
+  /** Acquire only an explicitly released lease. */
   acquireReleased(input: AcquireReleasedRun): Promise<RunLeaseToken>;
   /** Take over an exact expired lease after a contemporaneous absent-owner observation. */
   takeoverExpired(input: TakeoverExpiredRun): Promise<RunLeaseToken>;
@@ -178,7 +178,6 @@ export type RunStoreErrorCode =
   | "idempotency-conflict"
   | "control-conflict"
   | "busy"
-  | "unsupported-history"
   | "corrupt-store";
 
 /** Expected durable-store failure whose code, rather than text, drives control flow. */
@@ -382,7 +381,7 @@ interface MemoryControl extends ControlRequest {
 interface MemoryRun {
   workflow: WorkflowDefinition;
   events: RunEvent[];
-  lease?: RunLease;
+  lease: RunLease;
   mutations: Map<string, MemoryMutation>;
   controls: Map<string, MemoryControl>;
   snapshots: RunSnapshot[];
@@ -536,11 +535,11 @@ export class InMemoryDurableRunStore implements DurableRunStore {
     return structuredClone(this.runs.get(runId)?.lease ?? null);
   }
 
-  /** Acquire only a released lease or a legacy run with no lease. */
+  /** Acquire only an explicitly released lease. */
   async acquireReleased(input: AcquireReleasedRun): Promise<RunLeaseToken> {
     validateAcquisition(input);
     const run = this.requireRun(input.runId);
-    if (run.lease && !run.lease.released) {
+    if (!run.lease.released) {
       throw new RunStoreError("ownership-conflict", `Run ${input.runId} is still owned`);
     }
     const now = validateClock(this.clock);
@@ -548,7 +547,7 @@ export class InMemoryDurableRunStore implements DurableRunStore {
       runId: input.runId,
       ownerId: input.ownerId,
       owner: structuredClone(input.owner),
-      generation: nextGeneration(run.lease?.generation ?? 0),
+      generation: nextGeneration(run.lease.generation),
       acquiredAtMs: now,
       renewedAtMs: now,
       expiresAtMs: leaseExpiry(now),
@@ -708,7 +707,7 @@ export class InMemoryDurableRunStore implements DurableRunStore {
   }
 }
 
-/** Validate an M3 creation request before any persistence changes. */
+/** Validate an owned-run creation request before any persistence changes. */
 export function validateCreateOwnedRun(input: CreateOwnedRun): void {
   assertIdentifier(input.runId, "run ID");
   if (!uuid.test(input.ownerId)) {

@@ -10,8 +10,5 @@
     "@anastom/engine": "workspace:*",
     "@anastom/path-policy": "workspace:*",
     "@anastom/runtime-contract": "workspace:*"
-  },
-  "devDependencies": {
-    "@anastom/runtime-fake": "workspace:*"
   }
 }

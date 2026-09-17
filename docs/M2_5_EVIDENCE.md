@@ -39,7 +39,7 @@ Later-process `status` and `inspect --json` both reconstructed the succeeded run
 
 ## Durable compatibility replay
 
-The checked-in [historical replay script](../scripts/check-historical-replay.ts) called the current reader's later-process `status` and `inspect --json`, then compared raw workflow/event row bytes before and after. It made zero model calls. Event-row hashes join ordered `event_json` rows with a newline; they are a comparison convention distinct from the earlier M2 evidence digest convention.
+The [historical replay script at the accepted evidence commit](https://github.com/gsornsen/anastom/blob/e20605988116159633dadc56209e47a226b9bb24/scripts/check-historical-replay.ts) called that reader's later-process `status` and `inspect --json`, then compared raw workflow/event row bytes before and after. It made zero model calls. Event-row hashes join ordered `event_json` rows with a newline; they are a comparison convention distinct from the earlier M2 evidence digest convention. The script was removed when the unreleased persistence adapter was superseded by the durable store.
 
 | Original store     | Run ID                                 | Replayed status | Events | Workflow-row SHA-256                                               | Ordered event-row SHA-256                                          |
 | ------------------ | -------------------------------------- | --------------- | -----: | ------------------------------------------------------------------ | ------------------------------------------------------------------ |
