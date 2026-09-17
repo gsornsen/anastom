@@ -323,6 +323,48 @@ describe.each(factories)("$name durable run store", (factory) => {
       fixture.close();
     }
   });
+
+  it("refuses controls that cannot change state while preserving prior receipts", async () => {
+    const fixture = factory.create();
+    try {
+      const owned = await fixture.store.createOwned(creation());
+      const accepted = await fixture.store.submitControl({
+        runId: "durable",
+        operationId: "accepted-before-terminal",
+        action: "pause",
+      });
+      await fixture.store.commit({
+        lease: owned.lease,
+        operationId: "block-run",
+        expectedSequence: 2,
+        events: [
+          {
+            type: "RunBlocked",
+            runId: "durable",
+            sequence: 3,
+            reason: "fixture terminal state",
+          },
+        ],
+      });
+
+      await expect(
+        fixture.store.submitControl({
+          runId: "durable",
+          operationId: "new-after-terminal",
+          action: "cancel",
+        }),
+      ).rejects.toSatisfy(expectCode("control-conflict"));
+      await expect(
+        fixture.store.submitControl({
+          runId: "durable",
+          operationId: "accepted-before-terminal",
+          action: "pause",
+        }),
+      ).resolves.toMatchObject({ recordedAtMs: accepted.recordedAtMs, replayed: true });
+    } finally {
+      fixture.close();
+    }
+  });
 });
 
 describe("SQLite durable corruption and contention handling", () => {

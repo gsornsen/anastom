@@ -164,7 +164,7 @@ export interface DurableRunStore {
   release(token: RunLeaseToken): Promise<void>;
   /** Atomically apply a fenced idempotent event batch and optional derived effects. */
   commit(input: FencedRunMutation): Promise<MutationReceipt>;
-  /** Submit or idempotently replay an operator control without acquiring ownership. */
+  /** Atomically submit an actionable control or replay its prior receipt without ownership. */
   submitControl(input: ControlSubmission): Promise<ControlReceipt>;
   /** Return unacknowledged controls oldest first, bounded to at most 100 records. */
   pendingControls(runId: string, limit?: number): Promise<ControlRequest[]>;
@@ -191,6 +191,26 @@ export class RunStoreError extends Error {
     super(message, options);
     this.name = "RunStoreError";
     this.code = code;
+  }
+}
+
+/**
+ * Reject a new control that cannot change the current event-derived run state.
+ * Shared by durable-store implementations so a terminal-state race cannot strand work.
+ */
+export function assertControlSubmittable(
+  state: RunState,
+  action: ControlSubmission["action"],
+): void {
+  const accepted =
+    state.status === "running" ||
+    state.status === "recovery-blocked" ||
+    (state.status === "paused" && action === "cancel");
+  if (!accepted) {
+    throw new RunStoreError(
+      "control-conflict",
+      `Control ${action} is unavailable while run is ${state.status}`,
+    );
   }
 }
 
@@ -681,6 +701,7 @@ export class InMemoryDurableRunStore implements DurableRunStore {
       }
       return { ...controlRequest(prior), replayed: true };
     }
+    assertControlSubmittable(replayRun(run.events), input.action);
     const control: MemoryControl = { ...input, recordedAtMs: validateClock(this.clock) };
     run.controls.set(input.operationId, control);
     return { ...controlRequest(control), replayed: false };

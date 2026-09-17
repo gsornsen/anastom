@@ -9,5 +9,6 @@ export * from "./context.js";
 export * from "./durable-store.js";
 export * from "./durable-coordinator.js";
 export * from "./execution-host.js";
+export * from "./graph.js";
 export * from "./projection.js";
 export { assertRunEvent } from "./event-validation.js";

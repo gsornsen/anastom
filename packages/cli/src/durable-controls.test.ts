@@ -138,6 +138,25 @@ describe("durable CLI controls and inspection", () => {
       decision: "cancelled",
     });
     expect(view.liveEvents?.at(-1)).toMatchObject({ type: "run", status: "cancelled" });
+
+    const snapshot = capture();
+    expect(
+      await runCli(["attach", runId, "--state-dir", stateDir, "--snapshot"], {
+        io: snapshot.io,
+      }),
+    ).toBe(0);
+    expect(snapshot.stdout[0]).toContain(`Anastom  ${view.state.workflowId}  run ${runId}`);
+    expect(snapshot.stdout[0]).toContain("status=cancelled");
+    expect(snapshot.stdout[0]).not.toContain("\u001b");
+
+    const followed = capture();
+    expect(
+      await runCli(["attach", runId, "--state-dir", stateDir], {
+        io: followed.io,
+      }),
+    ).toBe(0);
+    const observations = followed.stdout.map((line) => JSON.parse(line) as { type: string });
+    expect(observations.at(-1)).toMatchObject({ type: "run", status: "cancelled" });
   });
 
   it("reports a live owner without acquiring or releasing its lease", async () => {

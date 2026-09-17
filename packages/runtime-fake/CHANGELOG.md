@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Clarify that production concurrent Feature acceptance uses the durable coordinator's production-shaped runtime double rather than this process-local fake adapter.
 - Keep scenario implementation shapes and validation errors internal while retaining the documented scenario parser, loader and adapter API.
 - Resolve scenario `fromFile` references through the shared existing-child policy without changing Fake's stricter relative-input grammar.
 - Preserve M0 fake behavior while adding declared workspace-mode capabilities, defensive scenario/request/result ownership, immutable terminal outcomes, and shared adapter conformance coverage.

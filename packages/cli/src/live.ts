@@ -9,6 +9,29 @@ const color = {
   yellow: "\u001b[33m",
 } as const;
 
+/**
+ * Replace terminal control and bidirectional formatting characters in untrusted display text.
+ * This is shared by the line and full-screen CLI renderers, not the public event shape.
+ */
+export function terminalSafeText(value: string): string {
+  return [...value]
+    .map((character) => {
+      const point = character.codePointAt(0) ?? 0;
+      if (character === "\n" || character === "\r" || character === "\t") {
+        return " ";
+      }
+      const control = point < 32 || (point >= 127 && point <= 159);
+      const bidirectional =
+        point === 0x061c ||
+        point === 0x200e ||
+        point === 0x200f ||
+        (point >= 0x202a && point <= 0x202e) ||
+        (point >= 0x2066 && point <= 0x2069);
+      return control || bidirectional ? "�" : character;
+    })
+    .join("");
+}
+
 /** Render one public observation as JSON Lines for pipes or concise colored text for a terminal. */
 function renderLiveRunEvent(event: LiveRunEvent, isTty: boolean): string {
   if (!isTty) {
@@ -17,27 +40,27 @@ function renderLiveRunEvent(event: LiveRunEvent, isTty: boolean): string {
   const prefix = `${color.dim}#${event.sequence}${color.reset}`;
   switch (event.type) {
     case "run":
-      return `${prefix} ${tone(event.status)}run ${event.status}${color.reset}`;
+      return `${prefix} ${tone(event.status)}run ${event.status}${color.reset} id=${terminalSafeText(event.runId)}`;
     case "graph":
       return `${prefix} ${color.cyan}graph expanded${color.reset} nodes=${event.nodeCount}`;
     case "node":
-      return `${prefix} ${color.cyan}${event.phase}${color.reset} ${event.nodeId} ${tone(event.status)}${event.status}${color.reset}${category(event.failureCategory)}`;
+      return `${prefix} ${color.cyan}${event.phase}${color.reset} ${terminalSafeText(event.nodeId)} ${tone(event.status)}${event.status}${color.reset}${category(event.failureCategory)}`;
     case "attempt":
-      return `${prefix} ${event.nodeId}/${event.attempt} ${tone(event.status)}${event.status}${color.reset}${event.runtimeId ? ` runtime=${event.runtimeId}` : ""}${category(event.failureCategory)}`;
+      return `${prefix} ${terminalSafeText(event.nodeId)}/${event.attempt} ${tone(event.status)}${event.status}${color.reset}${event.runtimeId ? ` runtime=${terminalSafeText(event.runtimeId)}` : ""}${category(event.failureCategory)}`;
     case "log":
-      return `${prefix} ${event.nodeId}/${event.attempt} ${event.message}${event.messageTruncated ? " …" : ""}${event.droppedMessages ? ` (dropped=${event.droppedMessages})` : ""}`;
+      return `${prefix} ${terminalSafeText(event.nodeId)}/${event.attempt} ${terminalSafeText(event.message)}${event.messageTruncated ? " …" : ""}${event.droppedMessages ? ` (dropped=${event.droppedMessages})` : ""}`;
     case "runtime":
-      return `${prefix} ${event.nodeId}/${event.attempt} runtime=${event.provider}/${event.model}`;
+      return `${prefix} ${terminalSafeText(event.nodeId)}/${event.attempt} runtime=${terminalSafeText(event.provider)}/${terminalSafeText(event.model)}`;
     case "usage":
-      return `${prefix} ${event.nodeId}/${event.attempt} tokens=${event.usage.totalTokens ?? "unavailable"} coverage=${event.usage.coverage}`;
+      return `${prefix} ${terminalSafeText(event.nodeId)}/${event.attempt} tokens=${event.usage.totalTokens ?? "unavailable"} coverage=${event.usage.coverage}`;
     case "artifact":
-      return `${prefix} ${event.nodeId}/${event.attempt} artifact=${event.artifact.type} digest=${event.artifact.digest}`;
+      return `${prefix} ${terminalSafeText(event.nodeId)}/${event.attempt} artifact=${terminalSafeText(event.artifact.type)} digest=${terminalSafeText(event.artifact.digest)}`;
     case "workspace":
       return renderWorkspace(event, prefix);
     case "integration":
-      return `${prefix} ${event.nodeId} integration ${tone(event.status)}${event.status}${color.reset}${event.commit ? ` commit=${event.commit}` : ""}${category(event.failureCategory)}`;
+      return `${prefix} ${terminalSafeText(event.nodeId)} integration ${tone(event.status)}${event.status}${color.reset}${event.commit ? ` commit=${terminalSafeText(event.commit)}` : ""}${category(event.failureCategory)}`;
     case "verification":
-      return `${prefix} ${event.nodeId}/${event.attempt} verification ${event.passed ? `${color.green}passed` : `${color.red}failed`}${color.reset} exit=${event.exitCode ?? "none"} durationMs=${Math.round(event.durationMs)}`;
+      return `${prefix} ${terminalSafeText(event.nodeId)}/${event.attempt} verification ${event.passed ? `${color.green}passed` : `${color.red}failed`}${color.reset} exit=${event.exitCode ?? "none"} durationMs=${Math.round(event.durationMs)}`;
     case "control":
       return `${prefix} control ${event.status}${"action" in event ? ` action=${event.action}` : ""}${"outcome" in event ? ` outcome=${event.outcome}` : ""}`;
   }
@@ -83,10 +106,10 @@ function renderWorkspace(
 ): string {
   const identity = "nodeId" in event && event.nodeId ? ` ${event.nodeId}` : "";
   if (event.status === "assigned") {
-    return `${prefix}${identity} workspace assigned id=${event.workspaceId} mode=${event.mode}${event.path ? ` path=${event.path}` : ""}${event.branch ? ` branch=${event.branch}` : ""}`;
+    return `${prefix}${terminalSafeText(identity)} workspace assigned id=${terminalSafeText(event.workspaceId)} mode=${event.mode}${event.path ? ` path=${terminalSafeText(event.path)}` : ""}${event.branch ? ` branch=${terminalSafeText(event.branch)}` : ""}`;
   }
   if (event.status === "patch-accepted") {
-    return `${prefix}${identity}/${event.attempt} patch accepted digest=${event.patchDigest} files=${event.changedFiles.length}`;
+    return `${prefix}${terminalSafeText(identity)}/${event.attempt} patch accepted digest=${terminalSafeText(event.patchDigest)} files=${event.changedFiles.length}`;
   }
-  return `${prefix}${identity}/${event.attempt} workspace observed head=${event.headCommit} files=${event.changedFiles.length}`;
+  return `${prefix}${terminalSafeText(identity)}/${event.attempt} workspace observed head=${terminalSafeText(event.headCommit)} files=${event.changedFiles.length}`;
 }

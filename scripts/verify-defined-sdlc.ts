@@ -11,6 +11,7 @@ import { RunStoreError, type RunEvent, type RunState } from "../packages/engine/
 import { observeLocalProcess } from "../packages/execution-host/src/index.js";
 import { FileArtifactStore, SqliteDurableRunStore } from "../packages/persistence/src/index.js";
 import { digestBytes } from "../packages/core/src/index.js";
+import { assertLiveRunEvent } from "../packages/runtime-contract/src/index.js";
 import {
   loadFeatureWorkspaceTopology,
   GitWorkspaceManager,
@@ -79,6 +80,8 @@ export interface DefinedSdlcAcceptanceEvidence {
     sourceCheckoutClean: true;
     retainedBranch: string;
     laterProcessInspection: true;
+    terminalSnapshot: true;
+    nonInteractiveReplay: true;
   }[];
   controls: readonly {
     action: "pause" | "cancel";
@@ -331,6 +334,53 @@ async function inspectInLaterProcess(value: CompletedCase): Promise<DurableRunIn
   return JSON.parse(result.stdout) as DurableRunInspection;
 }
 
+async function terminalInLaterProcess(
+  value: CompletedCase,
+): Promise<{ terminalSnapshot: true; nonInteractiveReplay: true }> {
+  const stateDir = join(value.repository, ".anastom");
+  const snapshot = await runTypeScript(
+    cliProgram,
+    ["attach", value.runId, "--state-dir", stateDir, "--snapshot"],
+    value.repository,
+  );
+  if (
+    snapshot.code !== 0 ||
+    snapshot.stderr.trim() ||
+    snapshot.stdout.includes("\u001b") ||
+    !snapshot.stdout.includes(`run ${value.runId}`) ||
+    !snapshot.stdout.includes("status=succeeded") ||
+    !snapshot.stdout.includes("review.specification") ||
+    !snapshot.stdout.includes("verify.acceptance")
+  ) {
+    throw new Error(
+      `Later-process terminal snapshot failed: ${snapshot.stderr || snapshot.stdout}`,
+    );
+  }
+  const replay = await runTypeScript(
+    cliProgram,
+    ["attach", value.runId, "--state-dir", stateDir],
+    value.repository,
+  );
+  if (replay.code !== 0 || replay.stderr.trim() || replay.stdout.includes("\u001b")) {
+    throw new Error(`Later-process terminal replay failed: ${replay.stderr || replay.stdout}`);
+  }
+  const observations = replay.stdout
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as unknown);
+  observations.forEach(assertLiveRunEvent);
+  const publicEvents = observations as NonNullable<DurableRunInspection["liveEvents"]>;
+  if (
+    !publicEvents.some((event) => event.type === "integration" && event.status === "committed") ||
+    !publicEvents.some((event) => event.type === "verification" && event.passed) ||
+    publicEvents.at(-1)?.type !== "run"
+  ) {
+    throw new Error("Later-process terminal replay omitted required public lifecycle evidence");
+  }
+  return { terminalSnapshot: true, nonInteractiveReplay: true };
+}
+
 async function runSuccessOrder(
   scenario: "left-first" | "right-first",
 ): Promise<DefinedSdlcAcceptanceEvidence["successOrders"][number]> {
@@ -372,7 +422,10 @@ async function runSuccessOrder(
       readFile(join(topology.integration.path, "right.txt"), "utf8"),
       readFile(join(topology.integration.path, "acceptance.mjs")),
     ]);
-    const later = await inspectInLaterProcess(completed);
+    const [later, terminal] = await Promise.all([
+      inspectInLaterProcess(completed),
+      terminalInLaterProcess(completed),
+    ]);
     if (
       state.status !== "succeeded" ||
       completionOrder.join("\0") !== expectedOrder.join("\0") ||
@@ -405,6 +458,7 @@ async function runSuccessOrder(
       sourceCheckoutClean: true,
       retainedBranch: topology.integration.branch,
       laterProcessInspection: true,
+      ...terminal,
     };
   } finally {
     await rm(repository, { recursive: true, force: true });

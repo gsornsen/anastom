@@ -4,7 +4,7 @@ Persist immutable workflow definitions, ordered events, and filesystem evidence 
 
 ## Public API
 
-`SqliteDurableRunStore` provides atomic owned creation, 15-second leases, exact expired-owner takeover, monotonic fencing, idempotent event batches, deduplicated pause/cancel requests, rolling event integrity, and rebuildable snapshots. It expects the database parent to exist; production callers authorize and create that private state root through `@anastom/path-policy` before opening the store. `FileArtifactStore` creates artifact parents through the fixed-segment private-state root, atomically publishes synced immutable evidence without replacement, and verifies content digests on bounded reads. Reads reject symlinked run-owned parents, nonordinary files, identity changes during access, and artifacts larger than 16 MiB.
+`SqliteDurableRunStore` provides atomic owned creation, 15-second leases, exact expired-owner takeover, monotonic fencing, idempotent event batches, actionable and deduplicated pause/cancel requests, rolling event integrity, and rebuildable snapshots. A newly submitted control is accepted only when it can change the state folded inside the same write transaction; a prior operation ID keeps its original idempotent receipt. The store expects the database parent to exist; production callers authorize and create that private state root through `@anastom/path-policy` before opening it. `FileArtifactStore` creates artifact parents through the fixed-segment private-state root, atomically publishes synced immutable evidence without replacement, and verifies content digests on bounded reads. Reads reject symlinked run-owned parents, nonordinary files, identity changes during access, and artifacts larger than 16 MiB.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api persistence`; output is in `.generated/api/persistence/` and is not committed.
 
@@ -27,6 +27,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-The CLI composes this store for recoverable Pi, Codex, and Claude Code Task execution. The process-local YAML workflow path does not use SQLite. Parallel graphs, approvals, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
+The CLI composes this store for recoverable Pi, Codex, and Claude Code Task and Feature execution, including parallel expanded graphs and later-process terminal attachment. The process-local YAML workflow path does not use SQLite. Approvals and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
 
 License: [AGPL-3.0-only](../../LICENSE).
