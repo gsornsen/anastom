@@ -52,6 +52,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 - Controlled HTTP fixture, explicit fake file-change scenarios, M1 boundary tests, and a demo guide.
 - Successful live Pi/Anthropic `claude-opus-4-8` fixture demonstration with independent acceptance and recorded sanitized evidence.
 
+### Fixed
+
+- Reject inherited object keys during event replay, fail runtime/event schema validation on the first error, route execution-host fixture records through the shared private-path capability, and make the SQLite busy-error test independent of the production five-second contention wait.
+
 ### Changed
 
 - Accepted the M2 Codex CLI design; tracked blocked SDK reconsideration and added M2.5 Claude Code support after M2, with subscription authentication to be investigated during design.

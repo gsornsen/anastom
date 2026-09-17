@@ -52,7 +52,7 @@ async function fixturePaths(): Promise<FixturePaths> {
   const root = await mkdtemp(join(tmpdir(), "anastom-execution-host-"));
   roots.add(root);
   const workspace = join(root, "workspace");
-  await mkdir(workspace);
+  await mkdir(workspace, { mode: 0o700 });
   return {
     root,
     stateDir: join(root, "state"),
@@ -326,10 +326,9 @@ describe("local execution host", () => {
           "--import",
           import.meta.resolve("tsx"),
           fileURLToPath(new URL("testing/fixture-coordinator.ts", import.meta.url)),
-          paths.root,
           owner,
         ],
-        { detached: false, shell: false, stdio: ["pipe", "pipe", "pipe"] },
+        { cwd: paths.root, detached: false, shell: false, stdio: ["pipe", "pipe", "pipe"] },
       );
       const exited = once(coordinator, "exit");
       coordinator.stdout.resume();

@@ -497,19 +497,22 @@ describe("SQLite durable compatibility and corruption handling", () => {
 
   it("reports SQLite lock contention as a typed busy failure", async () => {
     const path = await databasePath();
-    const store = createSqliteDurableRunStoreForTesting(path, () => 1_000);
+    const store = createSqliteDurableRunStoreForTesting(path, () => 1_000, 0);
     await store.createOwned(creation("locked"));
     const locker = new DatabaseSync(path);
-    locker.exec("PRAGMA busy_timeout=0; BEGIN IMMEDIATE");
-    await expect(
-      store.submitControl({
-        runId: "locked",
-        operationId: "while-locked",
-        action: "pause",
-      }),
-    ).rejects.toSatisfy(expectCode("busy"));
-    locker.exec("ROLLBACK");
-    locker.close();
-    store.close();
-  }, 7_000);
+    try {
+      locker.exec("PRAGMA busy_timeout=0; BEGIN IMMEDIATE");
+      await expect(
+        store.submitControl({
+          runId: "locked",
+          operationId: "while-locked",
+          action: "pause",
+        }),
+      ).rejects.toSatisfy(expectCode("busy"));
+    } finally {
+      locker.exec("ROLLBACK");
+      locker.close();
+      store.close();
+    }
+  });
 });

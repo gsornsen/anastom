@@ -251,11 +251,10 @@ export class InvalidTransitionError extends Error {
 }
 
 function requireNode(state: RunState, nodeId: string): NodeRunState {
-  const node = state.nodes[nodeId];
-  if (node === undefined) {
+  if (!Object.hasOwn(state.nodes, nodeId)) {
     throw new InvalidTransitionError(`Unknown node ${JSON.stringify(nodeId)}`);
   }
-  return node;
+  return state.nodes[nodeId] as NodeRunState;
 }
 
 function requireNodeStatus(node: NodeRunState, eventType: string, allowed: NodeStatus[]): void {

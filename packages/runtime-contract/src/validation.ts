@@ -16,7 +16,9 @@ import type {
   WorkspaceCheckpoint,
 } from "./index.js";
 
-const ajv = new Ajv({ allErrors: true, strict: false });
+// Public runtime records fail on the first schema error so adversarially deep input cannot
+// multiply validation work merely to produce diagnostics.
+const ajv = new Ajv({ allErrors: false, strict: false });
 const capabilitiesValidator = ajv.compile(capabilitiesSchema);
 const observationValidator = ajv.compile(observationSchema);
 const runtimeDescriptorValidator = ajv.compile(runtimeDescriptorSchema);

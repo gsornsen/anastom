@@ -1,9 +1,9 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { rename, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 
+import { canonicalJson } from "@anastom/core";
+import { ensurePrivatePathRoot } from "@anastom/path-policy";
 import {
   assertExecutionRequest,
   type ExecutionHandle,
@@ -24,17 +24,6 @@ interface FixtureExecution {
   descendant?: number;
   cancelled: boolean;
   result: Promise<ExecutionResult>;
-}
-
-async function writeJsonAtomic(path: string, value: unknown): Promise<void> {
-  const temporary = `${path}.${process.pid}.tmp`;
-  try {
-    await writeFile(temporary, JSON.stringify(value), { flag: "wx", mode: 0o600 });
-    await rename(temporary, path);
-  } catch (error) {
-    await rm(temporary, { force: true }).catch(() => undefined);
-    throw error;
-  }
 }
 
 function signal(pid: number | undefined, value: NodeJS.Signals): void {
@@ -205,7 +194,9 @@ if (process.argv[2] === "start-gated") {
   if (!probeRoot) {
     throw new Error("Start-gated fixture runtime host requires a probe root");
   }
-  await writeJsonAtomic(join(probeRoot, "runtime-host.json"), { pid: process.pid });
+  const root = await ensurePrivatePathRoot(probeRoot);
+  const record = Buffer.from(canonicalJson({ pid: process.pid }));
+  await root.writeFileAtomic(["runtime-host.json"], record, { maxBytes: 4 * 1024 });
   await new Promise<void>(() => {});
 } else {
   await runExecutionRuntimeHost(async (descriptor) => {

@@ -30,6 +30,15 @@ describe("event transitions", () => {
     expect(() =>
       applyRunEvent(state, { type: "NodeSucceeded", runId: "run", sequence: 2, nodeId: "work" }),
     ).toThrow(InvalidTransitionError);
+    expect(() =>
+      applyRunEvent(state, {
+        type: "NodeReady",
+        runId: "run",
+        sequence: 2,
+        nodeId: "constructor",
+        reason: "dependencies-satisfied",
+      }),
+    ).toThrow('Unknown node "constructor"');
   });
 
   it("rejects gaps and duplicate events during replay", () => {

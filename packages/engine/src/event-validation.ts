@@ -288,17 +288,92 @@ schemas.set("RunCancelled", {
   ],
 });
 
-const ajv = new Ajv({ allErrors: true, strict: false });
+const ajv = new Ajv({ allErrors: false, strict: false });
 const validators = new Map(
   [...schemas].map(([type, schema]) => [type, ajv.compile(schema as object)]),
 );
+
+function validatorForEventType(type: string) {
+  switch (type) {
+    case "RuntimeNegotiated":
+      return validators.get("RuntimeNegotiated");
+    case "RuntimeConfigured":
+      return validators.get("RuntimeConfigured");
+    case "RunCreated":
+      return validators.get("RunCreated");
+    case "NodeReady":
+      return validators.get("NodeReady");
+    case "AttemptScheduled":
+      return validators.get("AttemptScheduled");
+    case "AttemptPrepared":
+      return validators.get("AttemptPrepared");
+    case "AttemptStartAuthorized":
+      return validators.get("AttemptStartAuthorized");
+    case "AttemptStarted":
+      return validators.get("AttemptStarted");
+    case "RuntimeEventObserved":
+      return validators.get("RuntimeEventObserved");
+    case "AttemptSucceeded":
+      return validators.get("AttemptSucceeded");
+    case "AttemptFailed":
+      return validators.get("AttemptFailed");
+    case "AttemptBlocked":
+      return validators.get("AttemptBlocked");
+    case "AttemptCancelled":
+      return validators.get("AttemptCancelled");
+    case "AttemptOrphaned":
+      return validators.get("AttemptOrphaned");
+    case "ControlRequestObserved":
+      return validators.get("ControlRequestObserved");
+    case "ExecutionCleanupObserved":
+      return validators.get("ExecutionCleanupObserved");
+    case "NodeSucceeded":
+      return validators.get("NodeSucceeded");
+    case "NodeFailed":
+      return validators.get("NodeFailed");
+    case "NodeBlocked":
+      return validators.get("NodeBlocked");
+    case "NodePaused":
+      return validators.get("NodePaused");
+    case "NodeCancelled":
+      return validators.get("NodeCancelled");
+    case "RunPaused":
+      return validators.get("RunPaused");
+    case "RunResumed":
+      return validators.get("RunResumed");
+    case "RunRecoveryBlocked":
+      return validators.get("RunRecoveryBlocked");
+    case "RunBlocked":
+      return validators.get("RunBlocked");
+    case "RunCancelled":
+      return validators.get("RunCancelled");
+    case "RunCompleted":
+      return validators.get("RunCompleted");
+    case "WorkspaceAssigned":
+      return validators.get("WorkspaceAssigned");
+    case "ArtifactProduced":
+      return validators.get("ArtifactProduced");
+    case "WorkspaceObserved":
+      return validators.get("WorkspaceObserved");
+    case "CommandCompleted":
+      return validators.get("CommandCompleted");
+    case "AttemptTimeoutRequested":
+      return validators.get("AttemptTimeoutRequested");
+    case "AttemptCancellationCompleted":
+      return validators.get("AttemptCancellationCompleted");
+    case "LateResultObserved":
+      return validators.get("LateResultObserved");
+    default:
+      return undefined;
+  }
+}
 
 /** Validate an untrusted persisted event's exact discriminated payload before replay. */
 export function assertRunEvent(value: unknown): asserts value is RunEvent {
   if (!value || typeof value !== "object" || !("type" in value) || typeof value.type !== "string") {
     throw new Error("Corrupt run event");
   }
-  const validate = validators.get(value.type);
+  const validate = validatorForEventType(value.type);
   if (!validate || !validate(value)) {
     throw new Error("Corrupt run event " + value.type + ": " + ajv.errorsText(validate?.errors));
   }

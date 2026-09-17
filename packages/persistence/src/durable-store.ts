@@ -1,5 +1,3 @@
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { DatabaseSync } from "node:sqlite";
 
@@ -105,24 +103,32 @@ interface SnapshotRow {
 }
 
 type StoreClock = () => number;
+const DEFAULT_BUSY_TIMEOUT_MS = 5_000;
+type BusyTimeoutMs = 0 | typeof DEFAULT_BUSY_TIMEOUT_MS;
 
 /** SQLite implementation of the fenced M3 durable run-store contract. */
 export class SqliteDurableRunStore implements DurableRunStore {
   private readonly db: DatabaseSync;
   private readonly injectedClock?: StoreClock;
 
-  /** Open and migrate a store whose transaction timestamps come from SQLite. */
+  /** Open and migrate a store beneath an existing, caller-authorized parent directory. */
   constructor(path: string);
-  constructor(path: string, clock?: StoreClock) {
-    if (path !== ":memory:") {
-      mkdirSync(dirname(path), { recursive: true });
+  constructor(
+    path: string,
+    clock?: StoreClock,
+    busyTimeoutMs: BusyTimeoutMs = DEFAULT_BUSY_TIMEOUT_MS,
+  ) {
+    if (busyTimeoutMs !== 0 && busyTimeoutMs !== DEFAULT_BUSY_TIMEOUT_MS) {
+      throw new TypeError("Invalid SQLite busy timeout");
     }
     this.db = new DatabaseSync(path);
     this.injectedClock = clock;
     try {
+      this.db.exec("PRAGMA foreign_keys = ON;");
       this.db.exec(
-        "PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;",
+        busyTimeoutMs === 0 ? "PRAGMA busy_timeout = 0;" : "PRAGMA busy_timeout = 5000;",
       );
+      this.db.exec("PRAGMA journal_mode = WAL;");
       applyMigrations(this.db);
     } catch (error) {
       this.db.close();
@@ -793,8 +799,13 @@ export class SqliteDurableRunStore implements DurableRunStore {
 export function createSqliteDurableRunStoreForTesting(
   path: string,
   clock: StoreClock,
+  busyTimeoutMs: BusyTimeoutMs = DEFAULT_BUSY_TIMEOUT_MS,
 ): SqliteDurableRunStore {
-  return Reflect.construct(SqliteDurableRunStore, [path, clock]) as SqliteDurableRunStore;
+  return Reflect.construct(SqliteDurableRunStore, [
+    path,
+    clock,
+    busyTimeoutMs,
+  ]) as SqliteDurableRunStore;
 }
 
 function leaseFromRow(row: LeaseRow): RunLease {
