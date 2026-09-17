@@ -15,8 +15,8 @@ import commandResult from "../schemas/command-result.v1alpha1.json" with { type:
  * @public
  */
 export const workerReportSchema = workerReport;
-/** Built-in verifier output schema with exit status and output accounting. */
-const commandResultSchema = commandResult;
+/** Built-in verifier output schema with exit status and output accounting. @public */
+export const commandResultSchema = commandResult;
 const workerSchemaPath = fileURLToPath(
   new URL("../schemas/worker-report.v1alpha1.json", import.meta.url),
 );

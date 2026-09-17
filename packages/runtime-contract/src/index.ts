@@ -4,6 +4,8 @@ import type {
   JsonSchema,
   JsonValue,
   NodeKind,
+  NodeStatus,
+  NormalizedFeaturePlan,
 } from "@anastom/core";
 
 /**
@@ -119,6 +121,24 @@ export interface ContextEnvelope {
   attempt?: number;
   task?: { id: string; version: string; objective: string; acceptanceCriteria: readonly string[] };
   role?: ResolvedRole;
+  instructions?: string;
+  feature?: {
+    id: string;
+    version: string;
+    objective: string;
+    acceptanceCriteria: readonly string[];
+    documentDigest: string;
+  };
+  plan?: NormalizedFeaturePlan;
+  assignment?: {
+    id: string;
+    title: string;
+    objective: string;
+    acceptanceCriteria: readonly string[];
+    dependsOn: readonly string[];
+    mutationScopes: readonly string[];
+  };
+  mutationScopes?: readonly string[];
   workspace?: WorkspaceRef;
   allowedMutations?: "readonly" | "isolated";
   artifacts?: readonly ArtifactRef[];
@@ -189,6 +209,164 @@ export interface RuntimeUsage {
   reasoningTokens?: number;
   totalTokens?: number;
 }
+
+/** Stable workflow phase labels used by public run observations and terminal clients. */
+export type RunPhase =
+  | "analysis"
+  | "planning"
+  | "implementation"
+  | "integration"
+  | "review"
+  | "verification"
+  | "execution";
+
+interface LiveRunEventBase {
+  version: "anastom.dev/live-run-event/v1alpha1";
+  runId: string;
+  sequence: number;
+}
+
+interface LiveNodeEventBase extends LiveRunEventBase {
+  nodeId: string;
+  phase: RunPhase;
+}
+
+interface LiveAttemptEventBase extends LiveNodeEventBase {
+  attempt: number;
+}
+
+/**
+ * A bounded, presentation-safe observation derived only from authoritative run history.
+ * Prompts, structured result bodies, private reasoning, tool bodies, credentials, and raw errors
+ * have no representation in this contract.
+ */
+export type LiveRunEvent =
+  | (LiveRunEventBase & {
+      type: "run";
+      status:
+        | "created"
+        | "paused"
+        | "running"
+        | "blocked"
+        | "recovery-blocked"
+        | "cancelled"
+        | "succeeded"
+        | "failed";
+    })
+  | (LiveRunEventBase & {
+      type: "graph";
+      status: "expanded";
+      nodeCount: number;
+      planDigest: string;
+      expansionDigest: string;
+    })
+  | (LiveNodeEventBase & {
+      type: "node";
+      status: NodeStatus;
+      failureCategory?: ExecutionFailure["category"];
+    })
+  | (LiveAttemptEventBase & {
+      type: "attempt";
+      status:
+        | "scheduled"
+        | "prepared"
+        | "authorized"
+        | "running"
+        | "timed-out"
+        | "orphaned"
+        | "blocked"
+        | "succeeded"
+        | "failed"
+        | "cancelled";
+      runtimeId?: string;
+      planDigest?: string;
+      failureCategory?: ExecutionFailure["category"];
+    })
+  | (LiveAttemptEventBase & {
+      type: "log";
+      message: string;
+      droppedMessages?: number;
+      messageTruncated?: true;
+    })
+  | (LiveAttemptEventBase & {
+      type: "runtime";
+      provider: string;
+      model: string;
+      source?: "configured" | "reported";
+      runtimeVersion?: string;
+    })
+  | (LiveAttemptEventBase & {
+      type: "usage";
+      usage: RuntimeUsage;
+    })
+  | (LiveAttemptEventBase & {
+      type: "artifact";
+      artifact: Omit<ArtifactRef, "producer">;
+    })
+  | (LiveRunEventBase & {
+      type: "workspace";
+      status: "assigned";
+      workspaceId: string;
+      mode: WorkspaceRef["mode"];
+      path?: string;
+      branch?: string;
+      baseCommit?: string;
+      nodeId?: string;
+    })
+  | (LiveAttemptEventBase & {
+      type: "workspace";
+      status: "observed";
+      headCommit: string;
+      changedFiles: readonly string[];
+      diffArtifactId: string;
+    })
+  | (LiveNodeEventBase & {
+      type: "workspace";
+      status: "patch-accepted";
+      attempt: number;
+      workspaceId: string;
+      patchDigest: string;
+      changedFiles: readonly string[];
+    })
+  | (LiveNodeEventBase & {
+      type: "integration";
+      status: "prepared" | "committed" | "failed";
+      preparationDigest?: string;
+      commit?: string;
+      failureCategory?: ExecutionFailure["category"];
+    })
+  | (LiveAttemptEventBase & {
+      type: "verification";
+      passed: boolean;
+      exitCode: number | null;
+      signal: string | null;
+      durationMs: number;
+      stdoutBytes: number;
+      stderrBytes: number;
+      stdoutTruncated: boolean;
+      stderrTruncated: boolean;
+    })
+  | (LiveRunEventBase & {
+      type: "control";
+      status: "requested";
+      action: "pause" | "cancel";
+      operationId: string;
+    })
+  | (LiveAttemptEventBase & {
+      type: "control";
+      status: "cleanup";
+      outcome: "confirmed" | "unknown";
+    })
+  | (LiveAttemptEventBase & {
+      type: "control";
+      status: "cancellation-completed";
+      outcome: "succeeded" | "failed" | "unavailable";
+    })
+  | (LiveAttemptEventBase & {
+      type: "control";
+      status: "late-result";
+      outcome: "succeeded" | "failed" | "blocked" | "cancelled";
+    });
 
 /** Validated selected-worker requirements and its immutable capability evidence. */
 export interface RuntimeNegotiation {
@@ -283,6 +461,7 @@ export {
   assertRuntimeNegotiation,
   assertRuntimeDescriptor,
   assertRuntimeEvent,
+  assertLiveRunEvent,
   assertExecutionRequest,
   assertExecutionResult,
   assertWorkspaceCheckpoint,

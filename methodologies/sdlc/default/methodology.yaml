@@ -1,0 +1,36 @@
+apiVersion: anastom.dev/v1alpha1
+kind: Methodology
+metadata:
+  id: sdlc/default
+  version: 0.1.0
+roles:
+  analyst:
+    id: analyst
+    prompt: prompts/analyst.md
+    outputSchema: schemas/analysis-report.v1alpha1.json
+    mutation: readonly
+  planner:
+    id: planner
+    prompt: prompts/planner.md
+    outputSchema: schemas/feature-plan.v1alpha1.json
+    mutation: readonly
+  implementer:
+    id: implementer
+    prompt: prompts/implementer.md
+    outputSchema: schemas/worker-report.v1alpha1.json
+    mutation: isolated
+  integrator:
+    id: integrator
+    prompt: prompts/integrator.md
+    outputSchema: schemas/worker-report.v1alpha1.json
+    mutation: isolated
+  specificationReviewer:
+    id: specification-reviewer
+    prompt: prompts/specification-reviewer.md
+    outputSchema: schemas/review-report.v1alpha1.json
+    mutation: readonly
+  qualityReviewer:
+    id: quality-reviewer
+    prompt: prompts/quality-reviewer.md
+    outputSchema: schemas/review-report.v1alpha1.json
+    mutation: readonly

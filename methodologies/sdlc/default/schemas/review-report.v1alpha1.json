@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://anastom.dev/schemas/review-report.v1alpha1.json",
+  "title": "Independent review report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["approved", "summary", "findings"],
+  "properties": {
+    "approved": { "type": "boolean" },
+    "summary": { "type": "string", "minLength": 20, "maxLength": 4096 },
+    "findings": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "summary", "evidence"],
+        "properties": {
+          "severity": { "enum": ["blocking", "advisory"] },
+          "summary": { "type": "string", "minLength": 1, "maxLength": 2048 },
+          "evidence": {
+            "type": "array",
+            "maxItems": 16,
+            "items": { "type": "string", "minLength": 1, "maxLength": 4096 }
+          }
+        }
+      }
+    }
+  }
+}

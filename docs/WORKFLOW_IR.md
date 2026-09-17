@@ -1,5 +1,17 @@
 # Workflow IR
 
+## Feature and methodology inputs
+
+The defined SDLC starts from a strict Markdown `Feature`, not model-authored Workflow YAML. YAML front matter owns identity, acceptance criteria, planning/concurrency limits, attempt policy, explicit repository-relative protected paths, and ordered shell-free verifier argv. The Markdown body is the objective. CLI selection confines the Feature to a caller-authorized source root. Protected paths name operator-owned acceptance programs or policy inputs that implementation patches must not change; command arguments are never reinterpreted as filenames.
+
+The checked-in `sdlc/default` methodology has a fixed manifest and six roles: analyst, planner, implementer, integrator, specification reviewer, and quality reviewer. Every local prompt and JSON Schema is bounded, confined to the methodology root after symlink resolution, compiled before use, and copied into a content-addressed snapshot. Restart uses that persisted snapshot rather than mutable package files.
+
+Planner output is bounded domain data. It supplies task objectives, acceptance criteria, dependencies, and repository-relative mutation scopes. Trusted normalization rejects unknown dependencies, cycles, task-limit violations, unsafe scopes, and segment-overlap between tasks in the same dependency wave. It derives stable topological waves and a canonical digest.
+
+Trusted expansion creates exact `implement.<task-id>` nodes, an integration operation after each dependency wave, one integrator plus its final integration operation, concurrent independent reviewers, and the operator's ordered verifiers. Generated nodes retain their normalized execution policy, exact prompt and schema snapshots, mutation/patch identity, controller operation, or verifier argv as applicable. The expansion records the Feature, methodology, and plan digests plus every node and dependency. Its own digest is checked on replay. Runtime completion order cannot change the expansion or integration order.
+
+The durable reducer accepts one expansion after the configured planner succeeds. Replay folds the exact normalized plan and generated graph without invoking a model or rereading methodology files. The scheduler resolves authored and generated nodes through one graph view, assigns independent mutators to exact-base worktrees, and never delegates integration authority to a model result.
+
 ## Status
 
 `anastom.dev/v1alpha1` is an experimental, strictly validated format. This document separates the compatible M0 profile, implemented M1 additions, and later design directions so examples cannot silently become APIs.
@@ -162,7 +174,7 @@ type ArtifactRef = {
 };
 ```
 
-The digest covers the stored bytes. Artifact metadata belongs in the durable run history; artifact bodies belong in the run artifact directory. M1 does not add an evidence graph, confidence score, named workflow state slots, or multi-output node transitions.
+The digest covers the stored bytes. Artifact metadata belongs in the durable run history; artifact bodies belong in the run artifact directory. The current evidence ledger is a deterministic projection over those records, not a separate mutable graph. Confidence scores, named workflow state slots, and multi-output node transitions remain outside the accepted IR.
 
 ## Deferred directions
 
@@ -172,8 +184,8 @@ The following concepts remain design intent rather than accepted syntax:
 - `fanout` and `fanin`;
 - loops and expressions;
 - nested `workflow` calls and explicit parent/child mappings;
-- shared integration workspaces;
-- human approval gates and resume;
+- cross-run shared integration workspaces;
+- human approval gates;
 - named authoritative outputs and workflow state slots;
 - role-to-model routing and runtime capability requirements;
 - evidence graphs and hypothesis entities.

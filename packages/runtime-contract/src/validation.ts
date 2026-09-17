@@ -1,6 +1,7 @@
 import Ajv from "ajv";
-import { canonicalJson } from "@anastom/core";
+import { assertNormalizedFeaturePlan, canonicalJson } from "@anastom/core";
 import capabilitiesSchema from "../schemas/capabilities.v1alpha1.json" with { type: "json" };
+import liveRunEventSchema from "../schemas/live-run-event.v1alpha1.json" with { type: "json" };
 import observationSchema from "../schemas/observation.v1alpha1.json" with { type: "json" };
 import runtimeDescriptorSchema from "../schemas/runtime-descriptor.v1alpha1.json" with { type: "json" };
 import workspaceCheckpointSchema from "../schemas/workspace-checkpoint.v1alpha1.json" with { type: "json" };
@@ -12,6 +13,7 @@ import type {
   RuntimeNegotiation,
   ExecutionRequest,
   ExecutionResult,
+  LiveRunEvent,
   WorkspaceRef,
   WorkspaceCheckpoint,
 } from "./index.js";
@@ -20,6 +22,7 @@ import type {
 // multiply validation work merely to produce diagnostics.
 const ajv = new Ajv({ allErrors: false, strict: false });
 const capabilitiesValidator = ajv.compile(capabilitiesSchema);
+const liveRunEventValidator = ajv.compile(liveRunEventSchema);
 const observationValidator = ajv.compile(observationSchema);
 const runtimeDescriptorValidator = ajv.compile(runtimeDescriptorSchema);
 const workspaceCheckpointValidator = ajv.compile(workspaceCheckpointSchema);
@@ -136,14 +139,19 @@ function validArtifact(value: unknown): boolean {
 
 const contextOptionalKeys = [
   "allowedMutations",
+  "assignment",
   "artifacts",
   "attempt",
   "budget",
+  "feature",
+  "instructions",
+  "mutationScopes",
   "nodeId",
   "requiredOutputSchema",
   "role",
   "runId",
   "task",
+  "plan",
   "verification",
   "version",
   "workflowInstanceId",
@@ -157,10 +165,67 @@ function validContextScalars(value: Record<string, unknown>): boolean {
     (value.workflowInstanceId !== undefined && !validString(value.workflowInstanceId)) ||
     (value.nodeId !== undefined && !validString(value.nodeId)) ||
     (value.attempt !== undefined && !validPositive(value.attempt)) ||
+    (value.instructions !== undefined && !validString(value.instructions)) ||
     (value.allowedMutations !== undefined &&
       value.allowedMutations !== "readonly" &&
       value.allowedMutations !== "isolated")
   );
+}
+
+function validStringArray(value: unknown): boolean {
+  return Array.isArray(value) && value.every(validString);
+}
+
+function validContextSdlc(value: Record<string, unknown>): boolean {
+  if (value.mutationScopes !== undefined && !validStringArray(value.mutationScopes)) {
+    return false;
+  }
+  if (
+    value.feature !== undefined &&
+    (!isRecord(value.feature) ||
+      !exactKeys(value.feature, [
+        "acceptanceCriteria",
+        "documentDigest",
+        "id",
+        "objective",
+        "version",
+      ]) ||
+      !validString(value.feature.id) ||
+      !validString(value.feature.version) ||
+      !validString(value.feature.objective) ||
+      !validString(value.feature.documentDigest) ||
+      !validStringArray(value.feature.acceptanceCriteria))
+  ) {
+    return false;
+  }
+  if (
+    value.assignment !== undefined &&
+    (!isRecord(value.assignment) ||
+      !exactKeys(value.assignment, [
+        "acceptanceCriteria",
+        "dependsOn",
+        "id",
+        "mutationScopes",
+        "objective",
+        "title",
+      ]) ||
+      ![value.assignment.id, value.assignment.title, value.assignment.objective].every(
+        validString,
+      ) ||
+      !validStringArray(value.assignment.acceptanceCriteria) ||
+      !validStringArray(value.assignment.dependsOn) ||
+      !validStringArray(value.assignment.mutationScopes))
+  ) {
+    return false;
+  }
+  if (value.plan !== undefined) {
+    try {
+      assertNormalizedFeaturePlan(value.plan);
+    } catch {
+      return false;
+    }
+  }
+  return true;
 }
 
 function validContextStructures(value: Record<string, unknown>): boolean {
@@ -196,7 +261,8 @@ function validContext(value: unknown): boolean {
     !isRecord(value.dependencyOutputs) ||
     !validContextScalars(value) ||
     !validContextStructures(value) ||
-    !validContextTask(value)
+    !validContextTask(value) ||
+    !validContextSdlc(value)
   ) {
     return false;
   }
@@ -238,6 +304,211 @@ export function assertRuntimeEvent(value: unknown): asserts value is RuntimeEven
   if (!observationValidator(value)) {
     throw new Error("Invalid public runtime observation");
   }
+}
+
+const liveBase = ["runId", "sequence", "type", "version"] as const;
+const liveNode = [...liveBase, "nodeId", "phase"] as const;
+const liveAttempt = [...liveNode, "attempt"] as const;
+const nodeStatuses = [
+  "pending",
+  "ready",
+  "running",
+  "blocked",
+  "succeeded",
+  "failed",
+  "paused",
+  "cancelled",
+] as const;
+
+/** Validate one exact bounded public run observation before external presentation. */
+export function assertLiveRunEvent(value: unknown): asserts value is LiveRunEvent {
+  if (!liveRunEventValidator(value) || !isRecord(value)) {
+    throw new Error("Invalid live run event");
+  }
+  let valid = false;
+  switch (value.type) {
+    case "run":
+      valid =
+        exactKeys(value, [...liveBase, "status"]) &&
+        [
+          "created",
+          "paused",
+          "running",
+          "blocked",
+          "recovery-blocked",
+          "cancelled",
+          "succeeded",
+          "failed",
+        ].includes(value.status as string);
+      break;
+    case "graph":
+      valid =
+        exactKeys(value, [...liveBase, "expansionDigest", "nodeCount", "planDigest", "status"]) &&
+        value.status === "expanded";
+      break;
+    case "node":
+      valid = validLiveNode(value);
+      break;
+    case "attempt":
+      valid = validLiveAttempt(value);
+      break;
+    case "log":
+      valid =
+        hasOnlyKeys(value, [...liveAttempt, "message"], ["droppedMessages", "messageTruncated"]) &&
+        Buffer.byteLength(value.message as string) <= 2 * 1024;
+      break;
+    case "runtime":
+      valid = hasOnlyKeys(
+        value,
+        [...liveAttempt, "model", "provider"],
+        ["runtimeVersion", "source"],
+      );
+      break;
+    case "usage":
+      valid = exactKeys(value, [...liveAttempt, "usage"]);
+      break;
+    case "artifact":
+      valid = exactKeys(value, [...liveAttempt, "artifact"]);
+      break;
+    case "workspace":
+      valid = validLiveWorkspace(value);
+      break;
+    case "integration":
+      valid = validLiveIntegration(value);
+      break;
+    case "verification":
+      valid = exactKeys(value, [
+        ...liveAttempt,
+        "durationMs",
+        "exitCode",
+        "passed",
+        "signal",
+        "stderrBytes",
+        "stderrTruncated",
+        "stdoutBytes",
+        "stdoutTruncated",
+      ]);
+      break;
+    case "control":
+      valid = validLiveControl(value);
+      break;
+  }
+  if (!valid) {
+    throw new Error("Invalid live run event");
+  }
+}
+
+function validLiveNode(value: Record<string, unknown>): boolean {
+  if (!nodeStatuses.includes(value.status as (typeof nodeStatuses)[number])) {
+    return false;
+  }
+  return value.status === "failed"
+    ? exactKeys(value, [...liveNode, "failureCategory", "status"])
+    : exactKeys(value, [...liveNode, "status"]);
+}
+
+function validLiveAttempt(value: Record<string, unknown>): boolean {
+  if (
+    ![
+      "scheduled",
+      "prepared",
+      "authorized",
+      "running",
+      "timed-out",
+      "orphaned",
+      "blocked",
+      "succeeded",
+      "failed",
+      "cancelled",
+    ].includes(value.status as string)
+  ) {
+    return false;
+  }
+  if (value.status === "scheduled") {
+    return exactKeys(value, [...liveAttempt, "runtimeId", "status"]);
+  }
+  if (value.status === "prepared" || value.status === "authorized") {
+    return exactKeys(value, [...liveAttempt, "planDigest", "status"]);
+  }
+  if (value.status === "failed") {
+    return exactKeys(value, [...liveAttempt, "failureCategory", "status"]);
+  }
+  return exactKeys(value, [...liveAttempt, "status"]);
+}
+
+function validLiveIntegration(value: Record<string, unknown>): boolean {
+  if (value.status === "prepared") {
+    return exactKeys(value, [...liveNode, "preparationDigest", "status"]);
+  }
+  if (value.status === "committed") {
+    return exactKeys(value, [...liveNode, "commit", "status"]);
+  }
+  return value.status === "failed" && exactKeys(value, [...liveNode, "failureCategory", "status"]);
+}
+
+function validLiveControl(value: Record<string, unknown>): boolean {
+  if (value.status === "requested") {
+    return exactKeys(value, [...liveBase, "action", "operationId", "status"]);
+  }
+  if (value.status === "cleanup" && ["confirmed", "unknown"].includes(value.outcome as string)) {
+    return exactKeys(value, [...liveAttempt, "outcome", "status"]);
+  }
+  if (
+    value.status === "cancellation-completed" &&
+    ["succeeded", "failed", "unavailable"].includes(value.outcome as string)
+  ) {
+    return exactKeys(value, [...liveAttempt, "outcome", "status"]);
+  }
+  return (
+    value.status === "late-result" &&
+    ["succeeded", "failed", "blocked", "cancelled"].includes(value.outcome as string) &&
+    exactKeys(value, [...liveAttempt, "outcome", "status"])
+  );
+}
+
+function validLiveWorkspace(value: Record<string, unknown>): boolean {
+  if (value.status === "assigned") {
+    if (
+      !hasOnlyKeys(
+        value,
+        [...liveBase, "mode", "status", "workspaceId"],
+        ["baseCommit", "branch", "nodeId", "path"],
+      )
+    ) {
+      return false;
+    }
+    if (value.mode === "memory") {
+      return (
+        value.path === undefined && value.baseCommit === undefined && value.branch === undefined
+      );
+    }
+    return (
+      typeof value.path === "string" &&
+      typeof value.baseCommit === "string" &&
+      (value.mode === "isolated"
+        ? typeof value.branch === "string"
+        : value.mode === "readonly" && value.branch === undefined)
+    );
+  }
+  if (value.status === "observed") {
+    return exactKeys(value, [
+      ...liveAttempt,
+      "changedFiles",
+      "diffArtifactId",
+      "headCommit",
+      "status",
+    ]);
+  }
+  if (value.status === "patch-accepted") {
+    return exactKeys(value, [
+      ...liveAttempt,
+      "changedFiles",
+      "patchDigest",
+      "status",
+      "workspaceId",
+    ]);
+  }
+  return false;
 }
 
 /** Validate an exact persisted execution request before passing it to a reconstructed adapter. */

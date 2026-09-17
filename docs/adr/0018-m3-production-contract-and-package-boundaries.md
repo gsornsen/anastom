@@ -1,6 +1,6 @@
 # 0018 — M3 production contract and package boundaries
 
-- Status: Accepted and implemented on the consolidated PR #24 candidate; complete-branch owner acceptance required before merge
+- Status: Accepted, owner-reviewed, and implemented in merged [PR #24](https://github.com/gsornsen/anastom/pull/24)
 - Date: 2026-09-16
 
 ## Context
@@ -11,7 +11,7 @@ Those probes also showed why copying their temporary types directly would be uns
 
 ## Decision
 
-Use [the M3 production contract](../M3_PRODUCTION_CONTRACT.md) as the implementation baseline while the owner reviews the completed stack before final acceptance and merge.
+Use [the M3 production contract](../M3_PRODUCTION_CONTRACT.md) as the delivered implementation baseline. Later changes must preserve or explicitly supersede its safety boundaries.
 
 The proposal makes the following package decisions:
 

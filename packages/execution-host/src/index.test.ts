@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { canonicalJson } from "@anastom/core";
-import { ensurePrivatePathRoot } from "@anastom/path-policy";
+import { ensurePrivatePathRoot, PrivatePathError } from "@anastom/path-policy";
 import type { ExecutionPlanRef, LocalProcessIdentity } from "@anastom/engine";
 import type { RuntimeEvent } from "@anastom/runtime-contract";
 import { afterEach, describe, expect, it } from "vitest";
@@ -114,6 +114,21 @@ async function manifest(paths: FixturePaths, execution: ExecutionPlanRef) {
     EXECUTION_PRIVATE_RECORD_MAX_BYTES,
     assertExecutionManifestRecord,
   );
+}
+
+/** Ignore only the expected identity race while polling an atomically replaced manifest. */
+async function stableManifest(
+  paths: FixturePaths,
+  execution: ExecutionPlanRef,
+): Promise<ExecutionManifestRecord | undefined> {
+  try {
+    return await manifest(paths, execution);
+  } catch (error) {
+    if (error instanceof PrivatePathError && error.reason === "changed") {
+      return undefined;
+    }
+    throw error;
+  }
 }
 
 async function drain(events: AsyncIterable<RuntimeEvent>): Promise<RuntimeEvent[]> {
@@ -419,8 +434,8 @@ describe("local execution host", () => {
     await waitForCondition(
       "persisted starting state",
       async () => {
-        starting = await manifest(paths, input.plan);
-        return starting.state === "starting";
+        starting = await stableManifest(paths, input.plan);
+        return starting?.state === "starting";
       },
       10_000,
     );

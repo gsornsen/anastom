@@ -1,3 +1,6 @@
+import type { FeatureDefinition } from "./feature.js";
+import type { SdlcMethodologySnapshot } from "./methodology.js";
+
 /**
  * A scalar representable in JSON; non-finite numbers are rejected during canonicalization.
  */
@@ -14,7 +17,7 @@ export type JsonSchema = Record<string, unknown>;
 /**
  * A workflow node's execution category, independent of its chosen runtime or model.
  */
-export type NodeKind = "agent" | "command" | "gate" | "verifier";
+export type NodeKind = "agent" | "command" | "gate" | "verifier" | "integration";
 
 /**
  * The durable lifecycle state of one workflow node.
@@ -41,7 +44,7 @@ export interface AttemptPolicyDocument {
  * An authored dependency-graph node before schemas and budgets are resolved.
  */
 interface WorkflowNodeDocument {
-  kind: NodeKind;
+  kind: Exclude<NodeKind, "integration">;
   needs?: string[];
   role?: string;
   output: SchemaReferenceDocument;
@@ -83,6 +86,7 @@ export interface WorkflowDocument {
   inputs: Record<string, SchemaReferenceDocument>;
   policies?: {
     defaultAttemptBudget?: AttemptPolicyDocument;
+    maxParallel?: number;
   };
   nodes: Record<string, WorkflowNodeDocument>;
 }
@@ -122,6 +126,22 @@ export interface WorkflowNode {
   attemptBudget: AttemptBudget;
   mutation?: "readonly" | "isolated";
   command?: CommandDefinition;
+  /** Exact methodology instructions persisted before execution. */
+  instructions?: string;
+  /** Digest of the exact methodology instructions. */
+  instructionsDigest?: string;
+  /** Planner task bound to an implementation node. */
+  taskId?: string;
+  /** Accepted patch identity produced by a mutating generated node. */
+  patchId?: string;
+  /** Repository-relative paths this node may modify. */
+  mutationScopes?: readonly string[];
+  /** Trusted controller operation; model runtimes never receive authority to perform it. */
+  controller?: {
+    operation: "integrate-patches";
+    wave: number;
+    taskIds: readonly string[];
+  };
 }
 
 /**
@@ -138,10 +158,19 @@ export interface WorkflowDefinition {
   inputs: Readonly<Record<string, WorkflowInputDefinition>>;
   policies: {
     defaultAttemptBudget: AttemptBudget;
+    maxParallel: number;
   };
   nodeOrder: readonly string[];
   nodes: Readonly<Record<string, WorkflowNode>>;
   task?: { objective: string; acceptanceCriteria: readonly string[] };
+  /** Immutable Feature and methodology inputs for a planner-expanded run. */
+  definedSdlc?: {
+    feature: FeatureDefinition;
+    methodology: SdlcMethodologySnapshot;
+    analysisNodeId: string;
+    planningNodeId: string;
+    protectedPaths: readonly string[];
+  };
 }
 
 /**

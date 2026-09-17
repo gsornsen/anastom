@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "anastom.dev/live-run-event/v1alpha1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "runId", "sequence", "type"],
+  "properties": {
+    "version": { "const": "anastom.dev/live-run-event/v1alpha1" },
+    "runId": { "$ref": "#/definitions/text" },
+    "sequence": { "$ref": "#/definitions/positive" },
+    "type": {
+      "enum": [
+        "run",
+        "graph",
+        "node",
+        "attempt",
+        "log",
+        "runtime",
+        "usage",
+        "artifact",
+        "workspace",
+        "integration",
+        "verification",
+        "control"
+      ]
+    },
+    "nodeId": { "$ref": "#/definitions/text" },
+    "phase": {
+      "enum": [
+        "analysis",
+        "planning",
+        "implementation",
+        "integration",
+        "review",
+        "verification",
+        "execution"
+      ]
+    },
+    "attempt": { "$ref": "#/definitions/positive" },
+    "status": { "$ref": "#/definitions/text" },
+    "failureCategory": { "$ref": "#/definitions/failureCategory" },
+    "nodeCount": { "$ref": "#/definitions/nonnegative" },
+    "planDigest": { "$ref": "#/definitions/digest" },
+    "expansionDigest": { "$ref": "#/definitions/digest" },
+    "runtimeId": { "$ref": "#/definitions/text" },
+    "message": { "type": "string", "maxLength": 2048 },
+    "droppedMessages": { "$ref": "#/definitions/positive" },
+    "messageTruncated": { "const": true },
+    "provider": { "$ref": "#/definitions/text" },
+    "model": { "$ref": "#/definitions/text" },
+    "source": { "enum": ["configured", "reported"] },
+    "runtimeVersion": { "$ref": "#/definitions/text" },
+    "usage": { "$ref": "#/definitions/usage" },
+    "artifact": { "$ref": "#/definitions/artifact" },
+    "workspaceId": { "$ref": "#/definitions/text" },
+    "mode": { "enum": ["memory", "readonly", "isolated"] },
+    "path": { "$ref": "#/definitions/text" },
+    "branch": { "$ref": "#/definitions/text" },
+    "baseCommit": { "$ref": "#/definitions/text" },
+    "headCommit": { "$ref": "#/definitions/text" },
+    "changedFiles": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": { "$ref": "#/definitions/text" }
+    },
+    "diffArtifactId": { "$ref": "#/definitions/text" },
+    "patchDigest": { "$ref": "#/definitions/digest" },
+    "preparationDigest": { "$ref": "#/definitions/digest" },
+    "commit": { "$ref": "#/definitions/text" },
+    "passed": { "type": "boolean" },
+    "exitCode": { "type": ["integer", "null"] },
+    "signal": { "type": ["string", "null"] },
+    "durationMs": { "type": "number", "minimum": 0 },
+    "stdoutBytes": { "$ref": "#/definitions/nonnegative" },
+    "stderrBytes": { "$ref": "#/definitions/nonnegative" },
+    "stdoutTruncated": { "type": "boolean" },
+    "stderrTruncated": { "type": "boolean" },
+    "action": { "enum": ["pause", "cancel"] },
+    "operationId": { "$ref": "#/definitions/text" },
+    "outcome": { "$ref": "#/definitions/text" }
+  },
+  "definitions": {
+    "text": { "type": "string", "minLength": 1, "maxLength": 8192 },
+    "positive": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "nonnegative": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "failureCategory": {
+      "enum": [
+        "runtime-unavailable",
+        "model-provider",
+        "tool",
+        "schema-violation",
+        "verification",
+        "budget-exhausted",
+        "policy-violation",
+        "workspace-conflict",
+        "human-rejection",
+        "unknown-internal"
+      ]
+    },
+    "counter": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "scope", "coverage"],
+      "properties": {
+        "type": { "const": "usage" },
+        "scope": { "const": "attempt" },
+        "coverage": { "enum": ["complete", "partial"] },
+        "inputTokens": { "$ref": "#/definitions/counter" },
+        "outputTokens": { "$ref": "#/definitions/counter" },
+        "cacheReadTokens": { "$ref": "#/definitions/counter" },
+        "cacheWriteTokens": { "$ref": "#/definitions/counter" },
+        "reasoningTokens": { "$ref": "#/definitions/counter" },
+        "totalTokens": { "$ref": "#/definitions/counter" }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "mediaType", "uri", "digest"],
+      "properties": {
+        "id": { "$ref": "#/definitions/text" },
+        "type": { "$ref": "#/definitions/text" },
+        "mediaType": { "$ref": "#/definitions/text" },
+        "uri": { "$ref": "#/definitions/text" },
+        "digest": { "$ref": "#/definitions/digest" }
+      }
+    }
+  }
+}

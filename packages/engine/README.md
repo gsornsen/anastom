@@ -8,6 +8,12 @@ Own deterministic scheduling, typed event transitions, fresh attempt contexts, r
 
 Recoverable Task execution uses the engine-owned `DurableRunStore` and `ExecutionHost` interfaces, stable `RunStoreError` codes, lease/process/snapshot/control records, exact execution-plan construction, rolling event-history identity, and the `InMemoryDurableRunStore` reference implementation. `DurableRunCoordinator` composes those boundaries with a runtime registry, workspace checkpoint service, artifact store, and process observer. It creates and releases owned runs, renews leases, persists preparation before host creation and start authority before launch, polls controls, reconciles orphaned attempts, compares complete workspace evidence, applies retry budgets, and refuses unsafe ownership. Durable event contracts record runtime configuration, prepared and authorized execution references, workspace checkpoints, control and cleanup observations, orphan evidence, typed pause reasons, and recovery-blocked state. Renderers expose recorded negotiation, public identity, partial usage, status, and evidence.
 
+The same coordinator folds a validated `WorkflowExpanded` event into its executable graph and supervises up to the persisted parallel limit. Each active attempt retains separate ownership and cleanup evidence while one owned session serializes event commits. Generated implementation work uses assigned task workspaces and accepted patch artifacts. Controller integration records the exact parent/tree/result before compare-and-swap, reconciles interrupted commits, and schedules fresh read-only reviewers plus ordered operator verifiers only after committed integration.
+
+Concurrent terminal handling settles the whole run only after every active sibling reaches a recorded cleanup result. An exhausted failed attempt fails its node even when the worker changed its workspace. A retryable failed attempt with workspace differences pauses the node and cancels active siblings before the run becomes paused, preserving those edits for inspection without starting a replacement.
+
+`projectEvidenceLedger` reconstructs phase decisions, runtime/model identity, exact context and report references, workspace/diff evidence, usage, integration commits, and dependency evidence from the immutable workflow plus authoritative events. `LiveRunProjector` derives the presentation-safe stream used by terminal clients. It caps each message at 2 KiB and each attempt at 128 messages or 64 KiB, reports omitted messages, and produces the same observations when durable history is replayed after reconnect. Prompts, structured output bodies, private reasoning, tool bodies, credentials, and raw provider errors have no live-event representation. Commit observers run only after persistence and cannot affect workflow decisions.
+
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api engine`; output is in `.generated/api/engine/` and is not committed.
 
 ## Boundaries and invariants
@@ -29,6 +35,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker Task execution uses the durable coordinator through the CLI, including pause, cancel, resume, crash recovery, and operational inspection. Deterministic YAML workflows continue through `WorkflowEngine`. Parallel graphs, approvals, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
+Single-worker Task execution and `sdlc/default` Feature execution use the durable coordinator through the CLI, including pause, cancel, resume, crash recovery, concurrent attempts, recoverable Git integration, live public observations, evidence-ledger inspection, and operational inspection. The defined-SDLC deterministic matrix and unchanged Pi/Codex live demonstrations pass. Deterministic YAML workflows continue through `WorkflowEngine`.
 
 License: [AGPL-3.0-only](../../LICENSE).

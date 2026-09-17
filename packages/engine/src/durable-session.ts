@@ -23,6 +23,11 @@ interface OwnedRunSessionOptions {
   workflow: WorkflowDefinition;
   loaded: Pick<LoadedRun, "state" | "eventPrefixDigest">;
   createOperationId: () => string;
+  observeCommittedEvents?: (
+    events: readonly RunEvent[],
+    state: RunState,
+    workflow: WorkflowDefinition,
+  ) => void;
 }
 
 /**
@@ -46,6 +51,7 @@ export class OwnedRunSession {
   readonly lease: RunLeaseToken;
   readonly workflow: WorkflowDefinition;
   private readonly createOperationId: () => string;
+  private readonly observeCommittedEvents?: OwnedRunSessionOptions["observeCommittedEvents"];
 
   /** Start serialized mutation and heartbeat ownership for one already acquired lease. */
   constructor(options: OwnedRunSessionOptions) {
@@ -53,6 +59,7 @@ export class OwnedRunSession {
     this.lease = options.lease;
     this.workflow = options.workflow;
     this.createOperationId = options.createOperationId;
+    this.observeCommittedEvents = options.observeCommittedEvents;
     this.currentState = structuredClone(options.loaded.state);
     this.prefixDigest = options.loaded.eventPrefixDigest;
     this.heartbeatSignal = new Promise<void>((resolve) => {
@@ -113,6 +120,11 @@ export class OwnedRunSession {
       );
       this.currentState = transition.state;
       this.prefixDigest = nextPrefix;
+      try {
+        this.observeCommittedEvents?.(transition.events, this.state, this.workflow);
+      } catch {
+        // Presentation observers cannot change an already committed workflow decision.
+      }
       result = this.state;
     });
     this.mutationTail = work.then(

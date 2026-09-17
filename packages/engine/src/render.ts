@@ -3,6 +3,7 @@ import type { RunEvent, AttemptState } from "./events.js";
 import type { CommandReport } from "./command.js";
 
 import type { RunState } from "./events.js";
+import { resolveRunWorkflowGraph } from "./graph.js";
 
 /**
  * Render the workflow's outgoing dependency edges in authored order.
@@ -31,10 +32,11 @@ export function renderWorkflowGraph(workflow: WorkflowDefinition): string {
  * Render run and node status with attempt counts and classified failures.
  */
 export function renderRunStatus(state: RunState, workflow: WorkflowDefinition): string {
+  const graph = resolveRunWorkflowGraph(workflow, state);
   return [
     `Run ${state.runId} [${state.status}]`,
     `Workflow ${state.workflowId}@${state.workflowVersion}`,
-    ...workflow.nodeOrder.map((nodeId) => {
+    ...graph.nodeOrder.map((nodeId) => {
       const node = state.nodes[nodeId];
       const failure =
         node?.failure === undefined ? "" : ` (${node.failure.category}: ${node.failure.message})`;

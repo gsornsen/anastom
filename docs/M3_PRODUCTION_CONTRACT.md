@@ -2,7 +2,7 @@
 
 ## Status and review boundary
 
-This is the accepted production contract requested after the five M3 feasibility phases. The owner authorized a stacked implementation against it, with final acceptance and merge deferred until review of the complete stack. The production stack through CLI composition and deterministic local process-level acceptance is implemented in the review stack; [M3 evidence](M3_EVIDENCE.md) records the results. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Implementation must preserve these names, ownership boundaries, state transitions, and pre-release baseline rules unless new evidence first amends this contract and the build brief.
+This is the accepted production contract requested after the five M3 feasibility phases and delivered in [PR #24](https://github.com/gsornsen/anastom/pull/24). [M3 evidence](M3_EVIDENCE.md) records the deterministic process-level results and completed gates. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Later work must preserve these names, ownership boundaries, state transitions, and pre-release baseline rules unless new evidence explicitly supersedes the contract.
 
 The proposal covers local Linux and macOS Task runs. It does not add provider-session adoption, remote workers, parallel scheduling, force takeover, automatic worktree repair, or exactly-once external effects.
 
@@ -714,15 +714,15 @@ Generated operation IDs are printed before the first mutation so an interrupted 
 
 ## Implementation slices after approval
 
-Each slice is a separately reviewable stacked PR. Later slices remain based on the preceding approved contract branch so the whole stack can ultimately merge through PR #24 in order.
+Each slice was reviewed as a stacked PR and then consolidated into PR #24 for whole-branch acceptance.
 
 1. Runtime descriptors, event/reducer additions, exact JSON schemas, conformance fixtures, and Changesets.
 2. `PrivatePathRoot`, workspace checkpoint production code, and focused caller migrations.
 3. Durable store migration, lease/fence/idempotency/control transactions, event integrity, and snapshot loader.
 4. `@anastom/execution-host`, hidden fixture host, and model-free conformance for all four execution owners.
-5. Engine start, heartbeat, control, orphan, workspace, and recovery state machines. **Implemented in the review stack.**
-6. CLI commands, runtime registry, inspection output, and corrupt-state refusal behavior. **Implemented in the review stack.**
-7. Process-level M3 acceptance and `docs/M3_EVIDENCE.md`. **Implemented and passing locally in the review stack.**
+5. Engine start, heartbeat, control, orphan, workspace, and recovery state machines. **Complete.**
+6. CLI commands, runtime registry, inspection output, and corrupt-state refusal behavior. **Complete.**
+7. Process-level M3 acceptance and `docs/M3_EVIDENCE.md`. **Complete.**
 
 Every code/contract slice carries reviewed package Changesets and updates affected package READMEs/changelogs. No slice uses a real model. A contradiction found during implementation stops the affected slice and updates this proposal, ADR 0018, and the build brief before the API changes.
 

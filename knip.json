@@ -13,7 +13,8 @@
         "scripts/testing/m3-protocol-coordinator.ts",
         "scripts/testing/m3-protocol-supervisor.ts",
         "scripts/testing/m3-runtime-coordinator.ts",
-        "scripts/testing/m3-sqlite-contention-worker.ts"
+        "scripts/testing/m3-sqlite-contention-worker.ts",
+        "scripts/testing/defined-sdlc-acceptance-runtime-host.ts"
       ],
       "project": ["scripts/**/*.{ts,mjs}", "*.config.{ts,js,mjs}"]
     },

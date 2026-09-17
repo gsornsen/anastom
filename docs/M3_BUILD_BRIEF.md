@@ -2,7 +2,7 @@
 
 ## Status and mission
 
-**Accepted by the owner on 2026-09-16 under [issue #22](https://github.com/gsornsen/anastom/issues/22) and [PR #23](https://github.com/gsornsen/anastom/pull/23).** [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) records the accepted boundary. All model-free feasibility phases pass on Linux and macOS in stacked PRs #24–#28. The owner also accepted the exact runtime, persistence, execution-host, workspace, and path shapes in the separate [M3 production contract](M3_PRODUCTION_CONTRACT.md) and [ADR 0018](adr/0018-m3-production-contract-and-package-boundaries.md) as the stacked implementation baseline. The review stack implements those contracts through CLI composition and operator commands; its local deterministic process-level matrix and required checks pass with [recorded evidence](M3_EVIDENCE.md). Final implementation and evidence acceptance remains deferred until complete-stack owner review; contradictory implementation evidence must revise this brief before changing the contract.
+**Complete and merged in [PR #24](https://github.com/gsornsen/anastom/pull/24) as `2bc7588`.** The owner accepted the design on 2026-09-16 under [issue #22](https://github.com/gsornsen/anastom/issues/22) and [PR #23](https://github.com/gsornsen/anastom/pull/23), approved the feasibility and exact production contracts, then reviewed and accepted the consolidated implementation and evidence. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md), [ADR 0018](adr/0018-m3-production-contract-and-package-boundaries.md), the [production contract](M3_PRODUCTION_CONTRACT.md), and [completion evidence](M3_EVIDENCE.md) record the delivered boundary.
 
 Make a durable Task run survive abrupt coordinator termination. A later Anastom process must reconstruct the run, reject stale ownership, account for the interrupted attempt, preserve its evidence, and either continue as a fresh bounded attempt or stop with a precise reason why continuation is unsafe.
 
@@ -230,10 +230,10 @@ Explicit pause cancellation and crash orphaning are distinct attempt outcomes. I
 2. **Schemas and compatibility:** define event/projection additions, sanitized runtime descriptors, typed ownership/control errors, and old-history compatibility tests. Add Changesets for every affected package contract.
 3. **Persistence:** add versioned migrations for leases, mutation keys, control requests, and snapshots; implement fenced/idempotent transactions and full-replay fallback.
 4. **Runtime ownership:** implement the evidence-backed common outcome contract and model-free conformance coverage for each current adapter and command execution.
-5. **Engine recovery:** checkpoint before execution, heartbeat ownership, poll control requests, reconcile orphans, and enforce pause/cancel/resume transitions and attempt budgets. **Implemented in the review stack.**
-6. **CLI:** add durable commands, operation IDs, reconstruction from sanitized descriptors, stable exit behavior, and useful status/inspection output. **Implemented in the review stack.**
-7. **Process-level acceptance:** run the deterministic clean, dirty-workspace, unknown-execution, stale-fence, duplicate-operation, and corrupt-snapshot cases from separate processes. **Implemented and passing locally in the review stack.**
-8. **Completion evidence:** write `docs/M3_EVIDENCE.md`, update the README, roadmap, architecture, package docs/changelogs, and root changelog, then obtain owner review and green required checks. **Evidence, documentation, and required checks are complete; owner review remains.**
+5. **Engine recovery:** checkpoint before execution, heartbeat ownership, poll control requests, reconcile orphans, and enforce pause/cancel/resume transitions and attempt budgets. **Complete.**
+6. **CLI:** add durable commands, operation IDs, reconstruction from sanitized descriptors, stable exit behavior, and useful status/inspection output. **Complete.**
+7. **Process-level acceptance:** run the deterministic clean, dirty-workspace, unknown-execution, stale-fence, duplicate-operation, and corrupt-snapshot cases from separate processes. **Complete.**
+8. **Completion evidence:** write `docs/M3_EVIDENCE.md`, update the README, roadmap, architecture, package docs/changelogs, and root changelog, then obtain owner review and green required checks. **Complete.**
 
 Do not combine public contract design and implementation in one review step. The design issue and docs PR gate the feasibility work; feasibility gates the final API shapes; deterministic evidence gates milestone completion.
 

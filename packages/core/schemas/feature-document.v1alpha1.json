@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://anastom.dev/schemas/feature-document.v1alpha1.json",
+  "title": "Feature front matter",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "acceptanceCriteria", "verification"],
+  "properties": {
+    "apiVersion": { "const": "anastom.dev/v1alpha1" },
+    "kind": { "const": "Feature" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9/._-]*$" },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$"
+        }
+      }
+    },
+    "acceptanceCriteria": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 2048 }
+    },
+    "verification": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/verifier" }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxTasks": { "type": "integer", "minimum": 2, "maximum": 8 },
+        "maxParallel": { "type": "integer", "minimum": 1, "maximum": 4 },
+        "protectedPaths": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        },
+        "attemptPolicy": { "$ref": "#/$defs/attemptPolicy" }
+      }
+    }
+  },
+  "$defs": {
+    "attemptPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "maxDuration": { "type": "string", "pattern": "^[1-9][0-9]*(?:ms|s|m|h)$" }
+      }
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "argv", "maxDuration"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,47}$" },
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        },
+        "cwd": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "maxDuration": { "type": "string", "pattern": "^[1-9][0-9]*(?:ms|s|m|h)$" },
+        "maxOutputBytes": { "type": "integer", "minimum": 1, "maximum": 16777216 }
+      }
+    }
+  }
+}

@@ -8,13 +8,18 @@ import {
   RunOwnershipBlockedError,
   RunStoreError,
   WorkflowEngine,
+  LiveRunProjector,
   renderRunStatus,
   renderWorkflowGraph,
   type RunPersistence,
   type RunState,
 } from "@anastom/engine";
 import { FakeRuntimeAdapter, loadFakeScenario } from "@anastom/runtime-fake";
-import { resolveGitRepository, assertRunId } from "@anastom/workspaces";
+import {
+  createFeatureWorkspaceTopology,
+  resolveGitRepository,
+  assertRunId,
+} from "@anastom/workspaces";
 import { PiRuntimeAdapter } from "@anastom/runtime-pi";
 import { CodexRuntimeAdapter } from "@anastom/runtime-codex";
 import { ClaudeCodeRuntimeAdapter, type ClaudeAuthSource } from "@anastom/runtime-claude-code";
@@ -27,6 +32,9 @@ import {
   openDurableRunStore,
   renderDurableRunInspection,
 } from "./durable.js";
+import { CliUsageError } from "./errors.js";
+import { prepareFeatureCommand } from "./feature-command.js";
+import { LiveRunRenderer } from "./live.js";
 
 /**
  * Injectable CLI output streams, allowing hosts and tests to capture diagnostics.
@@ -36,6 +44,8 @@ interface CliIo {
   stdout(message: string): void;
   /** Emit usage or operator-readable command diagnostics. */
   stderr(message: string): void;
+  /** Whether stdout supports terminal styling rather than newline-delimited JSON. */
+  isTty?: boolean;
 }
 
 /**
@@ -48,8 +58,6 @@ export interface CliOptions {
 
 const processLocalPersistence = new InMemoryRunPersistence();
 
-class CliUsageError extends Error {}
-
 function usage(): string {
   return [
     "Usage:",
@@ -58,6 +66,7 @@ function usage(): string {
     "  anastom run <workflow> --fake-scenario <file>",
     "  anastom inspect <run>",
     "  anastom run <task.md> --runtime pi|codex|claude-code [--repo <path>] [--provider <id> --model <id>] [--auth-source subscription|api-key] [--reasoning-effort <level>]",
+    "  anastom run <feature.md> --method sdlc/default --runtime pi|codex|claude-code [--repo <path>] [--provider <id> --model <id>] [--auth-source subscription|api-key] [--reasoning-effort <level>]",
     "  anastom status <run> [--state-dir <path>]",
     "  anastom inspect <run> [--state-dir <path>] [--json]",
     "  anastom pause <run> [--state-dir <path>] [--operation-id <uuid>]",
@@ -96,12 +105,12 @@ function loadTarget(file: string) {
     : loadWorkflowWithinRoot(root, file);
 }
 
-type TaskRuntimeId = "pi" | "codex" | "claude-code";
+type SelectedRuntimeId = "pi" | "codex" | "claude-code";
 const reasoningLevels = ["low", "medium", "high", "xhigh", "max"] as const;
 
 function checkedReasoningEffort(
   value: string | undefined,
-  runtimeId: TaskRuntimeId,
+  runtimeId: SelectedRuntimeId,
 ): (typeof reasoningLevels)[number] | undefined {
   if (!value) {
     return undefined;
@@ -116,7 +125,7 @@ function checkedReasoningEffort(
 }
 
 function assertClaudeAuthSelection(
-  runtimeId: TaskRuntimeId,
+  runtimeId: SelectedRuntimeId,
   provider: string | undefined,
   model: string | undefined,
   authSource: string | undefined,
@@ -134,8 +143,8 @@ function assertClaudeAuthSelection(
   }
 }
 
-function assertTaskSelection(selection: {
-  runtimeId: TaskRuntimeId;
+function assertRuntimeSelection(selection: {
+  runtimeId: SelectedRuntimeId;
   provider?: string;
   model?: string;
   authSource?: string;
@@ -156,9 +165,12 @@ function assertTaskSelection(selection: {
   assertClaudeAuthSelection(runtimeId, provider, model, authSource);
 }
 
-function parseTaskOptions(args: readonly string[]): {
+function parseRuntimeOptions(
+  args: readonly string[],
+  extraOptions: readonly string[] = [],
+): {
   opts: Record<string, string | true>;
-  runtimeId: TaskRuntimeId;
+  runtimeId: SelectedRuntimeId;
   provider?: string;
   model?: string;
   reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max";
@@ -172,16 +184,17 @@ function parseTaskOptions(args: readonly string[]): {
     "--model",
     "--reasoning-effort",
     "--auth-source",
+    ...extraOptions,
   ]);
   const runtimeId = stringFlag(opts, "--runtime");
   if (runtimeId !== "pi" && runtimeId !== "codex" && runtimeId !== "claude-code") {
-    throw new CliUsageError("Task run requires --runtime pi, codex or claude-code");
+    throw new CliUsageError("Run requires --runtime pi, codex or claude-code");
   }
   const provider = stringFlag(opts, "--provider"),
     model = stringFlag(opts, "--model");
   const reasoningEffort = checkedReasoningEffort(stringFlag(opts, "--reasoning-effort"), runtimeId);
   const authSource = stringFlag(opts, "--auth-source");
-  assertTaskSelection({ runtimeId, provider, model, authSource });
+  assertRuntimeSelection({ runtimeId, provider, model, authSource });
   return {
     opts,
     runtimeId,
@@ -192,8 +205,8 @@ function parseTaskOptions(args: readonly string[]): {
   };
 }
 
-async function selectedTaskRuntime(
-  selection: ReturnType<typeof parseTaskOptions>,
+async function selectedRuntime(
+  selection: ReturnType<typeof parseRuntimeOptions>,
 ): Promise<DurableRuntimeAdapter> {
   if (selection.runtimeId === "pi") {
     return new PiRuntimeAdapter({ provider: selection.provider, model: selection.model });
@@ -213,10 +226,10 @@ async function selectedTaskRuntime(
 }
 
 async function runTask(target: string, args: readonly string[], io: CliIo): Promise<number> {
-  const selection = parseTaskOptions(args);
+  const selection = parseRuntimeOptions(args);
   const opts = selection.opts;
   const workflow = await loadTaskWithinRoot(process.cwd(), target);
-  const runtime = await selectedTaskRuntime(selection);
+  const runtime = await selectedRuntime(selection);
   const descriptor = await runtime.descriptor();
   const { repoRoot } = await resolveGitRepository(stringFlag(opts, "--repo") ?? process.cwd());
   const stateDir = resolve(stringFlag(opts, "--state-dir") ?? resolve(repoRoot, ".anastom"));
@@ -225,20 +238,67 @@ async function runTask(target: string, args: readonly string[], io: CliIo): Prom
   if (mutation !== "readonly" && mutation !== "isolated") {
     throw new Error("Task requires a filesystem mutation mode");
   }
-  const services = await openDurableCliServices(stateDir);
+  const services = await openLiveDurableServices(stateDir, io);
   try {
     const workspace = await services.workspaces.create(repoRoot, runId, mutation);
     if (workspace.mode === "memory") {
       throw new Error("Durable task execution requires a filesystem workspace");
     }
     await services.coordinator.createRun(workflow, { runId, workspace, descriptor });
-    io.stdout("Run " + runId + " created\nWorkspace: " + workspace.path);
     const state = await services.coordinator.resume(runId);
-    const inspection = await inspectDurableRun(services.store, runId, true);
-    if (!inspection) {
-      throw new Error("Created durable run could not be inspected");
-    }
-    io.stdout(renderDurableRunInspection(inspection));
+    return state.status === "succeeded" ? 0 : 1;
+  } finally {
+    services.store.close();
+  }
+}
+
+async function openLiveDurableServices(stateDir: string, io: CliIo) {
+  const renderer = new LiveRunRenderer(io.isTty ?? false);
+  let projector: LiveRunProjector | undefined;
+  return openDurableCliServices(stateDir, {
+    observeCommittedEvents(events, state, committedWorkflow) {
+      projector ??= new LiveRunProjector(committedWorkflow);
+      for (const line of renderer.render(projector.project(state, events))) {
+        io.stdout(line);
+      }
+    },
+  });
+}
+
+async function runFeature(target: string, args: readonly string[], io: CliIo): Promise<number> {
+  const selection = parseRuntimeOptions(args, ["--method"]);
+  const method = stringFlag(selection.opts, "--method");
+  if (method !== "sdlc/default") {
+    throw new CliUsageError("Feature run requires --method sdlc/default");
+  }
+  const [prepared, runtime] = await Promise.all([
+    prepareFeatureCommand({
+      sourceRoot: process.cwd(),
+      target,
+      repository: stringFlag(selection.opts, "--repo") ?? process.cwd(),
+    }),
+    selectedRuntime(selection),
+  ]);
+  const descriptor = await runtime.descriptor();
+  const { workflow, repositoryRoot: repoRoot, protectedPaths } = prepared;
+  const stateDir = resolve(
+    stringFlag(selection.opts, "--state-dir") ?? resolve(repoRoot, ".anastom"),
+  );
+  const runId = randomUUID();
+  const services = await openLiveDurableServices(stateDir, io);
+  try {
+    const topology = await createFeatureWorkspaceTopology(
+      services.workspaces,
+      repoRoot,
+      runId,
+      protectedPaths,
+    );
+    await services.coordinator.createRun(workflow, {
+      runId,
+      workspace: topology.integration,
+      descriptor,
+    });
+    const state = await services.coordinator.resume(runId);
     return state.status === "succeeded" ? 0 : 1;
   } finally {
     services.store.close();
@@ -420,6 +480,7 @@ export async function runCli(args: readonly string[], options: CliOptions = {}):
   const io = options.io ?? {
     stdout: (message: string) => console.log(message),
     stderr: (message: string) => console.error(message),
+    isTty: process.stdout.isTTY === true,
   };
   const persistence = options.persistence ?? processLocalPersistence;
   try {
@@ -451,9 +512,10 @@ async function executeCliCommand(
     return 0;
   }
   if (command === "run") {
-    return extname(target).toLowerCase() === ".md"
-      ? runTask(target, rest, io)
-      : runFakeWorkflow(target, rest, { io, persistence });
+    if (extname(target).toLowerCase() !== ".md") {
+      return runFakeWorkflow(target, rest, { io, persistence });
+    }
+    return rest.includes("--method") ? runFeature(target, rest, io) : runTask(target, rest, io);
   }
   if (command === "inspect" && rest.length === 0) {
     return inspectProcessLocalOrDurable(target, io, persistence);

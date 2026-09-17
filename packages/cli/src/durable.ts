@@ -4,9 +4,12 @@ import { join } from "node:path";
 import { digestJson, type WorkflowDefinition } from "@anastom/core";
 import {
   DurableRunCoordinator,
+  projectEvidenceLedger,
+  projectLiveRunEvents,
   renderRunInspection,
   renderRunStatus,
   type ControlRequest,
+  type EvidenceLedger,
   type LoadedRun,
   type RunEvent,
   type RunLease,
@@ -21,9 +24,15 @@ import { FileArtifactStore, SqliteDurableRunStore } from "@anastom/persistence";
 import { ensurePrivatePathRoot } from "@anastom/path-policy";
 import {
   GitWorkspaceManager,
+  captureScopedWorkspacePatch,
   captureWorkspaceCheckpoint,
   compareWorkspaceCheckpoints,
+  createFeatureTaskWorkspace,
+  loadFeatureWorkspaceTopology,
+  prepareWorkspaceIntegration,
+  reconcileWorkspaceIntegration,
 } from "@anastom/workspaces";
+import type { LiveRunEvent } from "@anastom/runtime-contract";
 
 import { durableRuntimeRegistry } from "./runtime-registry.js";
 
@@ -47,6 +56,10 @@ export interface DurableRunInspection {
   snapshot: { source: "snapshot-tail" | "full-replay"; sequence?: number };
   /** Complete authoritative history, present only for inspection. */
   events?: RunEvent[];
+  /** Deterministic evidence projection, present only with complete history. */
+  evidence?: EvidenceLedger;
+  /** Reconnect-equivalent bounded public history, present only with complete history. */
+  liveEvents?: LiveRunEvent[];
 }
 
 /** Durable storage, execution, workspace, and runtime services owned by one CLI invocation. */
@@ -59,6 +72,15 @@ export interface DurableCliServices {
   workspaces: GitWorkspaceManager;
 }
 
+/** Presentation callback invoked only after an authoritative event batch is committed. */
+export interface DurableCliServiceOptions {
+  observeCommittedEvents?: (
+    events: readonly RunEvent[],
+    state: RunState,
+    workflow: WorkflowDefinition,
+  ) => void;
+}
+
 /** Open the durable run store beneath one validated private-state root. */
 export async function openDurableRunStore(stateDir: string): Promise<SqliteDurableRunStore> {
   const state = await ensurePrivatePathRoot(stateDir);
@@ -66,7 +88,10 @@ export async function openDurableRunStore(stateDir: string): Promise<SqliteDurab
 }
 
 /** Compose production storage, process ownership, workspaces, artifacts, and runtimes. */
-export async function openDurableCliServices(stateDir: string): Promise<DurableCliServices> {
+export async function openDurableCliServices(
+  stateDir: string,
+  options: DurableCliServiceOptions = {},
+): Promise<DurableCliServices> {
   const state = await ensurePrivatePathRoot(stateDir);
   const store = new SqliteDurableRunStore(join(state.path, "anastom.sqlite"));
   try {
@@ -89,10 +114,30 @@ export async function openDurableCliServices(stateDir: string): Promise<DurableC
       workspace: {
         capture: (workspace) => captureWorkspaceCheckpoint(workspaces, workspace),
         compare: compareWorkspaceCheckpoints,
+        async createTaskWorkspace({ runId, taskId, baseCommit }) {
+          const topology = await loadFeatureWorkspaceTopology(workspaces, runId);
+          return createFeatureTaskWorkspace(workspaces, topology, taskId, baseCommit);
+        },
+        async captureAcceptedPatch({ runId, workspace, mutationScopes }) {
+          const topology = await loadFeatureWorkspaceTopology(workspaces, runId);
+          return captureScopedWorkspacePatch(workspaces, workspace, {
+            mutationScopes,
+            protectedPaths: topology.protectedPaths,
+          });
+        },
+        async prepareIntegration({ runId, patches }) {
+          const topology = await loadFeatureWorkspaceTopology(workspaces, runId);
+          return prepareWorkspaceIntegration(workspaces, topology.integration, patches);
+        },
+        async reconcileIntegration({ runId, preparation }) {
+          const topology = await loadFeatureWorkspaceTopology(workspaces, runId);
+          return reconcileWorkspaceIntegration(workspaces, topology.integration, preparation);
+        },
       },
       runtimes: durableRuntimeRegistry,
       owner: await localProcessIdentity(),
       observeProcess: observeLocalProcess,
+      observeCommittedEvents: options.observeCommittedEvents,
     });
     return { store, coordinator, workspaces };
   } catch (error) {
@@ -135,6 +180,8 @@ async function buildInspection(
     pendingControls: await store.pendingControls(runId),
     snapshot,
     ...(events ? { events } : {}),
+    ...(events ? { evidence: projectEvidenceLedger(loaded.workflow, events) } : {}),
+    ...(events ? { liveEvents: projectLiveRunEvents(loaded.workflow, events) } : {}),
   };
 }
 
@@ -151,6 +198,11 @@ export function renderDurableRunInspection(view: DurableRunInspection): string {
   const snapshot = `Snapshot: ${view.snapshot.source}${view.snapshot.sequence === undefined ? "" : ` sequence=${view.snapshot.sequence}`}`;
   const controls = `Pending controls: ${view.pendingControls.length}`;
   const diagnostics: string[] = [];
+  if (view.evidence) {
+    diagnostics.push(
+      `Evidence ledger: sequence=${view.evidence.throughSequence} phases=${view.evidence.phases.length}`,
+    );
+  }
   if (view.state.pauseReason) {
     diagnostics.push(`Pause reason: ${JSON.stringify(view.state.pauseReason)}`);
   }

@@ -58,7 +58,7 @@
     "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$" },
     "artifactId": {
       "type": "string",
-      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,254}$"
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,254}$"
     },
     "nonempty": { "type": "string", "minLength": 1 },
     "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }

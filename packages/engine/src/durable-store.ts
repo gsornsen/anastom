@@ -9,6 +9,7 @@ import {
 } from "@anastom/core";
 
 import { applyRunEvent, replayRun, type RunEvent, type RunState } from "./events.js";
+import { resolveRunWorkflowGraph } from "./graph.js";
 
 /** Production lease duration; coordinators renew no later than every five seconds. */
 export const RUN_LEASE_DURATION_MS = 15_000;
@@ -359,7 +360,7 @@ export function assertRunSnapshot(
 /** Validate that replayed workflow identity and node membership match the immutable definition. */
 export function assertStateMatchesWorkflow(state: RunState, workflow: WorkflowDefinition): void {
   const stateNodeIds = Object.keys(state.nodes).sort();
-  const workflowNodeIds = [...workflow.nodeOrder].sort();
+  const workflowNodeIds = [...resolveRunWorkflowGraph(workflow, state).nodeOrder].sort();
   if (
     state.workflowId !== workflow.metadata.id ||
     state.workflowVersion !== workflow.metadata.version ||

@@ -1,4 +1,11 @@
-import type { JsonValue, NodeStatus } from "@anastom/core";
+import {
+  assertNormalizedFeaturePlan,
+  assertSdlcGraphExpansion,
+  type JsonValue,
+  type NodeStatus,
+  type NormalizedFeaturePlan,
+  type SdlcGraphExpansion,
+} from "@anastom/core";
 import type {
   ArtifactRef,
   ExecutionFailure,
@@ -45,7 +52,9 @@ export type RecoveryBlockReason =
         | "supervisor-lost"
         | "cleanup-unconfirmed";
     }
-  | { kind: "cleanup-unknown"; executionId: string };
+  | { kind: "cleanup-unknown"; executionId: string }
+  | { kind: "cleanup-unknown-set"; executionIds: string[] }
+  | { kind: "integration-unknown"; nodeId: string; preparationDigest: string };
 
 /** Typed operator or safety-policy evidence attached to pause transitions. */
 export type PauseReason =
@@ -103,6 +112,32 @@ interface NodeRunState {
   pauseReason?: PauseReason;
 }
 
+/** Immutable accepted task patch identity retained without duplicating artifact bytes in events. */
+interface AcceptedPatchEvidence {
+  taskId: string;
+  nodeId: string;
+  attempt: number;
+  workspaceId: string;
+  baseCommit: string;
+  headCommit: string;
+  changedFiles: string[];
+  mutationScopes: string[];
+  patchArtifactId: string;
+  patchDigest: string;
+}
+
+/** Deterministic Git commit identity persisted before the integration branch may move. */
+export interface IntegrationPreparationEvidence {
+  version: "anastom.dev/integration-preparation/v1alpha1";
+  workspaceId: string;
+  branch: string;
+  parentCommit: string;
+  patches: readonly { taskId: string; digest: string }[];
+  tree: string;
+  expectedCommit: string;
+  preparationDigest: string;
+}
+
 /**
  * The run's materialized view; persisted events, rather than this object, are authoritative.
  */
@@ -115,7 +150,18 @@ export interface RunState {
   sequence: number;
   inputs: Record<string, JsonValue>;
   nodes: Record<string, NodeRunState>;
+  plan?: NormalizedFeaturePlan;
+  expansion?: SdlcGraphExpansion;
+  acceptedPatches?: Record<string, AcceptedPatchEvidence>;
+  integrations?: Record<
+    string,
+    {
+      preparation: IntegrationPreparationEvidence;
+      committed?: { commit: string; checkpoint: WorkspaceCheckpoint };
+    }
+  >;
   workspace?: WorkspaceRef;
+  nodeWorkspaces?: Record<string, WorkspaceRef>;
   runtimeNegotiation?: RuntimeNegotiation;
   runtimeDescriptor?: RuntimeDescriptor;
   pauseReason?: PauseReason;
@@ -131,6 +177,26 @@ export type RunEventPayload =
   | { type: "RuntimeNegotiated"; negotiation: RuntimeNegotiation }
   | { type: "RuntimeConfigured"; descriptor: RuntimeDescriptor }
   | { type: "WorkspaceAssigned"; workspace: WorkspaceRef }
+  | { type: "NodeWorkspaceAssigned"; nodeId: string; workspace: WorkspaceRef }
+  | {
+      type: "WorkflowExpanded";
+      sourceNodeId: string;
+      plan: NormalizedFeaturePlan;
+      expansion: SdlcGraphExpansion;
+    }
+  | { type: "TaskPatchAccepted"; patch: AcceptedPatchEvidence }
+  | {
+      type: "IntegrationPrepared";
+      nodeId: string;
+      preparation: IntegrationPreparationEvidence;
+    }
+  | {
+      type: "IntegrationCommitted";
+      nodeId: string;
+      commit: string;
+      checkpoint: WorkspaceCheckpoint;
+    }
+  | { type: "IntegrationFailed"; nodeId: string; failure: ExecutionFailure }
   | { type: "ArtifactProduced"; nodeId: string; attempt: number; artifact: ArtifactRef }
   | {
       type: "WorkspaceObserved";
@@ -354,10 +420,20 @@ export function applyRunEvent(current: RunState | undefined, event: RunEvent): R
       state.runtimeNegotiation = structuredClone(event.negotiation);
       break;
     case "WorkspaceAssigned":
+    case "NodeWorkspaceAssigned":
     case "ArtifactProduced":
     case "WorkspaceObserved":
     case "CommandCompleted":
       applyObservationEvent(state, event);
+      break;
+    case "WorkflowExpanded":
+      applyWorkflowExpanded(state, event);
+      break;
+    case "TaskPatchAccepted":
+    case "IntegrationPrepared":
+    case "IntegrationCommitted":
+    case "IntegrationFailed":
+      applyIntegrationEvent(state, event);
       break;
     case "AttemptTimeoutRequested":
     case "AttemptCancellationCompleted":
@@ -399,6 +475,108 @@ export function applyRunEvent(current: RunState | undefined, event: RunEvent): R
   }
 
   return state;
+}
+
+type IntegrationEvent = Extract<
+  RunEvent,
+  {
+    type:
+      "TaskPatchAccepted" | "IntegrationPrepared" | "IntegrationCommitted" | "IntegrationFailed";
+  }
+>;
+
+/** Fold accepted patch and controller-owned integration evidence into the run projection. */
+function applyIntegrationEvent(state: RunState, event: IntegrationEvent): void {
+  if (event.type === "TaskPatchAccepted") {
+    const node = requireNode(state, event.patch.nodeId);
+    const attempt = requireCurrentAttempt(node, event.patch.attempt, "running");
+    if (
+      attempt.executionPlan === undefined ||
+      event.patch.taskId.length === 0 ||
+      !state.artifacts?.some(
+        (artifact) =>
+          artifact.id === event.patch.patchArtifactId &&
+          artifact.digest === event.patch.patchDigest,
+      ) ||
+      Object.hasOwn(state.acceptedPatches ?? {}, event.patch.taskId)
+    ) {
+      throw new InvalidTransitionError("Accepted task patch evidence is incomplete or duplicated");
+    }
+    (state.acceptedPatches ??= {})[event.patch.taskId] = structuredClone(event.patch);
+    return;
+  }
+  const node = requireNode(state, event.nodeId);
+  if (event.type === "IntegrationFailed") {
+    requireNodeStatus(node, event.type, ["ready", "running"]);
+    node.status = "failed";
+    node.failure = structuredClone(event.failure);
+    return;
+  }
+  if (event.type === "IntegrationPrepared") {
+    requireNodeStatus(node, event.type, ["ready"]);
+    if (Object.hasOwn(state.integrations ?? {}, event.nodeId)) {
+      throw new InvalidTransitionError("Integration was already prepared");
+    }
+    node.status = "running";
+    (state.integrations ??= {})[event.nodeId] = {
+      preparation: structuredClone(event.preparation),
+    };
+    return;
+  }
+  requireNodeStatus(node, event.type, ["running"]);
+  const integration = state.integrations?.[event.nodeId];
+  if (
+    !integration ||
+    integration.committed ||
+    integration.preparation.expectedCommit !== event.commit
+  ) {
+    throw new InvalidTransitionError("Integration commit does not match its preparation");
+  }
+  integration.committed = {
+    commit: event.commit,
+    checkpoint: structuredClone(event.checkpoint),
+  };
+  node.output = {
+    commit: event.commit,
+    tree: integration.preparation.tree,
+    patchDigests: integration.preparation.patches.map(({ digest }) => digest),
+  };
+  node.status = "succeeded";
+}
+
+/** Add one validated planner expansion to folded state without consulting mutable files. */
+function applyWorkflowExpanded(
+  state: RunState,
+  event: Extract<RunEvent, { type: "WorkflowExpanded" }>,
+): void {
+  assertNormalizedFeaturePlan(event.plan);
+  assertSdlcGraphExpansion(event.expansion);
+  if (state.status !== "running" || state.expansion !== undefined || state.plan !== undefined) {
+    throw new InvalidTransitionError("Workflow expansion can occur once in a running run");
+  }
+  const source = requireNode(state, event.sourceNodeId);
+  if (
+    source.status !== "succeeded" ||
+    !event.expansion.externalNeeds.includes(event.sourceNodeId) ||
+    event.expansion.source.planDigest !== event.plan.planDigest
+  ) {
+    throw new InvalidTransitionError("Workflow expansion does not match its successful planner");
+  }
+  for (const dependency of event.expansion.externalNeeds) {
+    if (!Object.hasOwn(state.nodes, dependency)) {
+      throw new InvalidTransitionError("Workflow expansion names an unknown external dependency");
+    }
+  }
+  for (const nodeId of event.expansion.nodeOrder) {
+    if (Object.hasOwn(state.nodes, nodeId)) {
+      throw new InvalidTransitionError(
+        `Workflow expansion collides with node ${JSON.stringify(nodeId)}`,
+      );
+    }
+    state.nodes[nodeId] = { id: nodeId, status: "pending", attempts: [] };
+  }
+  state.plan = structuredClone(event.plan);
+  state.expansion = structuredClone(event.expansion);
 }
 
 type OperationalEvent = Extract<
@@ -470,7 +648,14 @@ export function materializeEvents(
 
 type ObservationEvent = Extract<
   RunEvent,
-  { type: "WorkspaceAssigned" | "ArtifactProduced" | "WorkspaceObserved" | "CommandCompleted" }
+  {
+    type:
+      | "WorkspaceAssigned"
+      | "NodeWorkspaceAssigned"
+      | "ArtifactProduced"
+      | "WorkspaceObserved"
+      | "CommandCompleted";
+  }
 >;
 
 /** Apply observation transitions after run identity and sequence checks. */
@@ -482,6 +667,20 @@ function applyObservationEvent(state: RunState, event: ObservationEvent): void {
       }
       state.workspace = structuredClone(event.workspace);
       break;
+    case "NodeWorkspaceAssigned": {
+      const node = requireNode(state, event.nodeId);
+      if (
+        state.status !== "running" ||
+        node.attempts.length > 0 ||
+        Object.hasOwn(state.nodeWorkspaces ?? {}, event.nodeId)
+      ) {
+        throw new InvalidTransitionError(
+          "Node workspace can only be assigned once before its first attempt",
+        );
+      }
+      (state.nodeWorkspaces ??= {})[event.nodeId] = structuredClone(event.workspace);
+      break;
+    }
     case "ArtifactProduced": {
       const node = requireNode(state, event.nodeId);
       requireNodeStatus(node, event.type, ["ready", "running"]);
@@ -737,10 +936,11 @@ function applyAttemptPrepared(
   requireNodeStatus(node, event.type, ["ready"]);
   const attempt = requireCurrentAttempt(node, event.attempt, "scheduled");
   const expectedKind = attempt.runtimeId === "command" ? "command" : "runtime";
+  const assignedWorkspace = state.nodeWorkspaces?.[event.nodeId] ?? state.workspace;
   if (
     event.execution.runId !== state.runId ||
     event.execution.generation < 1 ||
-    (state.workspace && event.workspaceCheckpoint.workspaceId !== state.workspace.id) ||
+    (assignedWorkspace && event.workspaceCheckpoint.workspaceId !== assignedWorkspace.id) ||
     event.execution.kind !== expectedKind
   ) {
     throw new InvalidTransitionError("Prepared attempt evidence does not match the run");
@@ -901,12 +1101,12 @@ function applyNodeEvent(state: RunState, event: NodeEvent): void {
         requireNodeStatus(node, event.type, ["pending", "ready", "running"]);
         if (
           node.status === "running" &&
-          !(["cancelled", "orphaned"] as AttemptStatus[]).includes(
+          !(["failed", "cancelled", "orphaned"] as AttemptStatus[]).includes(
             node.attempts.at(-1)?.status ?? "scheduled",
           )
         ) {
           throw new InvalidTransitionError(
-            "A running node can pause only after cancellation or orphaning",
+            "A running node can pause only after failure, cancellation, or orphaning",
           );
         }
         node.pauseReason = structuredClone(event.reason);
@@ -1067,17 +1267,41 @@ function applyRunRecoveryBlocked(
   )) {
     throw new InvalidTransitionError(`RunRecoveryBlocked is invalid in ${state.status} state`);
   }
-  const executionId = event.reason.executionId;
-  const attempt = Object.values(state.nodes)
-    .map((node) => node.attempts.at(-1))
-    .find((candidate) => candidate?.executionPlan?.executionId === executionId);
-  if (!attempt) {
-    throw new InvalidTransitionError("Recovery block does not match an owned execution");
+  if (event.reason.kind === "integration-unknown") {
+    const integration = state.integrations?.[event.reason.nodeId];
+    if (
+      !integration ||
+      integration.committed !== undefined ||
+      integration.preparation.preparationDigest !== event.reason.preparationDigest
+    ) {
+      throw new InvalidTransitionError("Integration recovery block does not match preparation");
+    }
+    state.status = "recovery-blocked";
+    state.recoveryBlock = {
+      operationId: event.operationId,
+      reason: structuredClone(event.reason),
+    };
+    return;
+  }
+  const executionIds =
+    event.reason.kind === "cleanup-unknown-set"
+      ? event.reason.executionIds
+      : [event.reason.executionId];
+  const attempts = executionIds.map((executionId) =>
+    Object.values(state.nodes)
+      .map((node) => node.attempts.at(-1))
+      .find((candidate) => candidate?.executionPlan?.executionId === executionId),
+  );
+  if (attempts.some((attempt) => attempt === undefined)) {
+    throw new InvalidTransitionError("Recovery block does not match every owned execution");
   }
   if (
-    event.reason.kind === "cleanup-unknown" &&
-    !attempt.cleanup?.some(
-      (cleanup) => cleanup.executionId === executionId && cleanup.outcome === "unknown",
+    (event.reason.kind === "cleanup-unknown" || event.reason.kind === "cleanup-unknown-set") &&
+    attempts.some(
+      (attempt, index) =>
+        !attempt?.cleanup?.some(
+          (cleanup) => cleanup.executionId === executionIds[index] && cleanup.outcome === "unknown",
+        ),
     )
   ) {
     throw new InvalidTransitionError("Cleanup recovery block requires unknown cleanup evidence");

@@ -63,8 +63,26 @@ describe("bounded Codex execution profile", () => {
     await writeFile(auth, "PRIVATE_SENTINEL", { mode: 0o600 });
     const workspace = join(root, "workspace");
     await mkdir(workspace);
+    const request = conformanceRequest(workspace);
+    request.requiredOutputSchema = {
+      type: "object",
+      additionalProperties: false,
+      required: ["items", "uniqueItems"],
+      properties: {
+        uniqueItems: {
+          type: "object",
+          const: { uniqueItems: "data, not a schema keyword" },
+        },
+        items: {
+          type: "array",
+          uniqueItems: true,
+          maxItems: 8,
+          items: { type: "string", pattern: "^[a-z]+$" },
+        },
+      },
+    };
     const profile = await createCodexProfile({
-      request: conformanceRequest(workspace),
+      request,
       authFile: auth,
       model: "gpt-5.6-terra",
       reasoningEffort: "medium",
@@ -83,6 +101,25 @@ describe("bounded Codex execution profile", () => {
     expect(profile.args.join(" ")).not.toContain("PRIVATE_SENTINEL");
     expect(profile.prompt).not.toContain("PRIVATE_SENTINEL");
     expect(await stat(join(profile.root, "output-schema.json"))).toBeDefined();
+    expect(JSON.parse(await readFile(join(profile.root, "output-schema.json"), "utf8"))).toEqual({
+      additionalProperties: false,
+      properties: {
+        items: {
+          items: { pattern: "^[a-z]+$", type: "string" },
+          maxItems: 8,
+          type: "array",
+        },
+        uniqueItems: {
+          const: { uniqueItems: "data, not a schema keyword" },
+          type: "object",
+        },
+      },
+      required: ["items", "uniqueItems"],
+      type: "object",
+    });
+    expect(request.requiredOutputSchema).toMatchObject({
+      properties: { items: { uniqueItems: true } },
+    });
     const catalog = JSON.parse(
       await readFile(join(profile.root, "model-catalog.json"), "utf8"),
     ) as { models: Array<{ context_window: unknown; slug: string }> };

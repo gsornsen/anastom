@@ -8,6 +8,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
+- Harden defined-SDLC validation, Linux lease identity, protected-input auditing, and artifact reads after consolidated Linux and CodeQL review.
+- Complete defined-SDLC acceptance with one checked-in two-task Feature fixture, unchanged owner-authenticated Pi and Codex runs, overlapping implementation and review attempts, retained deterministic integration branches, passing operator verification, later-process replay, and complete bounded private artifact audits.
+- Add a reusable live-run auditor for runtime identity, concurrency intervals, independent approvals, Git scope and branch identity, protected inputs, artifact completeness/integrity/modes/bounds, public-output bounds, and credential/private-field absence.
+- Add production-shaped defined-SDLC process acceptance covering both parallel completion orders, pause/cancel fan-in, sibling failure, review rejection, exact verifier failure, later-process inspection, artifact integrity, source-checkout isolation, retained integration branches, and interrupted-integration recovery under stale fencing.
+- Let Feature authors declare explicit repository-relative protected paths for verifier inputs and other policy files, and accept dotted expanded-node artifact identities in workspace checkpoints.
+
+- Compose repository-bound Feature documents and the checked-in `sdlc/default` methodology through the production CLI and durable coordinator. The command retains one run-owned integration branch, protects the Feature and repository-local methodology inputs, reuses explicit Pi/Codex/Claude Code selection, and streams the existing bounded public projection.
+- Add a deterministic evidence ledger and schema-validated public live-event projection over authoritative run history. Public logs have per-message and per-attempt bounds with exact dropped-message accounting; reconnect replay is equivalent, private execution fields remain excluded, and durable Task runs render committed progress as terminal text or JSON Lines.
+- Execute persisted planner expansions through the fenced coordinator with bounded concurrent attempts, per-task workspaces, scoped accepted patches, deterministic wave and integrator commits, independent review semantics, operator verifiers, all-attempt controls, and interrupted-integration recovery. Feature CLI selection and live model evidence remain in the active defined-SDLC stack.
+- Add production Feature workspace topology and deterministic Git integration: one owned integration worktree, exact-base task worktrees, protected mutation scopes, immutable patch bytes, fixed commit construction, compare-and-swap ref movement, and refusal of unrelated recovery state.
+- Add the defined-SDLC contract layer: strict source-scoped Feature documents, bounded content-addressed six-role methodology snapshots, normalized planner data with stable dependency waves and disjoint mutation scopes, semantically consistent independent reviews, and replay-validated graph expansion. Verification commands remain operator-authored.
+- Add model-free M4 feasibility for deterministic plan expansion across alternate completion orders, two simultaneously supervised execution identities with all-attempt recovery classification, and prepared Git integration across ref/worktree crash boundaries. Exact binary patch bytes, disjoint ready-task scopes, integration waves, compare-and-swap refs, and all-execution absence become production gates.
+- Begin the defined-SDLC work under issue #37 with a durable post-merge build brief and ADR covering bounded plan expansion, parallel task ownership, scoped worktrees, deterministic Git integration, independent review, evidence projection, and live CLI events. Track the MLP interactive terminal experience separately in issue #38 after the multi-node event projection stabilizes.
 - Add the seventh stacked M3 production slice: deterministic separate-process crash/restart acceptance for clean, dirty-workspace, and unknown-execution recovery; pre-expiry ownership refusal; stale-fence and duplicate-operation checks; snapshot-corruption fallback; artifact and source-worktree audits; and `docs/M3_EVIDENCE.md`.
 - Add the sixth stacked M3 production slice: CLI composition for exact Pi, Codex, and Claude Code descriptors; an isolated runtime-host entry point; durable `pause`, `cancel`, and `resume`; operational status/inspection; stable exit behavior; and fail-closed corrupt-state handling.
 - Add the fifth stacked M3 production slice: a vendor-neutral durable coordinator with five-second heartbeat, fenced two-phase start order, exact runtime/command ownership, control polling and restart continuation, orphan/workspace reconciliation, attempt-budget enforcement, snapshot boundaries, and typed ownership refusal.
@@ -54,11 +67,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Fixed
 
+- Settle a retryable dirty worker failure as a whole-run pause only after active sibling cancellation, while an exhausted failed attempt now fails the node and run even when its workspace changed.
+- Give Pi one format-only structured-output correction inside the same attempt before reporting a schema violation.
+- Accept and deterministically integrate a valid empty patch when the integrator finds no cross-task correction to make.
+- Project methodology schemas into Codex's supported native strict-output subset while retaining full local result validation, including `uniqueItems`.
 - Give Codex and Claude Code process-group inspection a bounded 500 ms command budget so cleanup does not fail spuriously when the process table is briefly slow under load.
 - Reject inherited object keys during event replay, fail runtime/event schema validation on the first error, route execution-host fixture records through the shared private-path capability, and make the SQLite busy-error test independent of the production five-second contention wait.
 
 ### Changed
 
+- Mark the defined SDLC complete after the model-free matrix and unchanged live Pi/Codex demonstrations, and make the interactive terminal experience the next MLP workstream.
+- Mark M3 durable execution complete after owner acceptance and merge of PR #24, and remove stale review-stack or pending-acceptance claims from current documentation.
 - Add a required implementation definition of done with whole-repository and strict production AST/dependency analysis, exact dynamic executable entries, and manual removal review for superseded tests, fixtures, APIs, and current documentation. Narrow package exports that had no supported caller while preserving explicitly documented public contracts and internal test seams.
 - Make package source, comments, JSDoc, identifiers, fixtures, and test names independent of project milestone labels; enforce the rule in `pnpm hygiene`. Remove the superseded fake Markdown Task path, `SqliteRunPersistence`, historical-resume variants, and compatibility-only tests before the first supported release; consolidate the durable store as the initial migration.
 - Accepted the M2 Codex CLI design; tracked blocked SDK reconsideration and added M2.5 Claude Code support after M2, with subscription authentication to be investigated during design.

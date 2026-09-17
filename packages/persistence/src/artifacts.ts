@@ -1,9 +1,10 @@
-import { lstat, readFile, realpath } from "node:fs/promises";
-import { join, resolve, sep } from "node:path";
+import { join, resolve } from "node:path";
 import { digestBytes } from "@anastom/core";
 import type { ArtifactStore, ArtifactWrite } from "@anastom/engine";
 import { ensurePrivatePathRoot } from "@anastom/path-policy";
 import type { ArtifactRef } from "@anastom/runtime-contract";
+
+const MAX_ARTIFACT_BYTES = 16 * 1024 * 1024;
 
 /**
  * Immutable filesystem evidence with confined producer paths and SHA-256 integrity verification.
@@ -21,19 +22,25 @@ export class FileArtifactStore implements ArtifactStore {
     if (!Number.isSafeInteger(artifact.attempt) || artifact.attempt < 1) {
       throw new Error("Invalid artifact attempt");
     }
-    for (const id of [artifact.runId, artifact.nodeId, artifact.type]) {
+    for (const id of [artifact.runId, artifact.type]) {
       if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(id)) {
         throw new Error("Invalid artifact identity");
       }
     }
-    const digest = digestBytes(artifact.bytes);
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(artifact.nodeId)) {
+      throw new Error("Invalid artifact producer node identity");
+    }
+    const bytes = Buffer.from(artifact.bytes);
+    if (bytes.byteLength > MAX_ARTIFACT_BYTES) {
+      throw new Error("Artifact exceeds the 16 MiB limit");
+    }
+    const digest = digestBytes(bytes);
     const id =
       artifact.nodeId + "-" + artifact.attempt + "-" + artifact.type + "-" + digest.slice(7);
     const state = await ensurePrivatePathRoot(this.stateDir);
     const dir = await state.ensureDirectory(["runs", artifact.runId, "artifacts"]);
-    const bytes = Buffer.from(artifact.bytes);
     await state.writeFileExclusive(["runs", artifact.runId, "artifacts", id], bytes, {
-      maxBytes: bytes.byteLength,
+      maxBytes: MAX_ARTIFACT_BYTES,
     });
     const uri = join(dir, id);
     return {
@@ -53,29 +60,17 @@ export class FileArtifactStore implements ArtifactStore {
     const id = artifact.id;
     if (
       !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(runId) ||
-      !/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(id)
+      !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(id)
     ) {
       throw new Error("Invalid artifact identity");
     }
-    const stateRoot = await realpath(this.stateDir);
-    const authoredDir = resolve(stateRoot, "runs", runId, "artifacts");
-    const boundary = stateRoot.endsWith(sep) ? stateRoot : stateRoot + sep;
-    if (!authoredDir.startsWith(boundary)) {
-      throw new Error("Artifact parent escapes the configured state root");
-    }
-    // No run-owned ancestor may redirect the read outside the state root.
-    if ((await realpath(authoredDir)) !== authoredDir) {
-      throw new Error("Artifact parent is a symlink");
-    }
-    const expectedFile = resolve(authoredDir, id);
+    const state = await ensurePrivatePathRoot(this.stateDir);
+    const segments = ["runs", runId, "artifacts", id] as const;
+    const expectedFile = join(state.path, ...segments);
     if (resolve(artifact.uri) !== expectedFile) {
       throw new Error("Invalid artifact path");
     }
-    const metadata = await lstat(expectedFile);
-    if (!metadata.isFile() || metadata.isSymbolicLink()) {
-      throw new Error("Artifact file must be an ordinary file");
-    }
-    const bytes = await readFile(expectedFile);
+    const bytes = await state.readFile(segments, { maxBytes: MAX_ARTIFACT_BYTES });
     if (digestBytes(bytes) !== artifact.digest) {
       throw new Error("Artifact digest mismatch");
     }

@@ -17,4 +17,6 @@ export interface ArtifactWrite {
 export interface ArtifactStore {
   /** Persist immutable producer-owned bytes and return a content-digested reference. */
   write(artifact: ArtifactWrite): Promise<ArtifactRef>;
+  /** Read immutable evidence bytes and verify the supplied reference before use. */
+  read?(artifact: ArtifactRef): Promise<Uint8Array>;
 }

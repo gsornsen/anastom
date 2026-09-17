@@ -118,7 +118,7 @@ The source adapter invokes an end user's separately installed, unmodified Claude
 
 ## M3 — Durable execution: "Kill it and it comes back"
 
-Status: building in a reviewed stack. The owner accepted the design on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23), approved the completed feasibility evidence, and authorized the exact [M3 production contract](M3_PRODUCTION_CONTRACT.md) and [ADR 0018](adr/0018-m3-production-contract-and-package-boundaries.md) as the implementation baseline. The five stacked [feasibility phases](M3_FEASIBILITY.md) pass on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI. The unmerged production stack includes CLI `pause`, `cancel`, and `resume`; its local deterministic [process-level evidence](M3_EVIDENCE.md) and all required checks pass. Whole-stack owner acceptance remains.
+Status: complete. The owner accepted the design on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23), approved the completed feasibility evidence and production contracts, and accepted the full implementation in [PR #24](https://github.com/gsornsen/anastom/pull/24). The five [feasibility phases](M3_FEASIBILITY.md), deterministic [process-level evidence](M3_EVIDENCE.md), and required Linux/macOS, DCO, dependency-review, and CodeQL checks pass.
 
 ### Demo
 
@@ -147,6 +147,8 @@ This is the first major differentiator from ordinary coding-agent wrappers.
 
 ## M4 — Defined SDLC: "Ship a real feature"
 
+Status: complete. The implementation, deterministic process matrix, unchanged owner-authenticated Pi/Codex runs, retained branches, and private-data audits are recorded in [M4_EVIDENCE.md](M4_EVIDENCE.md). [Issue #37](https://github.com/gsornsen/anastom/issues/37) tracks the delivered work.
+
 ### Demo
 
 Give Anastom a full-stack feature brief. It:
@@ -172,6 +174,31 @@ and produces a branch ready for human review.
 ### Why it matters
 
 This is the first workflow that can replace a typical Superpowers-style execution for known work.
+
+---
+
+## M4.5 — Terminal experience: "See the work happen"
+
+Status: next MLP workstream. The line-oriented live stream and reconnect-equivalent projection are delivered; interactive rendering, controls, and terminal-level acceptance remain.
+
+### Demo
+
+Attach to a running defined-SDLC workflow and follow public runtime output, node state, integration, review, verification, and operator controls as they change. Detach and reconnect without changing workflow authority.
+
+### Deliverables
+
+- stable live run projection;
+- streaming line-oriented CLI output;
+- interactive terminal run view;
+- pause, cancel, resume, and detach controls;
+- bounded public log and usage rendering;
+- noninteractive and recorded-terminal acceptance coverage.
+
+### Why it matters
+
+The MLP must be tested through the interface a developer uses for long-running work, and later circuit breakers need a clear surface for budgets, retries, pauses, and escalation.
+
+Tracked in [issue #38](https://github.com/gsornsen/anastom/issues/38). It follows the M4 event model and precedes or composes with M5.
 
 ---
 

@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import {
+  compileSdlcFeature,
+  expandSdlcPlan,
+  loadSdlcMethodology,
+  normalizeFeature,
+  normalizeFeaturePlan,
+  parseFeatureMarkdown,
+} from "@anastom/core";
 import { probeRuntime } from "@anastom/runtime-contract";
 import { FakeRuntimeAdapter } from "@anastom/runtime-fake";
 
@@ -11,6 +20,7 @@ import {
   materializeEvents,
   replayRun,
   type RunEvent,
+  findExecutableNodes,
 } from "./index.js";
 
 const created: RunEvent = {
@@ -39,6 +49,121 @@ describe("event transitions", () => {
         reason: "dependencies-satisfied",
       }),
     ).toThrow('Unknown node "constructor"');
+  });
+
+  it("assigns a node workspace once before that node starts", () => {
+    const state = applyRunEvent(undefined, created);
+    const assigned = applyRunEvent(state, {
+      type: "NodeWorkspaceAssigned",
+      runId: "run",
+      sequence: 2,
+      nodeId: "work",
+      workspace: {
+        id: "work-space",
+        mode: "readonly",
+        repoRoot: "/repo",
+        path: "/repo",
+        baseCommit: "base",
+      },
+    });
+    expect(assigned.nodeWorkspaces?.work).toMatchObject({ id: "work-space", mode: "readonly" });
+    expect(() =>
+      applyRunEvent(assigned, {
+        type: "NodeWorkspaceAssigned",
+        runId: "run",
+        sequence: 3,
+        nodeId: "work",
+        workspace: {
+          id: "replacement",
+          mode: "readonly",
+          repoRoot: "/repo",
+          path: "/repo",
+          baseCommit: "base",
+        },
+      }),
+    ).toThrow("Node workspace can only be assigned once");
+  });
+
+  it("folds one validated planner expansion into deterministic scheduling", async () => {
+    const feature = normalizeFeature(
+      parseFeatureMarkdown(`---
+apiVersion: anastom.dev/v1alpha1
+kind: Feature
+metadata: {id: test/expanded, version: 0.1.0}
+acceptanceCriteria: [Both independent changes are present]
+verification:
+  - id: test
+    argv: [pnpm, test]
+    maxDuration: 1m
+policies: {maxTasks: 2, maxParallel: 2}
+---
+Implement two independent changes and verify their integrated result.
+`),
+      "/tmp/expanded-feature.md",
+    );
+    const methodology = await loadSdlcMethodology(resolve("methodologies/sdlc/default"));
+    const workflow = compileSdlcFeature(feature, methodology, { protectedPaths: ["feature.md"] });
+    const plan = normalizeFeaturePlan(
+      {
+        summary: "Implement two independent files before deterministic integration.",
+        tasks: [
+          {
+            id: "left",
+            title: "Left change",
+            objective: "Implement the complete left-side change.",
+            acceptanceCriteria: ["Left behavior is present"],
+            dependsOn: [],
+            mutationScopes: ["left.txt"],
+          },
+          {
+            id: "right",
+            title: "Right change",
+            objective: "Implement the complete right-side change.",
+            acceptanceCriteria: ["Right behavior is present"],
+            dependsOn: [],
+            mutationScopes: ["right.txt"],
+          },
+        ],
+        risks: [],
+      },
+      feature.policies,
+    );
+    const start: RunEvent = {
+      ...created,
+      workflowId: workflow.metadata.id,
+      workflowVersion: workflow.metadata.version,
+      nodeIds: [...workflow.nodeOrder],
+    };
+    const planned = materializeEvents(applyRunEvent(undefined, start), "run", [
+      { type: "NodeReady", nodeId: "analysis", reason: "dependencies-satisfied" },
+      { type: "AttemptScheduled", nodeId: "analysis", attempt: 1, runtimeId: "fake" },
+      { type: "AttemptStarted", nodeId: "analysis", attempt: 1 },
+      { type: "AttemptSucceeded", nodeId: "analysis", attempt: 1, output: { accepted: true } },
+      { type: "NodeSucceeded", nodeId: "analysis" },
+      { type: "NodeReady", nodeId: "planning", reason: "dependencies-satisfied" },
+      { type: "AttemptScheduled", nodeId: "planning", attempt: 1, runtimeId: "fake" },
+      { type: "AttemptStarted", nodeId: "planning", attempt: 1 },
+      { type: "AttemptSucceeded", nodeId: "planning", attempt: 1, output: { accepted: true } },
+      { type: "NodeSucceeded", nodeId: "planning" },
+      {
+        type: "WorkflowExpanded",
+        sourceNodeId: "planning",
+        plan,
+        expansion: expandSdlcPlan(feature, methodology, plan),
+      },
+    ]).state;
+
+    expect(findExecutableNodes(workflow, planned)).toEqual(["implement.left", "implement.right"]);
+    expect(() =>
+      applyRunEvent(planned, {
+        type: "WorkflowExpanded",
+        runId: "run",
+        sequence: planned.sequence + 1,
+        sourceNodeId: "planning",
+        plan,
+        expansion: expandSdlcPlan(feature, methodology, plan),
+      }),
+    ).toThrow("can occur once");
   });
 
   it("rejects gaps and duplicate events during replay", () => {
@@ -400,7 +525,7 @@ describe("InMemoryRunPersistence", () => {
       metadata: { id: "test/workflow", version: "0.1.0" },
       sourcePath: "/tmp/workflow.yaml",
       inputs: {},
-      policies: { defaultAttemptBudget: { maxAttempts: 1 } },
+      policies: { defaultAttemptBudget: { maxAttempts: 1 }, maxParallel: 1 },
       nodeOrder: ["work"],
       nodes: {
         work: {

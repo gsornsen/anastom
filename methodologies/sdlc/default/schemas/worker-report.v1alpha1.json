@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://anastom.dev/methodologies/sdlc/default/worker-report.v1alpha1.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "changedFiles", "notes"],
+  "properties": {
+    "summary": { "type": "string", "minLength": 30, "maxLength": 8192 },
+    "changedFiles": {
+      "type": "array",
+      "maxItems": 256,
+      "items": { "type": "string", "minLength": 1, "maxLength": 4096 }
+    },
+    "notes": {
+      "type": "array",
+      "maxItems": 64,
+      "items": { "type": "string", "minLength": 1, "maxLength": 4096 }
+    }
+  }
+}

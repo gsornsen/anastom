@@ -112,7 +112,10 @@ describe("workspace checkpoints", () => {
   it("ignores only the later artifact reference during comparison", async () => {
     const { manager, workspace } = await setup("artifact");
     const capture = await captureWorkspaceCheckpoint(manager, workspace);
-    const withArtifact = { ...capture.checkpoint, diffArtifactId: "artifact-1" };
+    const withArtifact = {
+      ...capture.checkpoint,
+      diffArtifactId: "implement.left-1-diff-sha256",
+    };
     expect(compareWorkspaceCheckpoints(capture.checkpoint, withArtifact)).toEqual({
       matches: true,
       differences: [],

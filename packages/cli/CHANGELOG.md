@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Merge explicit authored Feature protected paths with CLI-selected Feature and methodology inputs before creating the run topology.
+- Add `anastom run <feature.md> --method sdlc/default --runtime ...` composition through the production durable coordinator. The Feature and any repository-local methodology resources are protected inputs, while external methodology content is retained in the immutable snapshot; successful work remains on its run-owned integration branch.
+- Stream only post-commit public Task observations through a cursor-aware renderer: concise colored terminal lines for TTYs and one schema-valid JSON value per line for pipes. Include the derived evidence ledger in complete JSON inspection.
+- Compose process-independent Feature topology loading, task workspace creation, scoped patch capture, and prepared integration recovery behind the durable coordinator boundary.
 - Keep CLI inspection and injected-output helper types internal to their actual source modules instead of advertising unused entry-point exports.
 - Compose the fenced store, shared execution host, exact runtime registry, workspace checkpoints, and artifact store for recoverable Pi, Codex, and Claude Code Task runs. Add `pause`, `cancel`, and `resume`, operation IDs, operational status/inspection, snapshot provenance, typed ownership diagnostics, and exit-code `2` for invalid usage or missing runs. Remove the superseded fake Task path while retaining deterministic fake YAML workflows.
 - Scope authored Task/Workflow/schema reads to the CLI's current source directory, rejecting absolute, traversal, and symlink escapes; run from the containing source tree when using an external Task file.

@@ -3,12 +3,14 @@ import capabilities from "../../runtime-contract/schemas/capabilities.v1alpha1.j
 import observation from "../../runtime-contract/schemas/observation.v1alpha1.json" with { type: "json" };
 import runtimeDescriptor from "../../runtime-contract/schemas/runtime-descriptor.v1alpha1.json" with { type: "json" };
 import { assertRuntimeDescriptor } from "@anastom/runtime-contract";
+import { assertNormalizedFeaturePlan, assertSdlcGraphExpansion, digestJson } from "@anastom/core";
 import type { RunEvent } from "./events.js";
 
 const str = { type: "string" };
 const positive = { type: "integer", minimum: 1, maximum: Number.MAX_SAFE_INTEGER };
 const nonnegative = { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER };
 const digest = { type: "string", pattern: "^sha256:[a-f0-9]{64}$" };
+const gitObject = { type: "string", pattern: "^[0-9a-f]{40,64}$" };
 const identifier = { type: "string", pattern: "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$" };
 const object = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({
   type: "object",
@@ -154,11 +156,35 @@ const recoveryBlockReason = {
       },
     }),
     object({ kind: { const: "cleanup-unknown" }, executionId: identifier }),
+    object({
+      kind: { const: "cleanup-unknown-set" },
+      executionIds: { type: "array", minItems: 1, uniqueItems: true, items: identifier },
+    }),
+    object({
+      kind: { const: "integration-unknown" },
+      nodeId: str,
+      preparationDigest: digest,
+    }),
   ],
 };
 const node = { nodeId: str };
 const attempt = { ...node, attempt: positive };
 const reason = { reason: str };
+const integrationPreparation = object({
+  version: { const: "anastom.dev/integration-preparation/v1alpha1" },
+  workspaceId: identifier,
+  branch: str,
+  parentCommit: gitObject,
+  patches: {
+    type: "array",
+    minItems: 1,
+    uniqueItems: true,
+    items: object({ taskId: identifier, digest }),
+  },
+  tree: gitObject,
+  expectedCommit: gitObject,
+  preparationDigest: digest,
+});
 const fields: Record<string, Record<string, unknown>> = {
   RuntimeNegotiated: {
     negotiation: object({
@@ -225,6 +251,29 @@ const fields: Record<string, Record<string, unknown>> = {
   RunCancelled: reason,
   RunCompleted: { outcome: { enum: ["succeeded", "failed"] } },
   WorkspaceAssigned: { workspace },
+  NodeWorkspaceAssigned: { ...node, workspace },
+  WorkflowExpanded: {
+    sourceNodeId: str,
+    plan: { type: "object" },
+    expansion: { type: "object" },
+  },
+  TaskPatchAccepted: {
+    patch: object({
+      taskId: identifier,
+      nodeId: str,
+      attempt: positive,
+      workspaceId: identifier,
+      baseCommit: gitObject,
+      headCommit: gitObject,
+      changedFiles: { type: "array", uniqueItems: true, items: str },
+      mutationScopes: { type: "array", minItems: 1, uniqueItems: true, items: str },
+      patchArtifactId: identifier,
+      patchDigest: digest,
+    }),
+  },
+  IntegrationPrepared: { ...node, preparation: integrationPreparation },
+  IntegrationCommitted: { ...node, commit: gitObject, checkpoint: workspaceCheckpoint },
+  IntegrationFailed: { ...node, failure },
   ArtifactProduced: { ...attempt, artifact },
   WorkspaceObserved: {
     ...attempt,
@@ -347,6 +396,18 @@ function validatorForEventType(type: string) {
       return validators.get("RunCompleted");
     case "WorkspaceAssigned":
       return validators.get("WorkspaceAssigned");
+    case "NodeWorkspaceAssigned":
+      return validators.get("NodeWorkspaceAssigned");
+    case "WorkflowExpanded":
+      return validators.get("WorkflowExpanded");
+    case "TaskPatchAccepted":
+      return validators.get("TaskPatchAccepted");
+    case "IntegrationPrepared":
+      return validators.get("IntegrationPrepared");
+    case "IntegrationCommitted":
+      return validators.get("IntegrationCommitted");
+    case "IntegrationFailed":
+      return validators.get("IntegrationFailed");
     case "ArtifactProduced":
       return validators.get("ArtifactProduced");
     case "WorkspaceObserved":
@@ -372,6 +433,20 @@ export function assertRunEvent(value: unknown): asserts value is RunEvent {
   const validate = validatorForEventType(value.type);
   if (!validate || !validate(value)) {
     throw new Error("Corrupt run event " + value.type + ": " + ajv.errorsText(validate?.errors));
+  }
+  if (value.type === "WorkflowExpanded") {
+    const expanded = value as unknown as { plan: unknown; expansion: unknown };
+    assertNormalizedFeaturePlan(expanded.plan);
+    assertSdlcGraphExpansion(expanded.expansion);
+  }
+  if (value.type === "IntegrationPrepared") {
+    const event = value as unknown as {
+      preparation: Record<string, unknown> & { preparationDigest: string };
+    };
+    const { preparationDigest, ...content } = event.preparation;
+    if (digestJson(content) !== preparationDigest) {
+      throw new Error("Corrupt run event IntegrationPrepared: preparation digest disagrees");
+    }
   }
   if (value.type === "RuntimeConfigured") {
     try {

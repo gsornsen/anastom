@@ -2,6 +2,9 @@ import { randomUUID } from "node:crypto";
 
 import {
   canonicalJson,
+  expandSdlcPlan,
+  normalizeFeaturePlan,
+  parseReviewReport,
   validateJsonValue,
   type JsonValue,
   type WorkflowDefinition,
@@ -59,8 +62,10 @@ import {
   type RunEvent,
   type RunEventPayload,
   type RunState,
+  type IntegrationPreparationEvidence,
 } from "./events.js";
 import { RunNotFoundError } from "./engine.js";
+import { resolveRunWorkflowGraph, resolveRunWorkflowNode } from "./graph.js";
 import { findExecutableNodes, findReadyNodes } from "./scheduler.js";
 
 const CONTROL_POLL_INTERVAL_MS = 500;
@@ -75,6 +80,50 @@ export interface DurableWorkspaceBoundary {
     expected: WorkspaceCheckpoint,
     observed: WorkspaceCheckpoint,
   ): { matches: boolean; differences: WorkspaceDifference[] };
+  /** Create one owned task workspace at the current exact integration commit. */
+  createTaskWorkspace?(options: {
+    runId: string;
+    taskId: string;
+    baseCommit: string;
+  }): Promise<Extract<WorkspaceRef, { mode: "isolated" }>>;
+  /** Validate and capture an implementation patch against its declared scope. */
+  captureAcceptedPatch?(options: {
+    runId: string;
+    taskId: string;
+    workspace: Extract<WorkspaceRef, { mode: "isolated" }>;
+    mutationScopes: readonly string[];
+  }): Promise<{
+    version: "anastom.dev/accepted-workspace-patch/v1alpha1";
+    workspaceId: string;
+    baseCommit: string;
+    headCommit: string;
+    changedFiles: readonly string[];
+    mutationScopes: readonly string[];
+    patch: Uint8Array;
+    patchDigest: string;
+  }>;
+  /** Compute a deterministic integration commit without moving its branch. */
+  prepareIntegration?(options: {
+    runId: string;
+    patches: readonly {
+      taskId: string;
+      accepted: {
+        version: "anastom.dev/accepted-workspace-patch/v1alpha1";
+        workspaceId: string;
+        baseCommit: string;
+        headCommit: string;
+        changedFiles: readonly string[];
+        mutationScopes: readonly string[];
+        patch: Uint8Array;
+        patchDigest: string;
+      };
+    }[];
+  }): Promise<IntegrationPreparationEvidence>;
+  /** Reconcile the prepared parent/result pair and synchronize the owned worktree. */
+  reconcileIntegration?(options: {
+    runId: string;
+    preparation: IntegrationPreparationEvidence;
+  }): Promise<{ outcome: "committed"; commit: string }>;
 }
 
 /** Exact descriptor registry supplied by the composition root without vendor imports in the engine. */
@@ -101,6 +150,12 @@ export interface DurableRunCoordinatorOptions {
   owner: LocalProcessIdentity;
   /** Observe the process identity recorded by a prior lease without signalling it. */
   observeProcess: (owner: LocalProcessIdentity) => Promise<ProcessObservation>;
+  /** Observe committed transitions for presentation; observer failures never affect authority. */
+  observeCommittedEvents?: (
+    events: readonly RunEvent[],
+    state: RunState,
+    workflow: WorkflowDefinition,
+  ) => void;
   /** Injectable cryptographic UUIDv4 run factory for deterministic tests. */
   createRunId?: () => string;
   /** Injectable cryptographic UUIDv4 lease-owner factory for deterministic tests. */
@@ -119,6 +174,8 @@ export interface CreateDurableRunOptions {
   inputs?: Record<string, JsonValue>;
   /** Authenticated filesystem workspace; in-memory workspaces are not recoverable. */
   workspace: Exclude<WorkspaceRef, { mode: "memory" }>;
+  /** Optional per-node filesystem assignments used when independent nodes may run together. */
+  nodeWorkspaces?: Readonly<Record<string, Exclude<WorkspaceRef, { mode: "memory" }>>>;
   /** Exact credential-free runtime selection persisted before any attempt. */
   descriptor: RuntimeDescriptor;
 }
@@ -156,19 +213,19 @@ interface RuntimeDriveResult {
   logs: Buffer;
 }
 
-interface RuntimeDriveControl {
-  kind: "control";
-  control: ControlRequest;
-  observation: ExecutionObservation;
-}
-
 interface RuntimeDriveTimeout {
   kind: "timeout";
   observation: ExecutionObservation;
   logs: Buffer;
 }
 
-type RuntimeDriveOutcome = RuntimeDriveResult | RuntimeDriveControl | RuntimeDriveTimeout;
+type RuntimeDriveOutcome = RuntimeDriveResult | RuntimeDriveTimeout;
+
+interface RuntimeDriveStopped {
+  kind: "stopped";
+}
+
+type ConcurrentDriveOutcome = RuntimeDriveOutcome | RuntimeDriveStopped;
 
 interface PreparedAttempt {
   node: WorkflowNode;
@@ -179,6 +236,18 @@ interface PreparedAttempt {
   launch: PrepareExecution;
   checkpoint: WorkspaceCheckpoint;
 }
+
+interface ActiveAttempt {
+  prepared: PreparedAttempt;
+  owned: OwnedExecution;
+  abort: AbortController;
+  outcome: Promise<ConcurrentDriveOutcome>;
+}
+
+type ActiveTurn =
+  | { kind: "control"; control: ControlRequest }
+  | { kind: "completed"; nodeId: string; outcome: ConcurrentDriveOutcome }
+  | { kind: "failed"; nodeId: string; error: unknown };
 
 interface FinishResultOptions {
   prepared: PreparedAttempt;
@@ -192,7 +261,6 @@ interface ReconcileAttemptOptions {
   control?: ControlRequest;
   controlAlreadyObserved: boolean;
   operationId: string;
-  descriptor: RuntimeDescriptor;
 }
 
 interface RecoveredAbsenceOptions {
@@ -222,6 +290,7 @@ export class DurableRunCoordinator {
   private readonly runtimes: CoordinatorRuntimeRegistry;
   private readonly owner: LocalProcessIdentity;
   private readonly observeProcess: (owner: LocalProcessIdentity) => Promise<ProcessObservation>;
+  private readonly observeCommittedEvents?: DurableRunCoordinatorOptions["observeCommittedEvents"];
   private readonly createRunId: () => string;
   private readonly createOwnerId: () => string;
   private readonly createOperationId: () => string;
@@ -237,6 +306,7 @@ export class DurableRunCoordinator {
     this.runtimes = options.runtimes;
     this.owner = structuredClone(options.owner);
     this.observeProcess = options.observeProcess;
+    this.observeCommittedEvents = options.observeCommittedEvents;
     this.createRunId = options.createRunId ?? randomUUID;
     this.createOwnerId = options.createOwnerId ?? randomUUID;
     this.createOperationId = options.createOperationId ?? randomUUID;
@@ -288,6 +358,7 @@ export class DurableRunCoordinator {
       workflow: loaded.workflow,
       loaded,
       createOperationId: this.createOperationId,
+      observeCommittedEvents: this.observeCommittedEvents,
     });
     return this.finishOwnedSession(session, () =>
       this.coordinateRecovered(session, loaded.events, descriptor, operationId),
@@ -304,7 +375,11 @@ export class DurableRunCoordinator {
     options: CreateDurableRunOptions,
   ): Promise<OwnedRunSession> {
     const descriptor = this.parseDescriptor(options.descriptor);
-    validateDurableRunInputs(workflow, options.inputs ?? {}, options.workspace, descriptor);
+    validateDurableRunInputs(workflow, options.inputs ?? {}, {
+      workspace: options.workspace,
+      descriptor,
+      nodeWorkspaces: options.nodeWorkspaces,
+    });
     const runId = options.runId ?? this.createRunId();
     const created = materializeEvents(undefined, runId, [
       {
@@ -319,6 +394,11 @@ export class DurableRunCoordinator {
     const initialized = materializeEvents(created.state, runId, [
       { type: "RuntimeConfigured", descriptor },
       { type: "WorkspaceAssigned", workspace: structuredClone(options.workspace) },
+      ...Object.entries(options.nodeWorkspaces ?? {}).map(([nodeId, workspace]) => ({
+        type: "NodeWorkspaceAssigned" as const,
+        nodeId,
+        workspace: structuredClone(workspace),
+      })),
       ...findExecutableNodes(workflow, created.state).map((nodeId) => ({
         type: "NodeReady" as const,
         nodeId,
@@ -336,12 +416,18 @@ export class DurableRunCoordinator {
       operationId: this.createOperationId(),
       snapshot,
     });
+    try {
+      this.observeCommittedEvents?.(events, initialized.state, workflow);
+    } catch {
+      // Presentation observers cannot change an already committed workflow decision.
+    }
     return new OwnedRunSession({
       store: this.store,
       lease: receipt.lease,
       workflow,
       loaded: { state: initialized.state, eventPrefixDigest: snapshot.eventPrefixDigest },
       createOperationId: this.createOperationId,
+      observeCommittedEvents: this.observeCommittedEvents,
     });
   }
 
@@ -407,24 +493,39 @@ export class DurableRunCoordinator {
   ): Promise<RunState> {
     const outstanding = outstandingObservedControl(events);
     const pending = outstanding ?? (await this.store.pendingControls(session.lease.runId, 1))[0];
-    const active = currentOwnedAttempt(session.state);
-    if (active) {
-      if (
-        !active.attempt.executionPlan ||
-        (active.attempt.status === "running" && !active.attempt.execution)
-      ) {
-        throw new RunStoreError(
-          "corrupt-store",
-          `Run ${session.lease.runId} has incomplete execution ownership evidence`,
-        );
+    if (!(await this.reconcileInterruptedIntegration(session, operationId))) {
+      return session.state;
+    }
+    const active = currentOwnedAttempts(session.state);
+    if (active.length > 0) {
+      if (pending && outstanding === undefined) {
+        await this.observeControl(session, pending);
       }
-      await this.reconcileOwnedAttempt(session, {
-        nodeId: active.nodeId,
-        ...(pending ? { control: pending } : {}),
-        controlAlreadyObserved: outstanding !== undefined,
-        operationId,
-        descriptor,
-      });
+      for (const owned of active) {
+        if (
+          !owned.attempt.executionPlan ||
+          (owned.attempt.status === "running" && !owned.attempt.execution)
+        ) {
+          throw new RunStoreError(
+            "corrupt-store",
+            `Run ${session.lease.runId} has incomplete execution ownership evidence`,
+          );
+        }
+        await this.reconcileOwnedAttempt(session, {
+          nodeId: owned.nodeId,
+          ...(pending ? { control: pending } : {}),
+          controlAlreadyObserved: true,
+          operationId,
+        });
+      }
+      if (session.state.status === "recovery-blocked") {
+        return session.state;
+      }
+      if (pending) {
+        await this.finishRecoveredControl(session, currentOrphanedNodeIds(session.state), pending);
+      } else {
+        await this.continueOrphaned(session, descriptor, operationId);
+      }
     } else if (pending) {
       await this.applyBoundaryControl(session, pending, outstanding === undefined);
     }
@@ -432,11 +533,10 @@ export class DurableRunCoordinator {
       return session.state;
     }
     if (session.state.status === "recovery-blocked") {
-      const orphaned = currentOrphanedAttempt(session.state);
-      if (!orphaned) {
+      if (currentOrphanedNodeIds(session.state).length === 0) {
         return session.state;
       }
-      await this.continueOrphaned(session, orphaned.nodeId, descriptor, operationId);
+      await this.continueOrphaned(session, descriptor, operationId);
     }
     if (session.state.status === "paused") {
       await this.resumePaused(session, descriptor, operationId);
@@ -447,52 +547,143 @@ export class DurableRunCoordinator {
     return this.coordinateRunning(session, descriptor);
   }
 
+  private async reconcileInterruptedIntegration(
+    session: OwnedRunSession,
+    operationId: string,
+  ): Promise<boolean> {
+    const prepared = Object.entries(session.state.integrations ?? {}).find(
+      ([, integration]) => integration.committed === undefined,
+    );
+    if (!prepared) {
+      return true;
+    }
+    return this.reconcilePreparedIntegration(
+      session,
+      prepared[0],
+      prepared[1].preparation,
+      operationId,
+    );
+  }
+
   private async coordinateRunning(
     session: OwnedRunSession,
     descriptor: RuntimeDescriptor,
   ): Promise<RunState> {
+    const active = new Map<string, ActiveAttempt>();
     while (session.state.status === "running") {
       const boundaryControl = (await this.store.pendingControls(session.lease.runId, 1))[0];
       if (boundaryControl) {
-        await this.applyBoundaryControl(session, boundaryControl, true);
-        continue;
-      }
-      let ready = findReadyNodes(session.workflow, session.state)[0];
-      if (!ready) {
-        const executable = findExecutableNodes(session.workflow, session.state);
-        if (executable.length === 0) {
-          return session.state;
+        if (active.size === 0) {
+          await this.applyBoundaryControl(session, boundaryControl, true);
+        } else {
+          await this.finishConcurrentControl(session, active, boundaryControl, true);
         }
-        await session.commit(
-          executable.map((nodeId) => ({
-            type: "NodeReady" as const,
-            nodeId,
-            reason: "dependencies-satisfied" as const,
-          })),
+        continue;
+      }
+      const readyBeforeExpansion = findReadyNodes(session.workflow, session.state);
+      if (readyBeforeExpansion.length === 0) {
+        const executable = findExecutableNodes(session.workflow, session.state);
+        if (executable.length > 0) {
+          await this.provisionTaskWorkspaces(session, executable);
+          await session.commit(
+            executable.map((nodeId) => ({
+              type: "NodeReady" as const,
+              nodeId,
+              reason: "dependencies-satisfied" as const,
+            })),
+          );
+        }
+      }
+      const capacity =
+        resolveRunWorkflowGraph(session.workflow, session.state).maxParallel - active.size;
+      const selected = findReadyNodes(session.workflow, session.state).slice(0, capacity);
+      if (await this.scheduleReadyNodes(session, descriptor, active, selected)) {
+        continue;
+      }
+      if (session.state.status !== "running") {
+        continue;
+      }
+      if (active.size === 0) {
+        if (Object.values(session.state.nodes).every((node) => node.status === "succeeded")) {
+          await session.commit([{ type: "RunCompleted", outcome: "succeeded" }], {
+            snapshot: true,
+          });
+          continue;
+        }
+        throw new Error("Durable scheduler has no active or schedulable node");
+      }
+      const turn = await this.waitForActiveTurn(session, active);
+      if (turn.kind === "control") {
+        await this.finishConcurrentControl(session, active, turn.control, true);
+        continue;
+      }
+      const completed = active.get(turn.nodeId);
+      active.delete(turn.nodeId);
+      if (!completed) {
+        throw new Error("Completed durable execution is not active");
+      }
+      if (turn.kind === "failed") {
+        await Promise.allSettled(
+          [...active.values()].map(({ prepared }) => this.executionHost.terminate(prepared.plan)),
         );
-        ready = findReadyNodes(session.workflow, session.state)[0];
+        throw turn.error;
       }
-      if (!ready) {
-        throw new Error("Durable scheduler did not produce a ready node");
+      if (turn.outcome.kind === "timeout") {
+        await this.finishTimeout(session, completed.prepared, turn.outcome);
+      } else if (turn.outcome.kind === "result") {
+        await this.finishExecution(session, completed.prepared, turn.outcome);
+      } else if (turn.outcome.kind !== "stopped") {
+        throw new Error("Concurrent execution returned an unexpected control outcome");
       }
-      if (!(await this.ensureAttemptBudget(session, ready))) {
-        continue;
-      }
-      const preflight = await this.preflight(session, descriptor);
-      if (!preflight.ok) {
-        await this.pauseForPreflight(session, preflight.reason);
-        continue;
-      }
-      await this.executeReadyNode(session, ready, descriptor);
+      await this.settleConcurrentRun(session, active);
     }
     return session.state;
   }
 
-  private async executeReadyNode(
+  private async scheduleReadyNodes(
+    session: OwnedRunSession,
+    descriptor: RuntimeDescriptor,
+    active: Map<string, ActiveAttempt>,
+    nodeIds: readonly string[],
+  ): Promise<boolean> {
+    for (const nodeId of nodeIds) {
+      const selectedNode = resolveRunWorkflowNode(session.workflow, session.state, nodeId);
+      if (selectedNode?.kind === "integration") {
+        await this.executeIntegrationNode(session, nodeId);
+        return true;
+      }
+      if (!(await this.ensureAttemptBudget(session, nodeId))) {
+        return false;
+      }
+      const workspace = assignedWorkspace(session.state, nodeId);
+      if (!workspace) {
+        throw new Error("Ready durable node has no filesystem workspace");
+      }
+      const preflight = await this.preflight(session, descriptor, workspace);
+      if (!preflight.ok) {
+        if (active.size > 0) {
+          await this.cancelConcurrentAttempts(session, active, {
+            nodeTransition: "paused",
+            reason: preflight.reason,
+            cause: "pause",
+            operationId: this.createOperationId(),
+            runTransition: "paused",
+          });
+        } else {
+          await this.pauseForPreflight(session, preflight.reason);
+        }
+        return false;
+      }
+      active.set(nodeId, await this.startReadyNode(session, nodeId, descriptor));
+    }
+    return false;
+  }
+
+  private async startReadyNode(
     session: OwnedRunSession,
     nodeId: string,
     descriptor: RuntimeDescriptor,
-  ): Promise<void> {
+  ): Promise<ActiveAttempt> {
     let prepared: PreparedAttempt | undefined;
     try {
       const attempt = await this.prepareAttempt(session, nodeId, descriptor);
@@ -507,16 +698,10 @@ export class DurableRunCoordinator {
         },
       ]);
       const owned = await session.guard(() => this.executionHost.authorize(persisted));
-      const driven = await this.driveExecution(session, attempt, owned);
-      if (driven.kind === "control") {
-        await this.finishActiveControl(session, attempt, driven);
-        return;
-      }
-      if (driven.kind === "timeout") {
-        await this.finishTimeout(session, attempt, driven);
-        return;
-      }
-      await this.finishExecution(session, attempt, driven);
+      const abort = new AbortController();
+      const outcome = this.driveExecution(session, attempt, owned, abort.signal);
+      void outcome.catch(() => undefined);
+      return { prepared: attempt, owned, abort, outcome };
     } catch (error) {
       if (prepared) {
         await this.executionHost.terminate(prepared.plan).catch(() => undefined);
@@ -525,22 +710,271 @@ export class DurableRunCoordinator {
     }
   }
 
+  private async waitForActiveTurn(
+    session: OwnedRunSession,
+    active: ReadonlyMap<string, ActiveAttempt>,
+  ): Promise<ActiveTurn> {
+    const completions = [...active].map(([nodeId, attempt]) =>
+      attempt.outcome.then(
+        (outcome): ActiveTurn => ({ kind: "completed", nodeId, outcome }),
+        (error: unknown): ActiveTurn => ({ kind: "failed", nodeId, error }),
+      ),
+    );
+    for (;;) {
+      const turn = await session.guard(() =>
+        Promise.race([
+          ...completions,
+          new Promise<{ kind: "poll" }>((resolve) => {
+            setTimeout(() => resolve({ kind: "poll" }), CONTROL_POLL_INTERVAL_MS);
+          }),
+        ]),
+      );
+      if (turn.kind !== "poll") {
+        return turn;
+      }
+      const control = (await this.store.pendingControls(session.lease.runId, 1))[0];
+      if (control) {
+        return { kind: "control", control };
+      }
+    }
+  }
+
+  private async finishConcurrentControl(
+    session: OwnedRunSession,
+    active: Map<string, ActiveAttempt>,
+    control: ControlRequest,
+    observe: boolean,
+  ): Promise<void> {
+    if (observe) {
+      await this.observeControl(session, control);
+    }
+    const reason: PauseReason = { kind: "operator", operationId: control.operationId };
+    await this.cancelConcurrentAttempts(session, active, {
+      cause: control.action,
+      operationId: control.operationId,
+      ...(control.action === "pause"
+        ? { nodeTransition: "paused", reason, runTransition: "paused" }
+        : {
+            nodeTransition: "cancelled",
+            reason: "operator",
+            runTransition: "cancelled",
+          }),
+    });
+  }
+
+  private async cancelConcurrentAttempts(
+    session: OwnedRunSession,
+    active: Map<string, ActiveAttempt>,
+    options:
+      | {
+          cause: "pause" | "cancel";
+          operationId: string;
+          nodeTransition: "paused";
+          reason: PauseReason;
+          runTransition?: "paused";
+        }
+      | {
+          cause: "pause" | "cancel";
+          operationId: string;
+          nodeTransition: "cancelled";
+          reason: string;
+          runTransition?: "cancelled";
+        },
+  ): Promise<void> {
+    const attempts = [...active.values()];
+    for (const attempt of attempts) {
+      attempt.abort.abort();
+    }
+    const observations = await Promise.all(
+      attempts.map(async ({ owned, prepared }) =>
+        owned.cancel().catch((): ExecutionObservation => ({
+          state: "unknown",
+          execution: prepared.plan,
+          reason: "cleanup-unconfirmed",
+        })),
+      ),
+    );
+    await Promise.allSettled(attempts.map(({ outcome }) => outcome));
+    active.clear();
+    const payloads: RunEventPayload[] = [];
+    const unresolved: string[] = [];
+    for (const [index, activeAttempt] of attempts.entries()) {
+      const { prepared } = activeAttempt;
+      const observation = observations[index]!;
+      const confirmed = observation.state === "absent";
+      payloads.push({
+        type: "ExecutionCleanupObserved",
+        nodeId: prepared.nodeId,
+        attempt: prepared.attempt,
+        executionId: prepared.plan.executionId,
+        cause: options.cause,
+        outcome: confirmed ? "confirmed" : "unknown",
+      });
+      if (!confirmed) {
+        unresolved.push(prepared.plan.executionId);
+        continue;
+      }
+      const finalCheckpoint = await this.captureCheckpoint(session, {
+        workspace: prepared.request.workspace,
+        nodeId: prepared.nodeId,
+        attempt: prepared.attempt,
+        alwaysPersistDiff: true,
+      });
+      if (!finalCheckpoint.artifact) {
+        throw new Error("Cancelled workspace capture did not publish its diff artifact");
+      }
+      payloads.push(
+        {
+          type: "ArtifactProduced",
+          nodeId: prepared.nodeId,
+          attempt: prepared.attempt,
+          artifact: finalCheckpoint.artifact,
+        },
+        {
+          type: "WorkspaceObserved",
+          nodeId: prepared.nodeId,
+          attempt: prepared.attempt,
+          headCommit: finalCheckpoint.checkpoint.headCommit,
+          changedFiles: finalCheckpoint.checkpoint.changedFiles,
+          diffArtifactId: finalCheckpoint.artifact.id,
+        },
+        {
+          type: "AttemptCancelled",
+          nodeId: prepared.nodeId,
+          attempt: prepared.attempt,
+          reason:
+            options.nodeTransition === "paused" ? `pause-${options.reason.kind}` : options.reason,
+        },
+      );
+      if (options.nodeTransition === "paused") {
+        payloads.push({
+          type: "NodePaused",
+          nodeId: prepared.nodeId,
+          reason: options.reason,
+        });
+      } else {
+        payloads.push({
+          type: "NodeCancelled",
+          nodeId: prepared.nodeId,
+          reason: options.reason,
+        });
+      }
+    }
+    if (unresolved.length > 0) {
+      payloads.push({
+        type: "RunRecoveryBlocked",
+        operationId: options.operationId,
+        reason:
+          unresolved.length === 1
+            ? { kind: "cleanup-unknown", executionId: unresolved[0]! }
+            : { kind: "cleanup-unknown-set", executionIds: unresolved },
+      });
+    } else if (options.runTransition === "paused") {
+      payloads.push({ type: "RunPaused", reason: options.reason });
+    } else if (options.runTransition === "cancelled") {
+      const activeNodeIds = new Set(attempts.map(({ prepared }) => prepared.nodeId));
+      payloads.push(...cancelNodePayloads(session.state, "operator", activeNodeIds), {
+        type: "RunCancelled",
+        operationId: options.operationId,
+        reason: "operator",
+      });
+    }
+    await session.commit(payloads, { snapshot: true });
+  }
+
+  private async settleConcurrentRun(
+    session: OwnedRunSession,
+    active: Map<string, ActiveAttempt>,
+  ): Promise<void> {
+    const failed = Object.values(session.state.nodes).find((node) => node.status === "failed");
+    const blocked = Object.values(session.state.nodes).find((node) => node.status === "blocked");
+    const cancelled = Object.values(session.state.nodes).find(
+      (node) => node.status === "cancelled",
+    );
+    const paused = Object.values(session.state.nodes).find((node) => node.status === "paused");
+    if (!failed && !blocked && !cancelled) {
+      if (paused) {
+        await this.settleConcurrentPause(session, active, paused);
+      }
+      return;
+    }
+    if (active.size > 0) {
+      let siblingReason = "sibling-cancelled";
+      if (failed) {
+        siblingReason = "sibling-failed";
+      } else if (blocked) {
+        siblingReason = "sibling-blocked";
+      }
+      await this.cancelConcurrentAttempts(session, active, {
+        cause: "cancel",
+        operationId: this.createOperationId(),
+        nodeTransition: "cancelled",
+        reason: siblingReason,
+      });
+    }
+    if (session.state.status === "recovery-blocked") {
+      return;
+    }
+    if (failed) {
+      await session.commit(
+        [
+          ...blockedNodePayloads(session.state, failed.id, "A dependency failed"),
+          { type: "RunCompleted", outcome: "failed" },
+        ],
+        { snapshot: true },
+      );
+    } else if (blocked) {
+      await session.commit(
+        [
+          ...blockedNodePayloads(session.state, blocked.id, blocked.blockedReason ?? "Run blocked"),
+          { type: "RunBlocked", reason: blocked.blockedReason ?? "Run blocked" },
+        ],
+        { snapshot: true },
+      );
+    } else if (cancelled) {
+      await session.commit(
+        [
+          ...cancelNodePayloads(session.state, "execution-cancelled"),
+          { type: "RunCancelled", reason: "execution-cancelled" },
+        ],
+        { snapshot: true },
+      );
+    }
+  }
+
+  private async settleConcurrentPause(
+    session: OwnedRunSession,
+    active: Map<string, ActiveAttempt>,
+    paused: { id: string; pauseReason?: PauseReason },
+  ): Promise<void> {
+    if (!paused.pauseReason) {
+      throw new Error(`Paused node ${paused.id} has no durable pause reason`);
+    }
+    if (active.size > 0) {
+      await this.cancelConcurrentAttempts(session, active, {
+        cause: "pause",
+        operationId: this.createOperationId(),
+        nodeTransition: "paused",
+        reason: paused.pauseReason,
+        runTransition: "paused",
+      });
+      return;
+    }
+    await session.commit([{ type: "RunPaused", reason: paused.pauseReason }], {
+      snapshot: true,
+    });
+  }
+
   private async prepareAttempt(
     session: OwnedRunSession,
     nodeId: string,
     descriptor: RuntimeDescriptor,
   ): Promise<PreparedAttempt> {
     const state = session.state;
-    const node = session.workflow.nodes[nodeId];
+    const node = resolveRunWorkflowNode(session.workflow, state, nodeId);
     const nodeState = state.nodes[nodeId];
-    const workspace = state.workspace;
-    if (
-      !node ||
-      !nodeState ||
-      nodeState.status !== "ready" ||
-      !workspace ||
-      workspace.mode === "memory"
-    ) {
+    const workspace = assignedWorkspace(state, nodeId);
+    if (!node || !nodeState || nodeState.status !== "ready" || !workspace) {
       throw new Error("Ready durable attempt is missing its node or filesystem workspace");
     }
     const attempt = nodeState.attempts.length + 1;
@@ -577,10 +1011,11 @@ export class DurableRunCoordinator {
       generation: session.lease.generation,
       coordinator: this.owner,
     };
-    const input =
-      node.kind === "command" && node.command
-        ? createPrepareExecution({ ...unplanned, command: node.command, workspace })
-        : createPrepareExecution({ ...unplanned, descriptor, request });
+    const runsCommand =
+      (node.kind === "command" || node.kind === "verifier") && node.command !== undefined;
+    const input = runsCommand
+      ? createPrepareExecution({ ...unplanned, command: node.command!, workspace })
+      : createPrepareExecution({ ...unplanned, descriptor, request });
     const artifactPayloads: RunEventPayload[] = [
       { type: "ArtifactProduced", nodeId, attempt, artifact: contextArtifact },
       ...(checkpoint.artifact
@@ -593,7 +1028,7 @@ export class DurableRunCoordinator {
           type: "AttemptScheduled",
           nodeId,
           attempt,
-          runtimeId: node.kind === "command" ? "command" : descriptor.runtimeId,
+          runtimeId: runsCommand ? "command" : descriptor.runtimeId,
         },
         ...artifactPayloads,
         {
@@ -621,7 +1056,8 @@ export class DurableRunCoordinator {
     session: OwnedRunSession,
     prepared: PreparedAttempt,
     owned: OwnedExecution,
-  ): Promise<RuntimeDriveOutcome> {
+    signal = new AbortController().signal,
+  ): Promise<ConcurrentDriveOutcome> {
     const iterator = owned.events()[Symbol.asyncIterator]();
     const collection = owned.collect();
     void collection.catch(() => undefined);
@@ -633,6 +1069,10 @@ export class DurableRunCoordinator {
     const deadline = maxDurationMs === undefined ? undefined : Date.now() + maxDurationMs;
     for (;;) {
       const turn = await session.guard(() => waitForExecutionTurn(next, deadline));
+      if (signal.aborted) {
+        await iterator.return?.().catch(() => undefined);
+        return { kind: "stopped" };
+      }
       if (turn.kind === "event") {
         if (turn.value.done) {
           const result = await session.guard(() => collection);
@@ -681,15 +1121,7 @@ export class DurableRunCoordinator {
           logs: Buffer.concat(logs),
         };
       }
-      const control = (await this.store.pendingControls(session.lease.runId, 1))[0];
-      if (!control) {
-        continue;
-      }
-      await this.observeControl(session, control);
-      const cancellation = owned.cancel();
-      await iterator.return?.().catch(() => undefined);
-      const observation = await cancellation;
-      return { kind: "control", control, observation };
+      continue;
     }
   }
 
@@ -765,7 +1197,7 @@ export class DurableRunCoordinator {
         });
       }
     }
-    const workspace = session.state.workspace;
+    const workspace = prepared.request.workspace;
     if (!workspace || workspace.mode === "memory") {
       throw new Error("Durable attempt lost its filesystem workspace");
     }
@@ -806,7 +1238,34 @@ export class DurableRunCoordinator {
     session: OwnedRunSession,
     options: FinishResultOptions,
   ): Promise<void> {
-    const { prepared, result, evidence, comparison } = options;
+    const { prepared, comparison } = options;
+    const evidence = [...options.evidence];
+    let { result } = options;
+    let expansionPayload: Extract<RunEventPayload, { type: "WorkflowExpanded" }> | undefined;
+    const configured = session.workflow.definedSdlc;
+    if (
+      result.status === "succeeded" &&
+      configured &&
+      prepared.nodeId === configured.planningNodeId
+    ) {
+      try {
+        const plan = normalizeFeaturePlan(result.output, configured.feature.policies);
+        expansionPayload = {
+          type: "WorkflowExpanded",
+          sourceNodeId: prepared.nodeId,
+          plan,
+          expansion: expandSdlcPlan(configured.feature, configured.methodology, plan),
+        };
+      } catch {
+        result = {
+          status: "failed",
+          failure: {
+            category: "schema-violation",
+            message: "Planner output violates the configured Feature planning policy",
+          },
+        };
+      }
+    }
     if (result.status === "blocked") {
       const reason = result.reason;
       await session.commit(
@@ -814,8 +1273,6 @@ export class DurableRunCoordinator {
           ...evidence,
           { type: "AttemptBlocked", nodeId: prepared.nodeId, attempt: prepared.attempt, reason },
           { type: "NodeBlocked", nodeId: prepared.nodeId, reason },
-          ...blockedNodePayloads(session.state, prepared.nodeId, reason),
-          { type: "RunBlocked", reason },
         ],
         { snapshot: true },
       );
@@ -831,8 +1288,7 @@ export class DurableRunCoordinator {
             attempt: prepared.attempt,
             reason: result.reason,
           },
-          ...cancelNodePayloads(session.state, result.reason),
-          { type: "RunCancelled", reason: result.reason },
+          { type: "NodeCancelled", nodeId: prepared.nodeId, reason: result.reason },
         ],
         { snapshot: true },
       );
@@ -849,29 +1305,25 @@ export class DurableRunCoordinator {
           failure,
         },
       ];
-      if (!comparison.matches) {
+      if (prepared.attempt >= prepared.node.attemptBudget.maxAttempts) {
+        terminal.push({ type: "NodeFailed", nodeId: prepared.nodeId, failure });
+      } else if (!comparison.matches) {
         const reason: PauseReason = {
           kind: "workspace-conflict",
           differences: comparison.differences,
         };
-        terminal.push(
-          { type: "NodePaused", nodeId: prepared.nodeId, reason },
-          { type: "RunPaused", reason },
-        );
-      } else if (prepared.attempt < prepared.node.attemptBudget.maxAttempts) {
-        terminal.push({ type: "NodeReady", nodeId: prepared.nodeId, reason: "retry" });
+        terminal.push({ type: "NodePaused", nodeId: prepared.nodeId, reason });
       } else {
-        terminal.push(
-          { type: "NodeFailed", nodeId: prepared.nodeId, failure },
-          ...blockedNodePayloads(session.state, prepared.nodeId, "A dependency failed"),
-          { type: "RunCompleted", outcome: "failed" },
-        );
+        terminal.push({ type: "NodeReady", nodeId: prepared.nodeId, reason: "retry" });
       }
       await session.commit(terminal, { snapshot: true });
       return;
     }
     if (result.status !== "succeeded") {
       throw new Error(`Unhandled execution result ${result.status}`);
+    }
+    if (prepared.node.patchId) {
+      evidence.push(...(await this.acceptTaskPatch(session, prepared)));
     }
     await session.commit(
       [
@@ -883,11 +1335,13 @@ export class DurableRunCoordinator {
           output: result.output,
         },
         { type: "NodeSucceeded", nodeId: prepared.nodeId },
+        ...(expansionPayload ? [expansionPayload] : []),
       ],
       { snapshot: true },
     );
     const ready = findExecutableNodes(session.workflow, session.state);
     if (ready.length > 0) {
+      await this.provisionTaskWorkspaces(session, ready);
       await session.commit(
         ready.map((nodeId) => ({
           type: "NodeReady" as const,
@@ -901,90 +1355,221 @@ export class DurableRunCoordinator {
     }
   }
 
-  private async finishActiveControl(
+  private async provisionTaskWorkspaces(
+    session: OwnedRunSession,
+    nodeIds: readonly string[],
+  ): Promise<void> {
+    for (const nodeId of nodeIds) {
+      const state = session.state;
+      const node = resolveRunWorkflowNode(session.workflow, state, nodeId);
+      if (!node?.patchId || state.nodeWorkspaces?.[nodeId]) {
+        continue;
+      }
+      if (!this.workspace.createTaskWorkspace) {
+        throw new Error("Defined-SDLC execution requires task-workspace creation");
+      }
+      const integration = state.workspace;
+      if (!integration || integration.mode !== "isolated") {
+        throw new Error("Defined-SDLC execution requires an isolated integration workspace");
+      }
+      const integrationDependency = node.needs
+        .map((dependency) => state.nodes[dependency]?.output)
+        .find(
+          (output): output is { commit: string } =>
+            output !== undefined &&
+            output !== null &&
+            !Array.isArray(output) &&
+            typeof output === "object" &&
+            typeof output.commit === "string",
+        );
+      const workspace = await session.guard(() =>
+        this.workspace.createTaskWorkspace!({
+          runId: state.runId,
+          taskId: node.patchId!,
+          baseCommit: integrationDependency?.commit ?? integration.baseCommit,
+        }),
+      );
+      await session.commit([{ type: "NodeWorkspaceAssigned", nodeId, workspace }]);
+    }
+  }
+
+  private async acceptTaskPatch(
     session: OwnedRunSession,
     prepared: PreparedAttempt,
-    driven: RuntimeDriveControl,
-  ): Promise<void> {
-    const cause = driven.control.action;
-    if (driven.observation.state !== "absent") {
-      const reason: RecoveryBlockReason = {
-        kind: "cleanup-unknown",
-        executionId: prepared.plan.executionId,
+  ): Promise<RunEventPayload[]> {
+    if (!this.workspace.captureAcceptedPatch || !prepared.node.patchId) {
+      throw new Error("Defined-SDLC execution requires scoped patch capture");
+    }
+    const workspace = prepared.request.workspace;
+    if (workspace.mode !== "isolated") {
+      throw new Error("Implementation patch capture requires an isolated workspace");
+    }
+    const accepted = await session.guard(() =>
+      this.workspace.captureAcceptedPatch!({
+        runId: session.lease.runId,
+        taskId: prepared.node.patchId!,
+        workspace,
+        mutationScopes: prepared.node.mutationScopes ?? [],
+      }),
+    );
+    const artifact = await this.writeArtifact(session, {
+      nodeId: prepared.nodeId,
+      attempt: prepared.attempt,
+      type: "accepted-patch",
+      mediaType: "text/x-diff",
+      bytes: accepted.patch,
+    });
+    if (artifact.digest !== accepted.patchDigest) {
+      throw new Error("Accepted patch artifact digest changed during persistence");
+    }
+    return [
+      { type: "ArtifactProduced", nodeId: prepared.nodeId, attempt: prepared.attempt, artifact },
+      {
+        type: "TaskPatchAccepted",
+        patch: {
+          taskId: prepared.node.patchId,
+          nodeId: prepared.nodeId,
+          attempt: prepared.attempt,
+          workspaceId: accepted.workspaceId,
+          baseCommit: accepted.baseCommit,
+          headCommit: accepted.headCommit,
+          changedFiles: [...accepted.changedFiles],
+          mutationScopes: [...accepted.mutationScopes],
+          patchArtifactId: artifact.id,
+          patchDigest: artifact.digest,
+        },
+      },
+    ];
+  }
+
+  private async executeIntegrationNode(session: OwnedRunSession, nodeId: string): Promise<void> {
+    const state = session.state;
+    const node = resolveRunWorkflowNode(session.workflow, state, nodeId);
+    if (
+      node?.kind !== "integration" ||
+      !node.controller ||
+      !this.workspace.prepareIntegration ||
+      !this.workspace.reconcileIntegration ||
+      !this.artifacts.read
+    ) {
+      throw new Error("Defined-SDLC execution requires durable integration services");
+    }
+    const patches = await Promise.all(
+      node.controller.taskIds.map(async (taskId) => {
+        const evidence = state.acceptedPatches?.[taskId];
+        const artifact = state.artifacts?.find(
+          (candidate) => candidate.id === evidence?.patchArtifactId,
+        );
+        if (!evidence || !artifact) {
+          throw new Error(`Integration is missing accepted patch ${JSON.stringify(taskId)}`);
+        }
+        const patch = await session.guard(() => this.artifacts.read!(artifact));
+        return {
+          taskId,
+          accepted: {
+            version: "anastom.dev/accepted-workspace-patch/v1alpha1" as const,
+            workspaceId: evidence.workspaceId,
+            baseCommit: evidence.baseCommit,
+            headCommit: evidence.headCommit,
+            changedFiles: [...evidence.changedFiles],
+            mutationScopes: [...evidence.mutationScopes],
+            patch,
+            patchDigest: evidence.patchDigest,
+          },
+        };
+      }),
+    );
+    let preparation: IntegrationPreparationEvidence;
+    try {
+      preparation = await session.guard(() =>
+        this.workspace.prepareIntegration!({ runId: state.runId, patches }),
+      );
+    } catch {
+      const failure: ExecutionFailure = {
+        category: "workspace-conflict",
+        message: "Controller-owned integration could not prepare the accepted patches",
       };
       await session.commit(
         [
-          {
-            type: "ExecutionCleanupObserved",
-            nodeId: prepared.nodeId,
-            attempt: prepared.attempt,
-            executionId: prepared.plan.executionId,
-            cause,
-            outcome: "unknown",
-          },
-          { type: "RunRecoveryBlocked", operationId: driven.control.operationId, reason },
+          { type: "IntegrationFailed", nodeId, failure },
+          ...blockedNodePayloads(session.state, nodeId, "Integration failed"),
+          { type: "RunCompleted", outcome: "failed" },
         ],
         { snapshot: true },
       );
       return;
     }
-    const workspace = session.state.workspace;
-    if (!workspace || workspace.mode === "memory") {
-      throw new Error("Durable attempt lost its filesystem workspace");
-    }
-    const finalCheckpoint = await this.captureCheckpoint(session, {
-      workspace,
-      nodeId: prepared.nodeId,
-      attempt: prepared.attempt,
-      alwaysPersistDiff: true,
+    await session.commit([{ type: "IntegrationPrepared", nodeId, preparation }], {
+      snapshot: true,
     });
-    if (!finalCheckpoint.artifact) {
-      throw new Error("Final workspace capture did not publish its diff artifact");
-    }
-    const common: RunEventPayload[] = [
-      {
-        type: "ArtifactProduced",
-        nodeId: prepared.nodeId,
-        attempt: prepared.attempt,
-        artifact: finalCheckpoint.artifact,
-      },
-      {
-        type: "WorkspaceObserved",
-        nodeId: prepared.nodeId,
-        attempt: prepared.attempt,
-        headCommit: finalCheckpoint.checkpoint.headCommit,
-        changedFiles: finalCheckpoint.checkpoint.changedFiles,
-        diffArtifactId: finalCheckpoint.artifact.id,
-      },
-      {
-        type: "ExecutionCleanupObserved",
-        nodeId: prepared.nodeId,
-        attempt: prepared.attempt,
-        executionId: prepared.plan.executionId,
-        cause,
-        outcome: "confirmed",
-      },
-      {
-        type: "AttemptCancelled",
-        nodeId: prepared.nodeId,
-        attempt: prepared.attempt,
-        reason: `operator-${cause}`,
-      },
-    ];
-    if (cause === "pause") {
-      const reason: PauseReason = { kind: "operator", operationId: driven.control.operationId };
-      common.push(
-        { type: "NodePaused", nodeId: prepared.nodeId, reason },
-        { type: "RunPaused", reason },
+    await this.reconcilePreparedIntegration(session, nodeId, preparation, this.createOperationId());
+  }
+
+  private async reconcilePreparedIntegration(
+    session: OwnedRunSession,
+    nodeId: string,
+    preparation: IntegrationPreparationEvidence,
+    operationId: string,
+  ): Promise<boolean> {
+    const resumesBlockedIntegration =
+      session.state.status === "recovery-blocked" &&
+      session.state.recoveryBlock?.reason.kind === "integration-unknown" &&
+      session.state.recoveryBlock.reason.nodeId === nodeId;
+    try {
+      await this.commitPreparedIntegration(session, nodeId, preparation);
+      if (resumesBlockedIntegration) {
+        await session.commit([{ type: "RunResumed", operationId }], { snapshot: true });
+      }
+      return true;
+    } catch {
+      await session.commit(
+        [
+          {
+            type: "RunRecoveryBlocked",
+            operationId,
+            reason: {
+              kind: "integration-unknown",
+              nodeId,
+              preparationDigest: preparation.preparationDigest,
+            },
+          },
+        ],
+        { snapshot: true },
       );
-    } else {
-      common.push(...cancelNodePayloads(session.state, "operator"), {
-        type: "RunCancelled",
-        operationId: driven.control.operationId,
-        reason: "operator",
-      });
+      return false;
     }
-    await session.commit(common, { snapshot: true });
+  }
+
+  private async commitPreparedIntegration(
+    session: OwnedRunSession,
+    nodeId: string,
+    preparation: IntegrationPreparationEvidence,
+  ): Promise<void> {
+    if (!this.workspace.reconcileIntegration) {
+      throw new Error("Defined-SDLC execution requires durable integration reconciliation");
+    }
+    const reconciled = await session.guard(() =>
+      this.workspace.reconcileIntegration!({ runId: session.lease.runId, preparation }),
+    );
+    const integration = session.state.workspace;
+    if (!integration || integration.mode !== "isolated") {
+      throw new Error("Integration workspace identity is missing");
+    }
+    const captured = await session.guard(() => this.workspace.capture(integration));
+    if (captured.checkpoint.headCommit !== reconciled.commit) {
+      throw new Error("Committed integration checkpoint does not match the prepared commit");
+    }
+    await session.commit(
+      [
+        {
+          type: "IntegrationCommitted",
+          nodeId,
+          commit: reconciled.commit,
+          checkpoint: captured.checkpoint,
+        },
+      ],
+      { snapshot: true },
+    );
   }
 
   private async finishTimeout(
@@ -1024,7 +1609,7 @@ export class DurableRunCoordinator {
       );
       return;
     }
-    const workspace = session.state.workspace;
+    const workspace = prepared.request.workspace;
     if (!workspace || workspace.mode === "memory") {
       throw new Error("Durable attempt lost its filesystem workspace");
     }
@@ -1085,7 +1670,7 @@ export class DurableRunCoordinator {
     session: OwnedRunSession,
     options: ReconcileAttemptOptions,
   ): Promise<void> {
-    const { nodeId, control, operationId, descriptor } = options;
+    const { nodeId, control, operationId } = options;
     const state = session.state;
     const attempt = state.nodes[nodeId]!.attempts.at(-1)!;
     const plan = attempt.executionPlan!;
@@ -1103,8 +1688,8 @@ export class DurableRunCoordinator {
     ) {
       return;
     }
-    const workspace = session.state.workspace;
-    if (!workspace || workspace.mode === "memory" || !attempt.workspaceCheckpoint) {
+    const workspace = assignedWorkspace(session.state, nodeId);
+    if (!workspace || !attempt.workspaceCheckpoint) {
       throw new RunStoreError(
         "corrupt-store",
         `Run ${session.lease.runId} has incomplete workspace recovery evidence`,
@@ -1148,11 +1733,6 @@ export class DurableRunCoordinator {
       workspaceDifferences: comparison.differences,
     });
     await session.commit(payloads, { snapshot: true });
-    if (control) {
-      await this.finishRecoveredControl(session, nodeId, control);
-      return;
-    }
-    await this.continueOrphaned(session, nodeId, descriptor, operationId);
   }
 
   private async establishRecoveredAbsence(
@@ -1200,54 +1780,78 @@ export class DurableRunCoordinator {
 
   private async continueOrphaned(
     session: OwnedRunSession,
-    nodeId: string,
     descriptor: RuntimeDescriptor,
     operationId: string,
   ): Promise<void> {
     const state = session.state;
-    const nodeState = state.nodes[nodeId];
-    const attempt = nodeState?.attempts.at(-1);
-    const node = session.workflow.nodes[nodeId];
-    if (!nodeState || !attempt?.orphan || !node) {
+    const nodeIds = currentOrphanedNodeIds(state);
+    if (nodeIds.length === 0) {
       throw new Error("Recovery continuation requires an orphaned current attempt");
     }
-    if (attempt.orphan.workspaceDifferences.length > 0) {
-      const reason: PauseReason = {
-        kind: "workspace-conflict",
-        differences: attempt.orphan.workspaceDifferences,
-      };
+    let pauseReason: PauseReason | undefined;
+    for (const nodeId of nodeIds) {
+      const nodeState = state.nodes[nodeId]!;
+      const attempt = nodeState.attempts.at(-1)!;
+      const node = resolveRunWorkflowNode(session.workflow, state, nodeId);
+      if (!attempt.orphan || !node) {
+        throw new Error("Recovery continuation lost orphaned attempt evidence");
+      }
+      if (attempt.orphan.workspaceDifferences.length > 0) {
+        pauseReason = {
+          kind: "workspace-conflict",
+          differences: attempt.orphan.workspaceDifferences,
+        };
+        break;
+      }
+      if (attempt.number >= node.attemptBudget.maxAttempts) {
+        pauseReason = {
+          kind: "attempt-budget-exhausted",
+          nodeId,
+          attempts: attempt.number,
+        };
+        break;
+      }
+    }
+    if (pauseReason) {
       await session.commit(
         [
-          { type: "NodePaused", nodeId, reason },
-          { type: "RunPaused", reason },
+          ...nodeIds.map((nodeId) => ({
+            type: "NodePaused" as const,
+            nodeId,
+            reason: pauseReason,
+          })),
+          { type: "RunPaused", reason: pauseReason },
         ],
         { snapshot: true },
       );
       return;
     }
-    if (attempt.number >= node.attemptBudget.maxAttempts) {
-      const reason: PauseReason = {
-        kind: "attempt-budget-exhausted",
-        nodeId,
-        attempts: attempt.number,
-      };
-      await session.commit(
-        [
-          { type: "NodePaused", nodeId, reason },
-          { type: "RunPaused", reason },
-        ],
-        { snapshot: true },
-      );
-      return;
-    }
-    const preflight = await this.preflight(session, descriptor);
+    const preflight = await this.preflight(
+      session,
+      descriptor,
+      assignedWorkspace(state, nodeIds[0]!),
+    );
     if (!preflight.ok) {
-      await this.pauseForPreflight(session, preflight.reason, nodeId);
+      await session.commit(
+        [
+          ...nodeIds.map((nodeId) => ({
+            type: "NodePaused" as const,
+            nodeId,
+            reason: preflight.reason,
+          })),
+          { type: "RunPaused", reason: preflight.reason },
+        ],
+        { snapshot: true },
+      );
       return;
     }
     await session.commit(
       [
-        { type: "NodeReady", nodeId, reason: "recovered" },
+        ...nodeIds.map((nodeId) => ({
+          type: "NodeReady" as const,
+          nodeId,
+          reason: "recovered" as const,
+        })),
         ...(session.state.status === "recovery-blocked"
           ? [{ type: "RunResumed" as const, operationId }]
           : []),
@@ -1258,14 +1862,14 @@ export class DurableRunCoordinator {
 
   private async finishRecoveredControl(
     session: OwnedRunSession,
-    nodeId: string,
+    nodeIds: readonly string[],
     control: ControlRequest,
   ): Promise<void> {
     if (control.action === "pause") {
       const reason: PauseReason = { kind: "operator", operationId: control.operationId };
       await session.commit(
         [
-          { type: "NodePaused", nodeId, reason },
+          ...nodeIds.map((nodeId) => ({ type: "NodePaused" as const, nodeId, reason })),
           { type: "RunPaused", reason },
         ],
         { snapshot: true },
@@ -1289,7 +1893,7 @@ export class DurableRunCoordinator {
     const state = session.state;
     const paused = Object.values(state.nodes).filter((node) => node.status === "paused");
     for (const nodeState of paused) {
-      const node = session.workflow.nodes[nodeState.id];
+      const node = resolveRunWorkflowNode(session.workflow, state, nodeState.id);
       const attempt = nodeState.attempts.at(-1);
       if (!node || nodeState.pauseReason?.kind === "attempt-budget-exhausted") {
         return;
@@ -1298,8 +1902,8 @@ export class DurableRunCoordinator {
         return;
       }
       if (nodeState.pauseReason?.kind === "workspace-conflict") {
-        const workspace = state.workspace;
-        if (!workspace || workspace.mode === "memory" || !attempt?.workspaceCheckpoint) {
+        const workspace = assignedWorkspace(state, nodeState.id);
+        if (!workspace || !attempt?.workspaceCheckpoint) {
           return;
         }
         const observed = await session.guard(() => this.workspace.capture(workspace));
@@ -1380,10 +1984,11 @@ export class DurableRunCoordinator {
   private async preflight(
     session: OwnedRunSession,
     descriptor: RuntimeDescriptor,
+    selectedWorkspace = session.state.workspace,
   ): Promise<{ ok: true; negotiation: RuntimeNegotiation } | { ok: false; reason: PauseReason }> {
     try {
       const adapter = await session.guard(() => this.runtimes.create(descriptor));
-      const workspace = session.state.workspace;
+      const workspace = selectedWorkspace;
       if (!workspace || workspace.mode === "memory") {
         throw new Error("Durable runtime preflight requires a filesystem workspace");
       }
@@ -1420,7 +2025,7 @@ export class DurableRunCoordinator {
   }
 
   private async ensureAttemptBudget(session: OwnedRunSession, nodeId: string): Promise<boolean> {
-    const node = session.workflow.nodes[nodeId];
+    const node = resolveRunWorkflowNode(session.workflow, session.state, nodeId);
     const nodeState = session.state.nodes[nodeId];
     if (!node || !nodeState) {
       throw new Error("Ready durable node is missing from its workflow");
@@ -1518,9 +2123,30 @@ class PublicObservationFilter {
 function validateDurableRunInputs(
   workflow: WorkflowDefinition,
   inputs: Record<string, JsonValue>,
-  workspace: Exclude<WorkspaceRef, { mode: "memory" }>,
-  descriptor: RuntimeDescriptor,
+  options: {
+    workspace: Exclude<WorkspaceRef, { mode: "memory" }>;
+    descriptor: RuntimeDescriptor;
+    nodeWorkspaces?: Readonly<Record<string, Exclude<WorkspaceRef, { mode: "memory" }>>>;
+  },
 ): void {
+  const { workspace, descriptor, nodeWorkspaces = {} } = options;
+  const errors = [
+    ...durableInputIssues(workflow, inputs),
+    ...durableNodeIssues(workflow, workspace, nodeWorkspaces),
+    ...concurrentWorkspaceIssues(workflow, workspace, nodeWorkspaces),
+  ];
+  if (!descriptor.runtimeId) {
+    errors.push("runtime descriptor is missing its runtime ID");
+  }
+  if (errors.length) {
+    throw new Error(`Invalid durable run:\n${errors.map((error) => `- ${error}`).join("\n")}`);
+  }
+}
+
+function durableInputIssues(
+  workflow: WorkflowDefinition,
+  inputs: Record<string, JsonValue>,
+): string[] {
   const missing = Object.keys(workflow.inputs).filter((id) => !Object.hasOwn(inputs, id));
   const unknown = Object.keys(inputs).filter((id) => !Object.hasOwn(workflow.inputs, id));
   const errors = [
@@ -1536,6 +2162,15 @@ function validateDurableRunInputs(
       errors.push(`input ${id}: ${validation.errors.join("; ")}`);
     }
   }
+  return errors;
+}
+
+function durableNodeIssues(
+  workflow: WorkflowDefinition,
+  workspace: Exclude<WorkspaceRef, { mode: "memory" }>,
+  nodeWorkspaces: Readonly<Record<string, Exclude<WorkspaceRef, { mode: "memory" }>>>,
+): string[] {
+  const errors: string[] = [];
   for (const node of Object.values(workflow.nodes)) {
     if (node.kind !== "agent" && (node.kind !== "command" || !node.command)) {
       errors.push(`unsupported durable node: ${node.id}`);
@@ -1543,16 +2178,69 @@ function validateDurableRunInputs(
     if (node.kind === "agent" && node.mutation === undefined) {
       errors.push(`agent mutation intent is required: ${node.id}`);
     }
-    if (node.mutation && node.mutation !== workspace.mode) {
+    const assignedWorkspace = nodeWorkspaces[node.id] ?? workspace;
+    if (node.mutation === "isolated" && assignedWorkspace.mode !== "isolated") {
       errors.push(`workspace mode does not match mutation intent: ${node.id}`);
     }
   }
-  if (!descriptor.runtimeId) {
-    errors.push("runtime descriptor is missing its runtime ID");
+  for (const nodeId of Object.keys(nodeWorkspaces)) {
+    if (!Object.hasOwn(workflow.nodes, nodeId)) {
+      errors.push(`workspace assigned to unknown node: ${nodeId}`);
+    }
   }
-  if (errors.length) {
-    throw new Error(`Invalid durable run:\n${errors.map((error) => `- ${error}`).join("\n")}`);
+  return errors;
+}
+
+function concurrentWorkspaceIssues(
+  workflow: WorkflowDefinition,
+  workspace: Exclude<WorkspaceRef, { mode: "memory" }>,
+  nodeWorkspaces: Readonly<Record<string, Exclude<WorkspaceRef, { mode: "memory" }>>>,
+): string[] {
+  if (workflow.policies.maxParallel === 1) {
+    return [];
   }
+  const errors: string[] = [];
+  const nodes = Object.values(workflow.nodes);
+  for (let leftIndex = 0; leftIndex < nodes.length; leftIndex += 1) {
+    const left = nodes[leftIndex]!;
+    for (let rightIndex = leftIndex + 1; rightIndex < nodes.length; rightIndex += 1) {
+      const right = nodes[rightIndex]!;
+      const independent =
+        !nodeDependsOn(workflow, left.id, right.id) && !nodeDependsOn(workflow, right.id, left.id);
+      const leftWorkspace = nodeWorkspaces[left.id] ?? workspace;
+      const rightWorkspace = nodeWorkspaces[right.id] ?? workspace;
+      if (
+        independent &&
+        (left.mutation === "isolated" || right.mutation === "isolated") &&
+        leftWorkspace.path === rightWorkspace.path
+      ) {
+        errors.push(
+          `concurrent nodes require distinct mutation workspaces: ${left.id}, ${right.id}`,
+        );
+      }
+    }
+  }
+  return errors;
+}
+
+function nodeDependsOn(
+  workflow: WorkflowDefinition,
+  nodeId: string,
+  dependencyId: string,
+): boolean {
+  const visited = new Set<string>();
+  const pending = [...(workflow.nodes[nodeId]?.needs ?? [])];
+  while (pending.length > 0) {
+    const current = pending.pop()!;
+    if (current === dependencyId) {
+      return true;
+    }
+    if (!visited.has(current)) {
+      visited.add(current);
+      pending.push(...(workflow.nodes[current]?.needs ?? []));
+    }
+  }
+  return false;
 }
 
 function normalizedFailure(node: WorkflowNode, result: ExecutionResult): ExecutionFailure | null {
@@ -1586,6 +2274,23 @@ function normalizedFailure(node: WorkflowNode, result: ExecutionResult): Executi
       return { category: "verification", message: "Verifier reported that its checks failed" };
     }
   }
+  if (node.role === "specification-reviewer" || node.role === "quality-reviewer") {
+    let review;
+    try {
+      review = parseReviewReport(result.output);
+    } catch {
+      return {
+        category: "schema-violation",
+        message: `Review output for ${node.id} violates independent-review semantics`,
+      };
+    }
+    if (!review.approved) {
+      return {
+        category: "human-rejection",
+        message: `${node.role} rejected the integrated revision`,
+      };
+    }
+  }
   return null;
 }
 
@@ -1595,9 +2300,15 @@ function blockedNodePayloads(state: RunState, except: string, reason: string): R
     .map((node) => ({ type: "NodeBlocked", nodeId: node.id, reason }));
 }
 
-function cancelNodePayloads(state: RunState, reason: string): RunEventPayload[] {
+function cancelNodePayloads(
+  state: RunState,
+  reason: string,
+  except = new Set<string>(),
+): RunEventPayload[] {
   return Object.values(state.nodes)
-    .filter((node) => !["succeeded", "failed", "cancelled"].includes(node.status))
+    .filter(
+      (node) => !except.has(node.id) && !["succeeded", "failed", "cancelled"].includes(node.status),
+    )
     .map((node) => ({ type: "NodeCancelled", nodeId: node.id, reason }));
 }
 
@@ -1610,25 +2321,29 @@ function controlObservedPayload(control: ControlRequest): RunEventPayload {
   };
 }
 
-function currentOwnedAttempt(
+function assignedWorkspace(
   state: RunState,
-): { nodeId: string; attempt: RunState["nodes"][string]["attempts"][number] } | undefined {
-  for (const node of Object.values(state.nodes)) {
-    const attempt = node.attempts.at(-1);
-    if (attempt && (attempt.status === "prepared" || attempt.status === "running")) {
-      return { nodeId: node.id, attempt };
-    }
-  }
-  return undefined;
+  nodeId: string,
+): Exclude<WorkspaceRef, { mode: "memory" }> | undefined {
+  const selected = state.nodeWorkspaces?.[nodeId] ?? state.workspace;
+  return selected?.mode === "memory" ? undefined : selected;
 }
 
-function currentOrphanedAttempt(state: RunState): { nodeId: string } | undefined {
-  for (const node of Object.values(state.nodes)) {
-    if (node.attempts.at(-1)?.status === "orphaned" && node.status === "running") {
-      return { nodeId: node.id };
-    }
-  }
-  return undefined;
+function currentOwnedAttempts(
+  state: RunState,
+): Array<{ nodeId: string; attempt: RunState["nodes"][string]["attempts"][number] }> {
+  return Object.values(state.nodes).flatMap((node) => {
+    const attempt = node.attempts.at(-1);
+    return attempt && (attempt.status === "prepared" || attempt.status === "running")
+      ? [{ nodeId: node.id, attempt }]
+      : [];
+  });
+}
+
+function currentOrphanedNodeIds(state: RunState): string[] {
+  return Object.values(state.nodes)
+    .filter((node) => node.attempts.at(-1)?.status === "orphaned" && node.status === "running")
+    .map(({ id }) => id);
 }
 
 function outstandingObservedControl(events: readonly RunEvent[]): ControlRequest | undefined {

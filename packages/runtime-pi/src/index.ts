@@ -65,8 +65,17 @@ export function renderPiPrompt(request: ExecutionRequest): string {
     "Perform the bounded task described by this immutable context envelope.",
     "Operate only in the assigned workspace. Respect the mutation mode.",
     "The control plane will run the authoritative verification command after you finish.",
-    "Return ONLY one JSON object matching requiredOutputSchema; do not use Markdown fences.",
+    "Your final response is machine parsed. Its first byte must begin one JSON object and its last byte must end that object.",
+    "Match requiredOutputSchema exactly, including every required property and no additional properties. Do not use Markdown fences or prose.",
     canonicalJson(request.context),
+  ].join("\n\n");
+}
+function renderPiCorrectionPrompt(request: ExecutionRequest): string {
+  return [
+    "Your previous final response did not validate against the required output schema.",
+    "Do not perform more repository work and do not invoke tools.",
+    "Return only the corrected JSON object: no Markdown fence, preamble, explanation, or trailing text.",
+    canonicalJson(request.requiredOutputSchema),
   ].join("\n\n");
 }
 function finalResult(message: unknown, request: ExecutionRequest): ExecutionResult {
@@ -409,9 +418,21 @@ export class PiRuntimeAdapter implements DurableRuntimeAdapter {
           }
         });
         await pending.session.prompt(renderPiPrompt(request));
-        result = pending.controller.signal.aborted
-          ? { status: "cancelled", reason: "Pi cancelled by control plane" }
-          : finalResult(pending.session.finalMessage(), request);
+        if (pending.controller.signal.aborted) {
+          result = { status: "cancelled", reason: "Pi cancelled by control plane" };
+        } else {
+          result = finalResult(pending.session.finalMessage(), request);
+          if (result.status === "failed" && result.failure.category === "schema-violation") {
+            this.push(pending, {
+              type: "log",
+              message: "Pi requested one structured-output correction",
+            });
+            await pending.session.prompt(renderPiCorrectionPrompt(request));
+            result = pending.controller.signal.aborted
+              ? { status: "cancelled", reason: "Pi cancelled by control plane" }
+              : finalResult(pending.session.finalMessage(), request);
+          }
+        }
       }
     } catch {
       result = pending.controller.signal.aborted
