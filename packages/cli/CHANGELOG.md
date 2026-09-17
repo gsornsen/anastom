@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add `anastom run <feature.md> --method sdlc/default --runtime ...` composition through the production durable coordinator. The Feature and any repository-local methodology resources are protected inputs, while external methodology content is retained in the immutable snapshot; successful work remains on its run-owned integration branch.
 - Stream only post-commit public Task observations through a cursor-aware renderer: concise colored terminal lines for TTYs and one schema-valid JSON value per line for pipes. Include the derived evidence ledger in complete JSON inspection.
 - Compose process-independent Feature topology loading, task workspace creation, scoped patch capture, and prepared integration recovery behind the durable coordinator boundary.
 - Keep CLI inspection and injected-output helper types internal to their actual source modules instead of advertising unused entry-point exports.

@@ -85,6 +85,7 @@ describe("Task command validation", () => {
     ],
     ["Pi with Claude auth source", ["--runtime", "pi", "--auth-source", "subscription"]],
     ["unknown flag", ["--runtime", "pi", "--unknown", "x"]],
+    ["unsupported Feature method", ["--method", "other", "--runtime", "pi"]],
   ])("rejects %s before execution", async (_reason, args) => {
     const output = captureCliOutput();
     const exitCode = await runCli(["run", healthEndpointTaskPath, ...args], { io: output.io });
