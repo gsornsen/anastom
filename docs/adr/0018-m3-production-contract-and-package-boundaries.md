@@ -1,6 +1,6 @@
 # 0018 — M3 production contract and package boundaries
 
-- Status: Accepted as the stacked implementation baseline; complete-stack owner acceptance required before merge
+- Status: Accepted and implemented on the consolidated PR #24 candidate; complete-branch owner acceptance required before merge
 - Date: 2026-09-16
 
 ## Context
@@ -25,6 +25,8 @@ The proposal makes the following package decisions:
 - keep `@anastom/cli` as the runtime registry and process composition root.
 
 The exact public records, event transitions, transaction order, limits, compatibility behavior, CLI syntax, and implementation slices are defined in the proposal. No production API or migration changes in this ADR.
+
+The path supplied to `ensurePrivatePathRoot()` is an explicitly caller-authorized local root, rather than an untrusted child path beneath some other universal root. The function canonicalizes the existing parent, fixes the leaf, rejects symlinks and non-directories, enforces current-user ownership and private permissions, verifies the canonical result, and returns a capability whose descendants use validated fixed segments. Automated or remote callers must authorize the root before invoking this boundary. CodeQL alert 41 was individually dismissed as a false positive with this rationale; the path-injection query remains enabled.
 
 ## Consequences
 

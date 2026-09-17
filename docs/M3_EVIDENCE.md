@@ -1,12 +1,12 @@
 # M3 durable-execution evidence
 
-Status: **implementation candidate complete locally; owner acceptance and required remote checks pending.** The stacked production implementation and deterministic process-level acceptance are complete on the owner macOS host. M3 becomes complete only after the owner reviews the whole stack and the final-code Linux, macOS, CodeQL, dependency-review, DCO, and repository-required checks pass.
+Status: **implementation candidate consolidated in PR #24; owner acceptance and final required checks pending.** The production implementation and deterministic process-level acceptance are complete on the owner macOS host. M3 becomes complete only after the owner reviews the combined branch and every final-code repository check passes.
 
 ## Reviewed design and implementation identity
 
 The owner accepted the M3 design in [issue #22](https://github.com/gsornsen/anastom/issues/22) and [PR #23](https://github.com/gsornsen/anastom/pull/23). [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) defines the ownership and recovery boundary. [ADR 0018](adr/0018-m3-production-contract-and-package-boundaries.md) and the [M3 production contract](M3_PRODUCTION_CONTRACT.md) define the exact production records and package APIs.
 
-The model-free feasibility stack established the implementation gates:
+The model-free feasibility slices established the implementation gates. Their linear commits and the later production slices are now consolidated into [PR #24](https://github.com/gsornsen/anastom/pull/24); the redundant remote branches were removed. The closed slice PRs retain their review history:
 
 | PR                                                 | Evidence                                                                                                           |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -16,7 +16,7 @@ The model-free feasibility stack established the implementation gates:
 | [#27](https://github.com/gsornsen/anastom/pull/27) | Exact Git workspace content and ownership checkpoints                                                              |
 | [#28](https://github.com/gsornsen/anastom/pull/28) | Snapshot-plus-tail equality, prefix binding, corrupt-cache fallback, and legacy lifecycle shapes                   |
 
-The production stack is split into separately reviewable PRs for schemas/contracts, private paths and workspaces, the durable store, shared execution host, engine recovery coordinator, and [CLI composition in PR #35](https://github.com/gsornsen/anastom/pull/35). They remain unmerged so the owner can review the complete stack before it is folded into PR #24.
+The production work was reviewed in linear slices for schemas/contracts, private paths and workspaces, the durable store, shared execution host, engine recovery coordinator, CLI composition, and acceptance. PRs #25 through #36 now resolve into PR #24's single feature branch so the owner can review and accept one main-targeting diff.
 
 ## Reproduce
 
@@ -44,12 +44,12 @@ The accepted local run was `m3-clean`.
 
 | Evidence              | Observed result                                                                                           |
 | --------------------- | --------------------------------------------------------------------------------------------------------- |
-| First execution       | `74f05a55-ea3f-42c9-a57d-53c8ff234fb5`, fencing generation 1                                              |
+| First execution       | `0990078c-a9d7-443d-be38-93d555d4161e`, fencing generation 1                                              |
 | Coordinator crash     | Exact recorded lease-owner process received `SIGKILL` after explicit attempt readiness                    |
 | Cross-process status  | Run remained `running`; absent owner was conservatively `unknown` before expiry; no work started          |
 | Early replacement     | Refused as `lease-active` before the exact lease expiry                                                   |
 | Parent-death cleanup  | Supervisor retained authenticated terminal evidence with `cleanup: confirmed`                             |
-| Replacement execution | `b90f3e49-7618-453e-a8e5-2200c0b489ca`, fencing generation 2                                              |
+| Replacement execution | `363463cd-703c-474b-bb1e-c65b2ccec75a`, fencing generation 2                                              |
 | Orphan accounting     | Exactly one `AttemptOrphaned`; attempt one remained numbered and consumed budget                          |
 | Fresh retry           | Attempt two used a distinct execution identity and fresh context                                          |
 | Independent verifier  | `node --test server.test.mjs` passed; only `server.mjs` changed                                           |
@@ -107,7 +107,11 @@ Local final-code validation completed on the acceptance candidate:
 | `pnpm lint`                         | Passed, including the custom no-inline-script rule                                                   |
 | `pnpm format` / `pnpm format:check` | Passed                                                                                               |
 | `pnpm hygiene`                      | Passed                                                                                               |
-| `pnpm docs:api`                     | Passed for all 12 packages; no package public API changed in this acceptance-only slice              |
+| `pnpm docs:api`                     | Passed for all 12 packages; generated output reviewed and left uncommitted                           |
 | Package builds                      | No separate package build scripts exist; repository-wide TypeScript validation is the build boundary |
 
-The final acceptance PR must still pass Linux and macOS CI, CodeQL, dependency review, DCO, and every other required repository check. This slice changes root scripts, fixtures, examples, and documentation only, so it has no package SemVer Changeset. The owner-review/contribution-rights checkbox remains open until the owner reviews the complete stack; standing contribution rights are already confirmed.
+On the combined code candidate `779ca38`, Linux and macOS CI, dependency review, DCO, CodeQL analysis, and the CodeQL policy gate passed. The fresh CodeQL scan closed 15 findings through code changes: test fixtures now use the shared private-path capability, the SQLite store requires a caller-authorized existing parent, persisted-event dispatch uses fixed method selection, inherited object keys are rejected, and public validation stops at its first error.
+
+CodeQL alert 41 (`js/path-injection`) was individually assessed as a false positive at the private-root trust boundary. A local operator explicitly authorizes the state-root path; `ensurePrivatePathRoot()` canonicalizes its existing parent, fixes the leaf, rejects symlinks and non-directories, requires current-user ownership, tightens mode to `0700`, verifies the canonical result, and returns a capability whose child operations accept validated fixed segments and revalidate parents. A future remote caller must authorize the root before invoking this API. The narrow dismissal and rationale are recorded in GitHub; the path-injection query remains enabled.
+
+The final consolidated head must still pass every required repository check. The owner-review/contribution-rights checkbox remains open until the owner reviews the complete branch; standing contribution rights are already confirmed.
