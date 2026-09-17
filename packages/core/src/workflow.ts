@@ -260,7 +260,7 @@ export async function normalizeWorkflow(
     metadata: { ...document.metadata },
     sourcePath,
     inputs: Object.fromEntries(inputEntries),
-    policies: { defaultAttemptBudget },
+    policies: { defaultAttemptBudget, maxParallel: document.policies?.maxParallel ?? 1 },
     nodeOrder: Object.keys(document.nodes),
     nodes: Object.fromEntries(nodeEntries),
   };

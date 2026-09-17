@@ -1,6 +1,7 @@
 import { canonicalJson, digestBytes, type WorkflowDefinition } from "@anastom/core";
 import type { ArtifactRef, ContextEnvelope, WorkspaceRef } from "@anastom/runtime-contract";
 import type { RunState } from "./events.js";
+import { resolveRunWorkflowNode } from "./graph.js";
 
 /** Named context inputs make workspace and attempt identity explicit at the call site. */
 export interface ContextOptions {
@@ -23,7 +24,7 @@ export function buildContext(options: ContextOptions): {
   digest: string;
 } {
   const { workflow, state, nodeId, attempt, workspace, artifacts = [] } = options;
-  const node = workflow.nodes[nodeId];
+  const node = resolveRunWorkflowNode(workflow, state, nodeId);
   if (!node) {
     throw new Error("Unknown context node " + nodeId);
   }
@@ -53,7 +54,24 @@ export function buildContext(options: ContextOptions): {
           },
         }
       : {}),
+    ...(workflow.definedSdlc
+      ? {
+          feature: {
+            id: workflow.definedSdlc.feature.metadata.id,
+            version: workflow.definedSdlc.feature.metadata.version,
+            objective: workflow.definedSdlc.feature.objective,
+            acceptanceCriteria: [...workflow.definedSdlc.feature.acceptanceCriteria],
+            documentDigest: workflow.definedSdlc.feature.documentDigest,
+          },
+        }
+      : {}),
+    ...(state.plan ? { plan: structuredClone(state.plan) } : {}),
     ...(node.role ? { role: { id: node.role } } : {}),
+    ...(node.instructions ? { instructions: node.instructions } : {}),
+    ...(node.mutationScopes ? { mutationScopes: [...node.mutationScopes] } : {}),
+    ...(node.taskId && state.plan?.tasks[node.taskId]
+      ? { assignment: structuredClone(state.plan.tasks[node.taskId]) }
+      : {}),
     workspace: structuredClone(workspace),
     allowedMutations: node.mutation ?? "readonly",
     artifacts: structuredClone(artifacts),

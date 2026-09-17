@@ -1,5 +1,5 @@
 import Ajv from "ajv";
-import { canonicalJson } from "@anastom/core";
+import { assertNormalizedFeaturePlan, canonicalJson } from "@anastom/core";
 import capabilitiesSchema from "../schemas/capabilities.v1alpha1.json" with { type: "json" };
 import observationSchema from "../schemas/observation.v1alpha1.json" with { type: "json" };
 import runtimeDescriptorSchema from "../schemas/runtime-descriptor.v1alpha1.json" with { type: "json" };
@@ -136,14 +136,19 @@ function validArtifact(value: unknown): boolean {
 
 const contextOptionalKeys = [
   "allowedMutations",
+  "assignment",
   "artifacts",
   "attempt",
   "budget",
+  "feature",
+  "instructions",
+  "mutationScopes",
   "nodeId",
   "requiredOutputSchema",
   "role",
   "runId",
   "task",
+  "plan",
   "verification",
   "version",
   "workflowInstanceId",
@@ -157,10 +162,67 @@ function validContextScalars(value: Record<string, unknown>): boolean {
     (value.workflowInstanceId !== undefined && !validString(value.workflowInstanceId)) ||
     (value.nodeId !== undefined && !validString(value.nodeId)) ||
     (value.attempt !== undefined && !validPositive(value.attempt)) ||
+    (value.instructions !== undefined && !validString(value.instructions)) ||
     (value.allowedMutations !== undefined &&
       value.allowedMutations !== "readonly" &&
       value.allowedMutations !== "isolated")
   );
+}
+
+function validStringArray(value: unknown): boolean {
+  return Array.isArray(value) && value.every(validString);
+}
+
+function validContextSdlc(value: Record<string, unknown>): boolean {
+  if (value.mutationScopes !== undefined && !validStringArray(value.mutationScopes)) {
+    return false;
+  }
+  if (
+    value.feature !== undefined &&
+    (!isRecord(value.feature) ||
+      !exactKeys(value.feature, [
+        "acceptanceCriteria",
+        "documentDigest",
+        "id",
+        "objective",
+        "version",
+      ]) ||
+      !validString(value.feature.id) ||
+      !validString(value.feature.version) ||
+      !validString(value.feature.objective) ||
+      !validString(value.feature.documentDigest) ||
+      !validStringArray(value.feature.acceptanceCriteria))
+  ) {
+    return false;
+  }
+  if (
+    value.assignment !== undefined &&
+    (!isRecord(value.assignment) ||
+      !exactKeys(value.assignment, [
+        "acceptanceCriteria",
+        "dependsOn",
+        "id",
+        "mutationScopes",
+        "objective",
+        "title",
+      ]) ||
+      ![value.assignment.id, value.assignment.title, value.assignment.objective].every(
+        validString,
+      ) ||
+      !validStringArray(value.assignment.acceptanceCriteria) ||
+      !validStringArray(value.assignment.dependsOn) ||
+      !validStringArray(value.assignment.mutationScopes))
+  ) {
+    return false;
+  }
+  if (value.plan !== undefined) {
+    try {
+      assertNormalizedFeaturePlan(value.plan);
+    } catch {
+      return false;
+    }
+  }
+  return true;
 }
 
 function validContextStructures(value: Record<string, unknown>): boolean {
@@ -196,7 +258,8 @@ function validContext(value: unknown): boolean {
     !isRecord(value.dependencyOutputs) ||
     !validContextScalars(value) ||
     !validContextStructures(value) ||
-    !validContextTask(value)
+    !validContextTask(value) ||
+    !validContextSdlc(value)
   ) {
     return false;
   }

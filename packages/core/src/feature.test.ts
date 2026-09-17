@@ -5,7 +5,12 @@ import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 
 import {
+  assertFeatureDefinition,
+  assertNormalizedFeaturePlan,
   assertSdlcGraphExpansion,
+  assertSdlcMethodologySnapshot,
+  assertWorkflowDefinition,
+  compileSdlcFeature,
   expandSdlcPlan,
   loadFeatureWithinRoot,
   loadSdlcMethodology,
@@ -160,6 +165,7 @@ describe("methodology snapshot", () => {
       expect(original.roles.analyst.mutation).toBe("readonly");
       expect(original.roles.implementer.mutation).toBe("isolated");
       expect(original.methodologyDigest).toBe(copy.methodologyDigest);
+      expect(() => assertSdlcMethodologySnapshot(original)).not.toThrow();
     } finally {
       await rm(fixture, { recursive: true, force: true });
     }
@@ -195,6 +201,23 @@ describe("plan and review contracts", () => {
     expect(first.waves).toEqual([["server", "tests"], ["docs"]]);
     expect(first.tasks.docs?.mutationScopes).toEqual(["README.md"]);
     expect(first.planDigest).toBe(second.planDigest);
+    expect(() => assertNormalizedFeaturePlan(first)).not.toThrow();
+  });
+
+  it("compiles immutable analysis and planning nodes from Feature methodology", async () => {
+    const feature = normalizeFeature(parseFeatureMarkdown(featureMarkdown()), "/tmp/feature.md");
+    const methodology = await loadSdlcMethodology(resolve("methodologies/sdlc/default"));
+    const workflow = compileSdlcFeature(feature, methodology, { protectedPaths: ["feature.md"] });
+
+    expect(() => assertFeatureDefinition(feature)).not.toThrow();
+    expect(() => assertWorkflowDefinition(workflow)).not.toThrow();
+    expect(workflow.nodeOrder).toEqual(["analysis", "planning"]);
+    expect(workflow.nodes.planning).toMatchObject({
+      role: "planner",
+      needs: ["analysis"],
+      mutation: "readonly",
+      output: { ref: "schemas/feature-plan.v1alpha1.json" },
+    });
   });
 
   it.each([
@@ -251,19 +274,25 @@ describe("plan and review contracts", () => {
     const second = expandSdlcPlan(feature, methodology, structuredClone(plan));
 
     expect(first.nodeOrder).toEqual([
-      "implement-server",
-      "implement-tests",
-      "integrate-wave-1",
-      "implement-docs",
-      "integrate-wave-2",
+      "implement.server",
+      "implement.tests",
+      "integrate.wave-1",
+      "implement.docs",
+      "integrate.wave-2",
       "integrator",
-      "review-specification",
-      "review-quality",
-      "verify-test",
+      "integrate.final",
+      "review.specification",
+      "review.quality",
+      "verify.test",
     ]);
-    expect(first.nodes["implement-server"]?.needs).toEqual(["planning"]);
-    expect(first.nodes["implement-docs"]?.needs).toEqual(["integrate-wave-1"]);
-    expect(first.nodes["review-specification"]?.needs).toEqual(["integrator"]);
+    expect(first.nodes["implement.server"]?.needs).toEqual(["planning"]);
+    expect(first.nodes["implement.docs"]?.needs).toEqual(["integrate.wave-1"]);
+    expect(first.nodes["review.specification"]?.needs).toEqual(["integrate.final"]);
+    expect(first.nodes["implement.server"]).toMatchObject({
+      role: "implementer",
+      taskId: "server",
+      output: { ref: "schemas/worker-report.v1alpha1.json" },
+    });
     expect(first.expansionDigest).toBe(second.expansionDigest);
     expect(() => assertSdlcGraphExpansion(first)).not.toThrow();
   });

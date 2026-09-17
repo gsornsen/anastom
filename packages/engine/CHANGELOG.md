@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fold validated planner expansions into the durable graph, run independent attempts concurrently under one serialized event owner, fan controls and recovery across every active execution, assign task workspaces, accept scoped patch artifacts, and prepare/reconcile controller-owned integrations before review and verification.
 - Keep event projection and execution terminal detail types internal while retaining the documented run, store, transition-error, and coordination contracts.
 - Add `DurableRunCoordinator` with independent lease heartbeat, exact descriptor prevalidation/current preflight, fenced start ordering, runtime and command result handling, bounded control polling, control-plane duration deadlines, restart-safe control precedence, orphan/workspace reconciliation, snapshots, attempt budgets, and typed ownership refusal. Allow current scheduled/prepared attempts to bind immutable context and workspace-diff artifacts before authorization.
 - Add the engine-owned `ExecutionHost` prepare/authorize/inspect/terminate boundary, exact digest-bound runtime and command launch plans, sanitized execution observations, and owned result/event handles.

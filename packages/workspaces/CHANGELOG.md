@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reload and revalidate Feature topology across processes, retain normalized protected paths, and provide the durable coordinator with exact task-workspace, patch-capture, and prepared-integration operations.
 - Add run-scoped integration and dependency-wave task worktrees, exact scoped patch capture with protected-path enforcement, and deterministic prepared Git integration. Recovery accepts only the recorded parent/result states, uses compare-and-swap ref movement, and refuses unrelated branch, index, worktree, or ignored content.
 - Require a clean source checkout before creating readonly or isolated workspaces.
 - Keep checkpoint capture and comparison result shapes reachable through their functions without redundant direct type re-exports.

@@ -38,7 +38,7 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "type": "string", "minLength": 1 }
+      "items": { "$ref": "#/$defs/id" }
     },
     "nodes": {
       "type": "object",
@@ -55,76 +55,90 @@
   },
   "$defs": {
     "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "nodeBase": {
-      "type": "object",
-      "required": ["id", "kind", "needs"],
-      "properties": {
-        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,95}$" },
-        "kind": { "enum": ["agent", "integration", "verifier"] },
-        "needs": {
-          "type": "array",
-          "uniqueItems": true,
-          "items": { "type": "string", "minLength": 1 }
-        }
-      }
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{0,95}$" },
+    "needs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
     },
     "attemptBudget": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["maxAttempts", "maxDurationMs"],
+      "required": ["maxAttempts"],
       "properties": {
         "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 3 },
         "maxDurationMs": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
       }
     },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "schema"],
+      "properties": { "ref": { "type": "string", "minLength": 1 }, "schema": { "type": "object" } }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv", "cwd", "maxDurationMs", "maxOutputBytes"],
+      "properties": {
+        "argv": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "cwd": { "type": "string", "minLength": 1 },
+        "maxDurationMs": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "maxOutputBytes": { "type": "integer", "minimum": 1, "maximum": 16777216 }
+      }
+    },
     "agentNode": {
-      "allOf": [
-        { "$ref": "#/$defs/nodeBase" },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "id",
-            "kind",
-            "needs",
-            "role",
-            "mutation",
-            "mutationScopes",
-            "attemptBudget",
-            "outputSchemaDigest"
-          ],
-          "properties": {
-            "id": { "type": "string" },
-            "kind": { "const": "agent" },
-            "needs": { "type": "array" },
-            "role": {
-              "enum": ["implementer", "integrator", "specificationReviewer", "qualityReviewer"]
-            },
-            "taskId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,47}$" },
-            "mutation": { "enum": ["readonly", "isolated"] },
-            "mutationScopes": {
-              "type": "array",
-              "uniqueItems": true,
-              "items": { "type": "string", "minLength": 1 }
-            },
-            "attemptBudget": { "$ref": "#/$defs/attemptBudget" },
-            "outputSchemaDigest": { "$ref": "#/$defs/digest" }
-          }
-        }
-      ]
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "needs",
+        "role",
+        "mutation",
+        "mutationScopes",
+        "attemptBudget",
+        "instructions",
+        "instructionsDigest",
+        "output"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "agent" },
+        "needs": { "$ref": "#/$defs/needs" },
+        "role": { "type": "string", "minLength": 1 },
+        "taskId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,47}$" },
+        "patchId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,47}$" },
+        "mutation": { "enum": ["readonly", "isolated"] },
+        "mutationScopes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 4096 }
+        },
+        "attemptBudget": { "$ref": "#/$defs/attemptBudget" },
+        "instructions": { "type": "string", "minLength": 1, "maxLength": 131072 },
+        "instructionsDigest": { "$ref": "#/$defs/digest" },
+        "output": { "$ref": "#/$defs/output" }
+      }
     },
     "integrationNode": {
-      "allOf": [
-        { "$ref": "#/$defs/nodeBase" },
-        {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "needs", "mutation", "attemptBudget", "output", "controller"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "integration" },
+        "needs": { "$ref": "#/$defs/needs" },
+        "mutation": { "const": "isolated" },
+        "attemptBudget": { "$ref": "#/$defs/attemptBudget" },
+        "output": { "$ref": "#/$defs/output" },
+        "controller": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["id", "kind", "needs", "wave", "taskIds"],
+          "required": ["operation", "wave", "taskIds"],
           "properties": {
-            "id": { "type": "string" },
-            "kind": { "const": "integration" },
-            "needs": { "type": "array" },
-            "wave": { "type": "integer", "minimum": 1, "maximum": 8 },
+            "operation": { "const": "integrate-patches" },
+            "wave": { "type": "integer", "minimum": 1, "maximum": 9 },
             "taskIds": {
               "type": "array",
               "minItems": 1,
@@ -133,53 +147,21 @@
             }
           }
         }
-      ]
+      }
     },
     "verifierNode": {
-      "allOf": [
-        { "$ref": "#/$defs/nodeBase" },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["id", "kind", "needs", "verifier"],
-          "properties": {
-            "id": { "type": "string" },
-            "kind": { "const": "verifier" },
-            "needs": { "type": "array" },
-            "verifier": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": ["id", "command"],
-              "properties": {
-                "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,47}$" },
-                "command": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": ["argv", "cwd", "maxDurationMs", "maxOutputBytes"],
-                  "properties": {
-                    "argv": {
-                      "type": "array",
-                      "minItems": 1,
-                      "items": { "type": "string", "minLength": 1 }
-                    },
-                    "cwd": { "type": "string", "minLength": 1 },
-                    "maxDurationMs": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 2147483647
-                    },
-                    "maxOutputBytes": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 16777216
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      ]
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "needs", "mutation", "attemptBudget", "output", "command"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "kind": { "const": "verifier" },
+        "needs": { "$ref": "#/$defs/needs" },
+        "mutation": { "const": "readonly" },
+        "attemptBudget": { "$ref": "#/$defs/attemptBudget" },
+        "output": { "$ref": "#/$defs/output" },
+        "command": { "$ref": "#/$defs/command" }
+      }
     }
   }
 }

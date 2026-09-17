@@ -8,6 +8,8 @@ Parse authored workflows, Markdown tasks, and bounded Feature contracts into str
 
 `loadFeatureWithinRoot` and `parseFeatureMarkdown` validate operator-owned objectives, acceptance criteria, planner/concurrency limits, attempt policy, and shell-free verifier commands. `loadSdlcMethodology` confines and snapshots the six checked-in role prompts and JSON Schemas. `normalizeFeaturePlan` accepts bounded planner data, derives stable dependency waves, and rejects cycles, unsafe scopes, and same-wave overlap. `expandSdlcPlan` produces the content-addressed task, integration, independent-review, and verifier graph; `assertSdlcGraphExpansion` protects replay. `parseReviewReport` enforces consistent approval and blocking-finding semantics. `canonicalJson`, `digestBytes`, and `digestJson` provide deterministic evidence identity.
 
+`compileSdlcFeature` creates the immutable analysis/planning prefix and binds exact Feature, methodology, prompt, schema, and protected-path snapshots. A successful normalized plan expands into executable `WorkflowNode` definitions: mutating agents carry patch identities and scopes, controller nodes carry ordered integration authority, and verifier nodes retain only operator-authored commands.
+
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api core`; output is in `.generated/api/core/` and is not committed.
 
 ## Boundaries and invariants

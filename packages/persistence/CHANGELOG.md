@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Accept expanded node identities in confined artifact filenames while preserving exact path and digest verification on reads.
 - Add the SQLite durable store and initial schema with transaction-time leases, exact absent-owner takeover, fenced idempotent mutations, deduplicated controls, rolling event integrity, and snapshot fallback.
 - Create artifact parent directories through the shared private-state root and atomically publish synced immutable artifact files without replacement.
 - Add durable canonical workflow snapshots, append-only events, and optimistic concurrency checks.

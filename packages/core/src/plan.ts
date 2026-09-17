@@ -3,7 +3,7 @@ import Ajv from "ajv";
 
 import featurePlanJsonSchema from "../schemas/feature-plan.v1alpha1.json" with { type: "json" };
 import reviewReportJsonSchema from "../schemas/review-report.v1alpha1.json" with { type: "json" };
-import { digestJson } from "./canonical.js";
+import { canonicalJson, digestJson } from "./canonical.js";
 import { formatSchemaErrors, SdlcValidationError, type FeaturePolicies } from "./feature.js";
 
 const ajv = new Ajv({ allErrors: true });
@@ -207,6 +207,49 @@ export function normalizeFeaturePlan(
     risks: [...value.risks],
   };
   return { ...normalized, planDigest: digestJson(normalized) };
+}
+
+/**
+ * Validate a normalized planner result and reproduce its canonical waves and digest.
+ * @throws SdlcValidationError when stored normalized data differs from planner normalization.
+ * @public
+ */
+export function assertNormalizedFeaturePlan(
+  value: unknown,
+): asserts value is NormalizedFeaturePlan {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    !("taskOrder" in value) ||
+    !Array.isArray(value.taskOrder) ||
+    !("tasks" in value) ||
+    value.tasks === null ||
+    typeof value.tasks !== "object"
+  ) {
+    throw new SdlcValidationError("normalized Feature plan", ["normalized shape is invalid"]);
+  }
+  const plan = value as NormalizedFeaturePlan;
+  let normalized: NormalizedFeaturePlan;
+  try {
+    normalized = normalizeFeaturePlan(
+      {
+        summary: plan.summary,
+        tasks: plan.taskOrder.map((id) => structuredClone(plan.tasks[id])),
+        risks: [...plan.risks],
+      },
+      { maxTasks: 8, maxParallel: 1 },
+    );
+  } catch (error) {
+    if (error instanceof SdlcValidationError) {
+      throw error;
+    }
+    throw new SdlcValidationError("normalized Feature plan", ["normalized shape is invalid"]);
+  }
+  if (canonicalJson(normalized) !== canonicalJson(plan)) {
+    throw new SdlcValidationError("normalized Feature plan", [
+      "canonical tasks, waves, or digest do not match",
+    ]);
+  }
 }
 
 /**

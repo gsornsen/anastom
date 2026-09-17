@@ -32,6 +32,7 @@ export interface FeatureWorkspaceTopology {
   runId: string;
   repositoryRoot: string;
   sourceBaseCommit: string;
+  protectedPaths: readonly string[];
   integration: IsolatedWorkspace;
 }
 
@@ -214,11 +215,76 @@ async function assertTopology(
   await manager.assertOwnedWorkspace(topology.integration);
 }
 
+function isFeatureWorkspaceTopology(
+  value: unknown,
+  runId: string,
+): value is FeatureWorkspaceTopology {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  const integration = candidate.integration;
+  return (
+    hasExactKeys(value, [
+      "integration",
+      "protectedPaths",
+      "repositoryRoot",
+      "runId",
+      "sourceBaseCommit",
+      "version",
+    ]) &&
+    candidate.version === "anastom.dev/feature-workspace-topology/v1alpha1" &&
+    candidate.runId === runId &&
+    typeof candidate.repositoryRoot === "string" &&
+    typeof candidate.sourceBaseCommit === "string" &&
+    /^[0-9a-f]{40,64}$/.test(candidate.sourceBaseCommit) &&
+    Array.isArray(candidate.protectedPaths) &&
+    candidate.protectedPaths.every((path) => typeof path === "string") &&
+    integration !== null &&
+    typeof integration === "object" &&
+    !Array.isArray(integration) &&
+    hasExactKeys(integration, ["baseCommit", "branch", "id", "mode", "path", "repoRoot"]) &&
+    (integration as Record<string, unknown>).mode === "isolated"
+  );
+}
+
+/** Load and revalidate one persisted run topology for process-independent recovery. */
+export async function loadFeatureWorkspaceTopology(
+  manager: GitWorkspaceManager,
+  runId: string,
+): Promise<FeatureWorkspaceTopology> {
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(runId)) {
+    throw new WorkspaceIntegrationError("invalid", "Feature run identity is invalid");
+  }
+  const state = await ensurePrivatePathRoot(manager.stateDir);
+  let value: unknown;
+  try {
+    value = JSON.parse(
+      (
+        await state.readFile(["runs", runId, "feature-workspaces.json"], {
+          maxBytes: TOPOLOGY_MAX_BYTES,
+        })
+      ).toString("utf8"),
+    );
+  } catch {
+    throw new WorkspaceIntegrationError(
+      "unexpected-state",
+      "Feature topology is missing or corrupt",
+    );
+  }
+  if (!isFeatureWorkspaceTopology(value, runId)) {
+    throw new WorkspaceIntegrationError("unexpected-state", "Feature topology fields are invalid");
+  }
+  await assertTopology(manager, value);
+  return structuredClone(value);
+}
+
 /** Create the run's integration branch at the clean source checkout's exact commit. */
 export async function createFeatureWorkspaceTopology(
   manager: GitWorkspaceManager,
   repository: string,
   runId: string,
+  protectedPaths: readonly string[] = [],
 ): Promise<FeatureWorkspaceTopology> {
   const source = await manager.create(repository, workspaceId(runId, "integration"));
   if (source.mode !== "isolated") {
@@ -232,6 +298,9 @@ export async function createFeatureWorkspaceTopology(
     runId,
     repositoryRoot: source.repoRoot,
     sourceBaseCommit: source.baseCommit,
+    protectedPaths: [
+      ...new Set(protectedPaths.map((path) => normalizeRepositoryPath(path, "Protected path"))),
+    ].sort(),
     integration: source,
   };
   await writeTopology(manager, topology);

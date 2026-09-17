@@ -21,10 +21,13 @@ export class FileArtifactStore implements ArtifactStore {
     if (!Number.isSafeInteger(artifact.attempt) || artifact.attempt < 1) {
       throw new Error("Invalid artifact attempt");
     }
-    for (const id of [artifact.runId, artifact.nodeId, artifact.type]) {
+    for (const id of [artifact.runId, artifact.type]) {
       if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(id)) {
         throw new Error("Invalid artifact identity");
       }
+    }
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/.test(artifact.nodeId)) {
+      throw new Error("Invalid artifact producer node identity");
     }
     const digest = digestBytes(artifact.bytes);
     const id =
@@ -53,7 +56,7 @@ export class FileArtifactStore implements ArtifactStore {
     const id = artifact.id;
     if (
       !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/.test(runId) ||
-      !/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(id)
+      !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(id)
     ) {
       throw new Error("Invalid artifact identity");
     }

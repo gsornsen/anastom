@@ -110,7 +110,7 @@ function workflow(label: string): WorkflowDefinition {
     metadata: { id: `snapshot/${label}`, version: "0.1.0" },
     sourcePath: `/fixture/${label}.yaml`,
     inputs: {},
-    policies: { defaultAttemptBudget: { maxAttempts: 2 } },
+    policies: { defaultAttemptBudget: { maxAttempts: 2 }, maxParallel: 1 },
     nodeOrder: ["work"],
     nodes: {
       work: {

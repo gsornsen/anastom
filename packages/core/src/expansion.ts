@@ -1,42 +1,45 @@
 import Ajv from "ajv";
 
 import expansionJsonSchema from "../schemas/sdlc-graph-expansion.v1alpha1.json" with { type: "json" };
-import { digestJson } from "./canonical.js";
+import integrationResultSchema from "../schemas/integration-result.v1alpha1.json" with { type: "json" };
+import commandResultSchema from "../schemas/command-result.v1alpha1.json" with { type: "json" };
+import { digestBytes, digestJson } from "./canonical.js";
 import type { FeatureDefinition, FeatureVerifierDefinition } from "./feature.js";
 import { formatSchemaErrors } from "./feature.js";
 import type { SdlcMethodologySnapshot, SdlcRoleName } from "./methodology.js";
 import type { NormalizedFeaturePlan } from "./plan.js";
-import type { AttemptBudget } from "./types.js";
+import type { AttemptBudget, WorkflowNode } from "./types.js";
 import { SdlcValidationError as ValidationError } from "./feature.js";
 
 /** A model-backed generated node with exact role, policy, and output-contract identity. */
-interface SdlcAgentExpansionNode {
-  id: string;
+interface SdlcAgentExpansionNode extends WorkflowNode {
   kind: "agent";
-  needs: readonly string[];
-  role: Exclude<SdlcRoleName, "analyst" | "planner">;
+  role: string;
   taskId?: string;
+  patchId?: string;
   mutation: "readonly" | "isolated";
   mutationScopes: readonly string[];
   attemptBudget: Required<AttemptBudget>;
-  outputSchemaDigest: string;
+  instructions: string;
+  instructionsDigest: string;
 }
 
 /** A deterministic controller operation that integrates one dependency wave in plan order. */
-interface SdlcIntegrationExpansionNode {
-  id: string;
+interface SdlcIntegrationExpansionNode extends WorkflowNode {
   kind: "integration";
-  needs: readonly string[];
-  wave: number;
-  taskIds: readonly string[];
+  mutation: "isolated";
+  controller: {
+    operation: "integrate-patches";
+    wave: number;
+    taskIds: readonly string[];
+  };
 }
 
 /** One exact operator-authored command retained as a generated verifier node. */
-interface SdlcVerifierExpansionNode {
-  id: string;
+interface SdlcVerifierExpansionNode extends WorkflowNode {
   kind: "verifier";
-  needs: readonly string[];
-  verifier: FeatureVerifierDefinition;
+  mutation: "readonly";
+  command: FeatureVerifierDefinition["command"];
 }
 
 /** A generated node whose operation is fully selected by trusted control-plane code. */
@@ -62,7 +65,7 @@ export interface SdlcGraphExpansion {
   expansionDigest: string;
 }
 
-const ajv = new Ajv({ allErrors: true, strict: false });
+const ajv = new Ajv({ allErrors: true, strict: false, addUsedSchema: false });
 const validateExpansion = ajv.compile<SdlcGraphExpansion>(expansionJsonSchema);
 
 function agentNode(options: {
@@ -70,6 +73,7 @@ function agentNode(options: {
   needs: readonly string[];
   role: Exclude<SdlcRoleName, "analyst" | "planner">;
   taskId?: string;
+  patchId?: string;
   scopes: readonly string[];
   feature: FeatureDefinition;
   methodology: SdlcMethodologySnapshot;
@@ -79,15 +83,21 @@ function agentNode(options: {
     id: options.id,
     kind: "agent",
     needs: [...options.needs],
-    role: options.role,
+    role: role.id,
     ...(options.taskId === undefined ? {} : { taskId: options.taskId }),
+    ...(options.patchId === undefined ? {} : { patchId: options.patchId }),
     mutation: role.mutation,
     mutationScopes: [...options.scopes],
     attemptBudget: {
       maxAttempts: options.feature.policies.attemptBudget.maxAttempts,
       maxDurationMs: options.feature.policies.attemptBudget.maxDurationMs!,
     },
-    outputSchemaDigest: role.outputSchemaDigest,
+    instructions: role.prompt,
+    instructionsDigest: role.promptDigest,
+    output: {
+      ref: role.outputSchemaRef,
+      schema: structuredClone(role.outputSchema),
+    },
   };
 }
 
@@ -106,25 +116,35 @@ export function expandSdlcPlan(
   for (const [waveIndex, taskIds] of plan.waves.entries()) {
     for (const taskId of taskIds) {
       const task = plan.tasks[taskId]!;
-      const id = `implement-${taskId}`;
+      const id = `implement.${taskId}`;
       nodes[id] = agentNode({
         id,
         needs: [precedingIntegration],
         role: "implementer",
         taskId,
+        patchId: taskId,
         scopes: task.mutationScopes,
         feature,
         methodology,
       });
       nodeOrder.push(id);
     }
-    const integrationId = `integrate-wave-${waveIndex + 1}`;
+    const integrationId = `integrate.wave-${waveIndex + 1}`;
     nodes[integrationId] = {
       id: integrationId,
       kind: "integration",
-      needs: taskIds.map((taskId) => `implement-${taskId}`),
-      wave: waveIndex + 1,
-      taskIds: [...taskIds],
+      needs: taskIds.map((taskId) => `implement.${taskId}`),
+      mutation: "isolated",
+      attemptBudget: { maxAttempts: 1 },
+      output: {
+        ref: "anastom.dev/integration-result/v1alpha1",
+        schema: structuredClone(integrationResultSchema),
+      },
+      controller: {
+        operation: "integrate-patches",
+        wave: waveIndex + 1,
+        taskIds: [...taskIds],
+      },
     };
     nodeOrder.push(integrationId);
     precedingIntegration = integrationId;
@@ -134,35 +154,58 @@ export function expandSdlcPlan(
     id: "integrator",
     needs: [precedingIntegration],
     role: "integrator",
+    patchId: "integration-corrections",
     scopes: [...new Set(allScopes)],
     feature,
     methodology,
   });
-  nodes["review-specification"] = agentNode({
-    id: "review-specification",
+  nodes["integrate.final"] = {
+    id: "integrate.final",
+    kind: "integration",
     needs: ["integrator"],
+    mutation: "isolated",
+    attemptBudget: { maxAttempts: 1 },
+    output: {
+      ref: "anastom.dev/integration-result/v1alpha1",
+      schema: structuredClone(integrationResultSchema),
+    },
+    controller: {
+      operation: "integrate-patches",
+      wave: plan.waves.length + 1,
+      taskIds: ["integration-corrections"],
+    },
+  };
+  nodes["review.specification"] = agentNode({
+    id: "review.specification",
+    needs: ["integrate.final"],
     role: "specificationReviewer",
     scopes: [],
     feature,
     methodology,
   });
-  nodes["review-quality"] = agentNode({
-    id: "review-quality",
-    needs: ["integrator"],
+  nodes["review.quality"] = agentNode({
+    id: "review.quality",
+    needs: ["integrate.final"],
     role: "qualityReviewer",
     scopes: [],
     feature,
     methodology,
   });
-  nodeOrder.push("integrator", "review-specification", "review-quality");
-  let verifierNeeds = ["review-specification", "review-quality"];
+  nodeOrder.push("integrator", "integrate.final", "review.specification", "review.quality");
+  let verifierNeeds = ["review.specification", "review.quality"];
   for (const verifier of feature.verification) {
-    const id = `verify-${verifier.id}`;
+    const id = `verify.${verifier.id}`;
     nodes[id] = {
       id,
       kind: "verifier",
       needs: verifierNeeds,
-      verifier: structuredClone(verifier),
+      mutation: "readonly",
+      attemptBudget: { maxAttempts: 1, maxDurationMs: verifier.command.maxDurationMs },
+      output: {
+        ref: "anastom.dev/command-result/v1alpha1",
+        schema: structuredClone(commandResultSchema),
+      },
+      command: structuredClone(verifier.command),
     };
     nodeOrder.push(id);
     verifierNeeds = [id];
@@ -214,6 +257,27 @@ export function assertSdlcGraphExpansion(value: unknown): asserts value is SdlcG
     ) {
       throw new ValidationError("workflow expansion", [
         `node ${JSON.stringify(node.id)} must follow every internal dependency`,
+      ]);
+    }
+    try {
+      ajv.compile(node.output.schema);
+    } catch {
+      throw new ValidationError("workflow expansion", [
+        `node ${JSON.stringify(node.id)} has an invalid output schema`,
+      ]);
+    }
+    if (node.kind === "agent" && digestBytes(node.instructions) !== node.instructionsDigest) {
+      throw new ValidationError("workflow expansion", [
+        `node ${JSON.stringify(node.id)} instructions digest does not match`,
+      ]);
+    }
+    if (
+      node.kind === "agent" &&
+      ((node.mutation === "isolated" && node.patchId === undefined) ||
+        (node.taskId !== undefined && node.patchId !== node.taskId))
+    ) {
+      throw new ValidationError("workflow expansion", [
+        `node ${JSON.stringify(node.id)} has an invalid accepted-patch identity`,
       ]);
     }
   }

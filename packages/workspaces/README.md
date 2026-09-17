@@ -6,7 +6,7 @@ Give each mutating run an owned Git topology, retain task edits as exact evidenc
 
 `resolveGitRepository` resolves the canonical source root and base commit. `GitWorkspaceManager.create` creates an isolated or readonly workspace. `capture` returns a binary-capable diff against the base. `captureWorkspaceCheckpoint` captures complete content and ownership twice; `compareWorkspaceCheckpoints` reports every recovery-relevant difference while ignoring only a later immutable diff-artifact reference. `cleanup` safely removes only an owned, clean, unchanged worktree.
 
-`createFeatureWorkspaceTopology` creates one integration branch/worktree for a Feature run, and `createFeatureTaskWorkspace` creates each task worktree at the exact integration commit for its dependency wave. `captureScopedWorkspacePatch` retains exact binary-capable bytes while rejecting changes outside declared mutation scopes or inside protected inputs. `prepareWorkspaceIntegration` applies ordered accepted patches through a temporary Git index and writes a deterministic commit object without moving a ref. `reconcileWorkspaceIntegration` accepts only the recorded parent or result, moves the owned branch with compare-and-swap, and synchronizes only unchanged controller-owned content. `assertIntegrationPreparation` validates replayed preparation identity and digest.
+`createFeatureWorkspaceTopology` creates one integration branch/worktree for a Feature run and retains its normalized protected paths. `loadFeatureWorkspaceTopology` revalidates that ownership in later processes. `createFeatureTaskWorkspace` creates each task worktree at the exact integration commit for its dependency wave. `captureScopedWorkspacePatch` retains exact binary-capable bytes while rejecting changes outside declared mutation scopes or inside protected inputs. `prepareWorkspaceIntegration` applies ordered accepted patches through a temporary Git index and writes a deterministic commit object without moving a ref. `reconcileWorkspaceIntegration` accepts only the recorded parent or result, moves the owned branch with compare-and-swap, and synchronizes only unchanged controller-owned content. `assertIntegrationPreparation` validates replayed preparation identity and digest.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api workspaces`; output is in `.generated/api/workspaces/` and is not committed.
 
@@ -31,6 +31,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker task execution and durable recovery are delivered. Run-scoped Feature topology, task worktrees, mutation-scope enforcement, and prepared deterministic Git integration are implemented for composition by the durable graph coordinator. Parallel scheduling and independent review execution remain in the active implementation stack; see [milestones](../../docs/MILESTONES.md).
+Single-worker task execution and durable recovery are delivered. Run-scoped Feature topology, task worktrees, mutation-scope enforcement, protected inputs, accepted patch capture, and prepared deterministic Git integration now compose with the concurrent durable graph coordinator. Feature CLI composition and live completion evidence remain in the active implementation stack.
 
 License: [AGPL-3.0-only](../../LICENSE).

@@ -8,7 +8,9 @@ The checked-in `sdlc/default` methodology has a fixed manifest and six roles: an
 
 Planner output is bounded domain data. It supplies task objectives, acceptance criteria, dependencies, and repository-relative mutation scopes. Trusted normalization rejects unknown dependencies, cycles, task-limit violations, unsafe scopes, and segment-overlap between tasks in the same dependency wave. It derives stable topological waves and a canonical digest.
 
-Trusted expansion creates exact implementation nodes, an integration operation after each wave, one integrator, concurrent independent reviewers, and the operator's ordered verifiers. The expansion records the Feature, methodology, and plan digests plus every node and dependency. Its own digest is checked on replay. Runtime completion order cannot change the expansion or integration order.
+Trusted expansion creates exact `implement.<task-id>` nodes, an integration operation after each dependency wave, one integrator plus its final integration operation, concurrent independent reviewers, and the operator's ordered verifiers. Generated nodes retain their normalized execution policy, exact prompt and schema snapshots, mutation/patch identity, controller operation, or verifier argv as applicable. The expansion records the Feature, methodology, and plan digests plus every node and dependency. Its own digest is checked on replay. Runtime completion order cannot change the expansion or integration order.
+
+The durable reducer accepts one expansion after the configured planner succeeds. Replay folds the exact normalized plan and generated graph without invoking a model or rereading methodology files. The scheduler resolves authored and generated nodes through one graph view, assigns independent mutators to exact-base worktrees, and never delegates integration authority to a model result.
 
 ## Status
 

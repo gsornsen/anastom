@@ -276,6 +276,7 @@ export {
   captureScopedWorkspacePatch,
   createFeatureTaskWorkspace,
   createFeatureWorkspaceTopology,
+  loadFeatureWorkspaceTopology,
   prepareWorkspaceIntegration,
   reconcileWorkspaceIntegration,
   type AcceptedWorkspacePatch,

@@ -21,8 +21,13 @@ import { FileArtifactStore, SqliteDurableRunStore } from "@anastom/persistence";
 import { ensurePrivatePathRoot } from "@anastom/path-policy";
 import {
   GitWorkspaceManager,
+  captureScopedWorkspacePatch,
   captureWorkspaceCheckpoint,
   compareWorkspaceCheckpoints,
+  createFeatureTaskWorkspace,
+  loadFeatureWorkspaceTopology,
+  prepareWorkspaceIntegration,
+  reconcileWorkspaceIntegration,
 } from "@anastom/workspaces";
 
 import { durableRuntimeRegistry } from "./runtime-registry.js";
@@ -89,6 +94,25 @@ export async function openDurableCliServices(stateDir: string): Promise<DurableC
       workspace: {
         capture: (workspace) => captureWorkspaceCheckpoint(workspaces, workspace),
         compare: compareWorkspaceCheckpoints,
+        async createTaskWorkspace({ runId, taskId, baseCommit }) {
+          const topology = await loadFeatureWorkspaceTopology(workspaces, runId);
+          return createFeatureTaskWorkspace(workspaces, topology, taskId, baseCommit);
+        },
+        async captureAcceptedPatch({ runId, workspace, mutationScopes }) {
+          const topology = await loadFeatureWorkspaceTopology(workspaces, runId);
+          return captureScopedWorkspacePatch(workspaces, workspace, {
+            mutationScopes,
+            protectedPaths: topology.protectedPaths,
+          });
+        },
+        async prepareIntegration({ runId, patches }) {
+          const topology = await loadFeatureWorkspaceTopology(workspaces, runId);
+          return prepareWorkspaceIntegration(workspaces, topology.integration, patches);
+        },
+        async reconcileIntegration({ runId, preparation }) {
+          const topology = await loadFeatureWorkspaceTopology(workspaces, runId);
+          return reconcileWorkspaceIntegration(workspaces, topology.integration, preparation);
+        },
       },
       runtimes: durableRuntimeRegistry,
       owner: await localProcessIdentity(),

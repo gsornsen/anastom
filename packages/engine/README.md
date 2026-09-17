@@ -8,6 +8,8 @@ Own deterministic scheduling, typed event transitions, fresh attempt contexts, r
 
 Recoverable Task execution uses the engine-owned `DurableRunStore` and `ExecutionHost` interfaces, stable `RunStoreError` codes, lease/process/snapshot/control records, exact execution-plan construction, rolling event-history identity, and the `InMemoryDurableRunStore` reference implementation. `DurableRunCoordinator` composes those boundaries with a runtime registry, workspace checkpoint service, artifact store, and process observer. It creates and releases owned runs, renews leases, persists preparation before host creation and start authority before launch, polls controls, reconciles orphaned attempts, compares complete workspace evidence, applies retry budgets, and refuses unsafe ownership. Durable event contracts record runtime configuration, prepared and authorized execution references, workspace checkpoints, control and cleanup observations, orphan evidence, typed pause reasons, and recovery-blocked state. Renderers expose recorded negotiation, public identity, partial usage, status, and evidence.
 
+The same coordinator folds a validated `WorkflowExpanded` event into its executable graph and supervises up to the persisted parallel limit. Each active attempt retains separate ownership and cleanup evidence while one owned session serializes event commits. Generated implementation work uses assigned task workspaces and accepted patch artifacts. Controller integration records the exact parent/tree/result before compare-and-swap, reconciles interrupted commits, and schedules fresh read-only reviewers plus ordered operator verifiers only after committed integration.
+
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api engine`; output is in `.generated/api/engine/` and is not committed.
 
 ## Boundaries and invariants
@@ -29,6 +31,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker Task execution uses the durable coordinator through the CLI, including pause, cancel, resume, crash recovery, and operational inspection. Deterministic YAML workflows continue through `WorkflowEngine`. Parallel graphs, approvals, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
+Single-worker Task execution uses the durable coordinator through the CLI, including pause, cancel, resume, crash recovery, and operational inspection. The coordinator and workspace boundary now execute planner-expanded graphs with concurrent attempts and recoverable Git integration; Feature CLI composition, public live projection, and completion evidence remain in the active defined-SDLC work. Deterministic YAML workflows continue through `WorkflowEngine`.
 
 License: [AGPL-3.0-only](../../LICENSE).

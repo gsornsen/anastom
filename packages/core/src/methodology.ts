@@ -186,3 +186,81 @@ export async function loadSdlcMethodology(
   };
   return { ...content, methodologyDigest: digestJson(content) };
 }
+
+function assertSnapshotRole(name: SdlcRoleName, role: SdlcRoleSnapshot | undefined): void {
+  const expectedKeys = [
+    "id",
+    "mutation",
+    "outputSchema",
+    "outputSchemaDigest",
+    "outputSchemaRef",
+    "prompt",
+    "promptDigest",
+    "promptRef",
+  ].sort();
+  if (
+    role === undefined ||
+    Object.keys(role).sort().join("\0") !== expectedKeys.join("\0") ||
+    role.id !== expectedRoleIds[name] ||
+    (role.mutation !== "readonly" && role.mutation !== "isolated")
+  ) {
+    throw new SdlcValidationError("methodology snapshot", [`role ${name} is invalid`]);
+  }
+  assertPortableReference(role.promptRef, `role ${name} prompt`);
+  assertPortableReference(role.outputSchemaRef, `role ${name} output schema`);
+  if (
+    digestBytes(role.prompt) !== role.promptDigest ||
+    digestJson(role.outputSchema) !== role.outputSchemaDigest
+  ) {
+    throw new SdlcValidationError("methodology snapshot", [`role ${name} digest disagrees`]);
+  }
+  try {
+    ajv.compile(role.outputSchema);
+  } catch {
+    throw new SdlcValidationError("methodology snapshot", [
+      `role ${name} output schema is invalid`,
+    ]);
+  }
+}
+
+/**
+ * Validate a persisted methodology snapshot without reading its original package directory.
+ * @throws SdlcValidationError when prompt, schema, role, or snapshot digests disagree.
+ * @public
+ */
+export function assertSdlcMethodologySnapshot(
+  value: unknown,
+): asserts value is SdlcMethodologySnapshot {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    !("apiVersion" in value) ||
+    value.apiVersion !== "anastom.dev/v1alpha1" ||
+    !("kind" in value) ||
+    value.kind !== "Methodology" ||
+    !("roles" in value) ||
+    value.roles === null ||
+    typeof value.roles !== "object" ||
+    !("methodologyDigest" in value) ||
+    typeof value.methodologyDigest !== "string"
+  ) {
+    throw new SdlcValidationError("methodology snapshot", ["snapshot shape is invalid"]);
+  }
+  const snapshot = value as SdlcMethodologySnapshot;
+  if (
+    Object.keys(snapshot.roles).sort().join("\0") !== [...roleNames].sort().join("\0") ||
+    snapshot.metadata?.id !== "sdlc/default" ||
+    typeof snapshot.metadata.version !== "string"
+  ) {
+    throw new SdlcValidationError("methodology snapshot", ["role set or metadata is invalid"]);
+  }
+  for (const name of roleNames) {
+    assertSnapshotRole(name, snapshot.roles[name]);
+  }
+  const { methodologyDigest, ...content } = snapshot;
+  if (digestJson(content) !== methodologyDigest) {
+    throw new SdlcValidationError("methodology snapshot", [
+      "methodology digest does not match content",
+    ]);
+  }
+}

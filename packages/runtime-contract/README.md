@@ -10,7 +10,7 @@ The documented entry point is [src/index.ts](src/index.ts). Generate optional HT
 
 ## Boundaries and invariants
 
-Capabilities describe observable support, including supported filesystem modes. Runtime descriptors are canonical JSON capped at 16 KiB; the shared envelope and adapter codec reject unknown fields, and descriptors exclude credentials, executable overrides, auth paths, environment, prompts, native sessions, and test factories. `RuntimeEvent` can report configured or native-reported provider/model identity and one partial or complete attempt-scoped token observation. Optional counters mean unavailable values stay absent rather than becoming invented zeroes; telemetry does not decide acceptance or price. Adapter handles convey identity, not authorization. Context contains explicit task, inputs, dependency outputs, policy, and required output schema; no ambient conversation is assumed. Durable process recovery belongs to the engine-owned execution host rather than runtime adapters.
+Capabilities describe observable support, including supported filesystem modes. Runtime descriptors are canonical JSON capped at 16 KiB; the shared envelope and adapter codec reject unknown fields, and descriptors exclude credentials, executable overrides, auth paths, environment, native sessions, and test factories. `RuntimeEvent` can report configured or native-reported provider/model identity and one partial or complete attempt-scoped token observation. Optional counters mean unavailable values stay absent rather than becoming invented zeroes; telemetry does not decide acceptance or price. Adapter handles convey identity, not authorization. Context contains explicit task or Feature identity, exact methodology instructions, normalized plan and assignment data, mutation scopes, dependency outputs, policy, and required output schema; no ambient conversation is assumed. Durable process recovery belongs to the engine-owned execution host rather than runtime adapters.
 
 ## Development
 
@@ -27,6 +27,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker task execution and durable recovery are delivered. Parallel production graphs, approvals, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
+Single-worker task execution and durable recovery are delivered. The runtime boundary now carries exact planner-expanded attempt context while scheduling, integration, and review acceptance stay in the control plane. Feature CLI composition and live projection remain in the active defined-SDLC work.
 
 License: [AGPL-3.0-only](../../LICENSE).

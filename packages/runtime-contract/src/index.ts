@@ -4,6 +4,7 @@ import type {
   JsonSchema,
   JsonValue,
   NodeKind,
+  NormalizedFeaturePlan,
 } from "@anastom/core";
 
 /**
@@ -119,6 +120,24 @@ export interface ContextEnvelope {
   attempt?: number;
   task?: { id: string; version: string; objective: string; acceptanceCriteria: readonly string[] };
   role?: ResolvedRole;
+  instructions?: string;
+  feature?: {
+    id: string;
+    version: string;
+    objective: string;
+    acceptanceCriteria: readonly string[];
+    documentDigest: string;
+  };
+  plan?: NormalizedFeaturePlan;
+  assignment?: {
+    id: string;
+    title: string;
+    objective: string;
+    acceptanceCriteria: readonly string[];
+    dependsOn: readonly string[];
+    mutationScopes: readonly string[];
+  };
+  mutationScopes?: readonly string[];
   workspace?: WorkspaceRef;
   allowedMutations?: "readonly" | "isolated";
   artifacts?: readonly ArtifactRef[];

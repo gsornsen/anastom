@@ -4,7 +4,7 @@ import Ajv, { type ErrorObject } from "ajv";
 import { parse } from "yaml";
 
 import featureDocumentSchema from "../schemas/feature-document.v1alpha1.json" with { type: "json" };
-import { digestJson } from "./canonical.js";
+import { canonicalJson, digestJson } from "./canonical.js";
 import { readBoundedUtf8 } from "./local-file.js";
 import type {
   AttemptBudget,
@@ -221,6 +221,67 @@ export function normalizeFeature(document: FeatureDocument, sourcePath: string):
     sourcePath: resolve(sourcePath),
     documentDigest: digestJson(normalized),
   };
+}
+
+/**
+ * Validate an immutable normalized Feature loaded from durable storage.
+ * @throws SdlcValidationError when fields, normalization, or the content digest disagree.
+ * @public
+ */
+export function assertFeatureDefinition(value: unknown): asserts value is FeatureDefinition {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    !("sourcePath" in value) ||
+    typeof value.sourcePath !== "string" ||
+    !("policies" in value) ||
+    value.policies === null ||
+    typeof value.policies !== "object" ||
+    !("attemptBudget" in value.policies) ||
+    value.policies.attemptBudget === null ||
+    typeof value.policies.attemptBudget !== "object"
+  ) {
+    throw new SdlcValidationError("Feature definition", ["normalized shape is invalid"]);
+  }
+  const feature = value as FeatureDefinition;
+  let normalized: FeatureDefinition;
+  try {
+    normalized = normalizeFeature(
+      {
+        apiVersion: feature.apiVersion,
+        kind: feature.kind,
+        metadata: structuredClone(feature.metadata),
+        acceptanceCriteria: [...feature.acceptanceCriteria],
+        verification: feature.verification.map(({ id, command }) => ({
+          id,
+          argv: [...command.argv],
+          cwd: command.cwd,
+          maxDuration: `${command.maxDurationMs}ms`,
+          maxOutputBytes: command.maxOutputBytes,
+        })),
+        policies: {
+          maxTasks: feature.policies.maxTasks,
+          maxParallel: feature.policies.maxParallel,
+          attemptPolicy: {
+            maxAttempts: feature.policies.attemptBudget.maxAttempts,
+            maxDuration: `${feature.policies.attemptBudget.maxDurationMs}ms`,
+          },
+        },
+        objective: feature.objective,
+      },
+      feature.sourcePath,
+    );
+  } catch (error) {
+    if (error instanceof SdlcValidationError) {
+      throw error;
+    }
+    throw new SdlcValidationError("Feature definition", ["normalized shape is invalid"]);
+  }
+  if (canonicalJson(normalized) !== canonicalJson(feature)) {
+    throw new SdlcValidationError("Feature definition", [
+      "normalized content or digest does not match",
+    ]);
+  }
 }
 
 /**

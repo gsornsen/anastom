@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Extend the exact context envelope with immutable Feature identity, methodology instructions, normalized plans, task assignments, and mutation scopes for planner-expanded attempts.
 - Keep nested role, tool-policy, failure-category and capability-validation details internal while retaining the documented request, result, adapter and codec contracts.
 - Add exact process-boundary validation for persisted execution requests and normalized terminal results, including 4 MiB request and 1 MiB result limits.
 - Add exact validation for versioned workspace checkpoints, ownership evidence, digests, identifiers, and ignored-content limits.
