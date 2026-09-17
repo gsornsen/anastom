@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
+- Begin the defined-SDLC work under issue #37 with a durable post-merge build brief and ADR covering bounded plan expansion, parallel task ownership, scoped worktrees, deterministic Git integration, independent review, evidence projection, and live CLI events. Track the MLP interactive terminal experience separately in issue #38 after the multi-node event projection stabilizes.
 - Add the seventh stacked M3 production slice: deterministic separate-process crash/restart acceptance for clean, dirty-workspace, and unknown-execution recovery; pre-expiry ownership refusal; stale-fence and duplicate-operation checks; snapshot-corruption fallback; artifact and source-worktree audits; and `docs/M3_EVIDENCE.md`.
 - Add the sixth stacked M3 production slice: CLI composition for exact Pi, Codex, and Claude Code descriptors; an isolated runtime-host entry point; durable `pause`, `cancel`, and `resume`; operational status/inspection; stable exit behavior; and fail-closed corrupt-state handling.
 - Add the fifth stacked M3 production slice: a vendor-neutral durable coordinator with five-second heartbeat, fenced two-phase start order, exact runtime/command ownership, control polling and restart continuation, orphan/workspace reconciliation, attempt-budget enforcement, snapshot boundaries, and typed ownership refusal.
@@ -59,6 +60,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Changed
 
+- Mark M3 durable execution complete after owner acceptance and merge of PR #24, and remove stale review-stack or pending-acceptance claims from current documentation.
 - Add a required implementation definition of done with whole-repository and strict production AST/dependency analysis, exact dynamic executable entries, and manual removal review for superseded tests, fixtures, APIs, and current documentation. Narrow package exports that had no supported caller while preserving explicitly documented public contracts and internal test seams.
 - Make package source, comments, JSDoc, identifiers, fixtures, and test names independent of project milestone labels; enforce the rule in `pnpm hygiene`. Remove the superseded fake Markdown Task path, `SqliteRunPersistence`, historical-resume variants, and compatibility-only tests before the first supported release; consolidate the durable store as the initial migration.
 - Accepted the M2 Codex CLI design; tracked blocked SDK reconsideration and added M2.5 Claude Code support after M2, with subscription authentication to be investigated during design.

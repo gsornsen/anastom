@@ -2,7 +2,7 @@
 
 ## Status and objective
 
-This document describes the delivered control plane through M2.5 and the implemented M3 production stack under review. The accepted M3 durability design, model-free feasibility evidence, and [production contract](M3_PRODUCTION_CONTRACT.md) govern that work. The review stack exposes M3 recovery commands and passes the local deterministic [crash/restart matrix](M3_EVIDENCE.md); owner acceptance and final-code remote checks remain before milestone completion.
+This document describes the delivered control plane through M3. The accepted M3 durability design, model-free feasibility evidence, and [production contract](M3_PRODUCTION_CONTRACT.md) govern the implementation merged in [PR #24](https://github.com/gsornsen/anastom/pull/24). The product exposes recovery commands and passes the deterministic [crash/restart matrix](M3_EVIDENCE.md) plus the required Linux/macOS, DCO, dependency-review, and CodeQL checks.
 
 Anastom keeps engineering policy independent from agent runtime implementation. The control plane owns authoritative state and verification; a runtime adapter owns one bounded agent loop.
 

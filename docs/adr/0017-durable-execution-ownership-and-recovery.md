@@ -1,6 +1,6 @@
 # 0017 — Durable execution ownership and recovery
 
-- Status: Accepted by the owner on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23); feasibility passes in stacked PRs #24–#28, and exact APIs are proposed separately in [ADR 0018](0018-m3-production-contract-and-package-boundaries.md)
+- Status: Accepted by the owner on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23) and implemented with the exact APIs in [ADR 0018](0018-m3-production-contract-and-package-boundaries.md) through merged [PR #24](https://github.com/gsornsen/anastom/pull/24)
 - Date: 2026-09-15
 
 ## Context

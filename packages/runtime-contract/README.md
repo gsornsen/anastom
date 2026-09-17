@@ -27,6 +27,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker task execution is delivered. Parallel graphs, approvals, durable worker recovery, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
+Single-worker task execution and durable recovery are delivered. Parallel production graphs, approvals, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
 
 License: [AGPL-3.0-only](../../LICENSE).

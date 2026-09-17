@@ -1,6 +1,6 @@
 # M3 durable-execution evidence
 
-Status: **implementation candidate consolidated in PR #24; owner acceptance pending.** The production implementation and deterministic process-level acceptance are complete on the owner macOS host, and the cleanup code candidate passes every required repository check. M3 becomes complete only after the owner reviews the combined branch.
+Status: **complete and owner-accepted.** The production implementation and deterministic process-level acceptance were merged in [PR #24](https://github.com/gsornsen/anastom/pull/24) as `2bc7588`. The accepted head passed every required repository check.
 
 ## Reviewed design and implementation identity
 
@@ -16,7 +16,7 @@ The model-free feasibility slices established the implementation gates. Their li
 | [#27](https://github.com/gsornsen/anastom/pull/27) | Exact Git workspace content and ownership checkpoints                                                              |
 | [#28](https://github.com/gsornsen/anastom/pull/28) | Snapshot-plus-tail equality, prefix binding, corrupt-cache fallback, and baseline lifecycle shapes                 |
 
-The production work was reviewed in linear slices for schemas/contracts, private paths and workspaces, the durable store, shared execution host, engine recovery coordinator, CLI composition, and acceptance. PRs #25 through #36 now resolve into PR #24's single feature branch so the owner can review and accept one main-targeting diff.
+The production work was reviewed in linear slices for schemas/contracts, private paths and workspaces, the durable store, shared execution host, engine recovery coordinator, CLI composition, and acceptance. PRs #25 through #36 were consolidated into PR #24's feature branch before whole-branch owner review and merge.
 
 ## Reproduce
 
@@ -98,7 +98,7 @@ Anastom has no external users, supported release, or retained user database. The
 
 M3 does not adopt provider sessions, promise exactly-once external effects, reset orphan workspaces, force takeover, add remote workers, parallel scheduling, human approval, M4 workflows, or another model integration.
 
-## Validation and remaining gates
+## Validation and completed gates
 
 Local final-code validation completed on acceptance candidate `9666dfd`:
 
@@ -120,4 +120,4 @@ On dead-code cleanup candidate `9666dfd`, Linux and macOS CI, dependency review,
 
 CodeQL alert 41 (`js/path-injection`) was individually assessed as a false positive at the private-root trust boundary. A local operator explicitly authorizes the state-root path; `ensurePrivatePathRoot()` canonicalizes its existing parent, fixes the leaf, rejects symlinks and non-directories, requires current-user ownership, tightens mode to `0700`, verifies the canonical result, and returns a capability whose child operations accept validated fixed segments and revalidate parents. A future remote caller must authorize the root before invoking this API. The narrow dismissal and rationale are recorded in GitHub; the path-injection query remains enabled.
 
-The final consolidated head must still pass every required repository check. The owner-review/contribution-rights checkbox remains open until the owner reviews the complete branch; standing contribution rights are already confirmed.
+The final consolidated head `9cf19aa` passed every required repository check. The owner reviewed and approved the complete branch and confirmed contribution rights before merge.
