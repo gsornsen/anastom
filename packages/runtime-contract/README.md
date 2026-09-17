@@ -29,6 +29,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker task execution and durable recovery are delivered. The runtime boundary carries exact planner-expanded attempt context while scheduling, integration, review acceptance, evidence derivation, and live projection stay in the control plane. Feature CLI composition remains in the active defined-SDLC work.
+Single-worker task execution and durable recovery are delivered. The runtime boundary carries exact planner-expanded attempt context while scheduling, integration, review acceptance, evidence derivation, and live projection stay in the control plane. The model-free defined-SDLC process matrix passes; paired live Pi/Codex evidence remains before completion.
 
 License: [AGPL-3.0-only](../../LICENSE).

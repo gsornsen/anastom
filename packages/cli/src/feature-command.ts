@@ -82,9 +82,13 @@ export async function prepareFeatureCommand(
     resolveGitRepository(options.repository),
   ]);
   const protectedPaths = await protectedFeatureInputs(feature, methodology, repository.repoRoot);
+  const workflow = compileSdlcFeature(feature, methodology, { protectedPaths });
+  if (!workflow.definedSdlc) {
+    throw new Error("Compiled Feature lost its defined-SDLC binding");
+  }
   return {
-    workflow: compileSdlcFeature(feature, methodology, { protectedPaths }),
+    workflow,
     repositoryRoot: repository.repoRoot,
-    protectedPaths,
+    protectedPaths: workflow.definedSdlc.protectedPaths,
   };
 }

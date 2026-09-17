@@ -1,3 +1,6 @@
+import type { FeatureDefinition } from "./feature.js";
+import type { SdlcMethodologySnapshot } from "./methodology.js";
+
 /**
  * A scalar representable in JSON; non-finite numbers are rejected during canonicalization.
  */
@@ -177,5 +180,3 @@ export interface ValidationResult {
   valid: boolean;
   errors: readonly string[];
 }
-import type { FeatureDefinition } from "./feature.js";
-import type { SdlcMethodologySnapshot } from "./methodology.js";

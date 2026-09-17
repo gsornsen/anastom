@@ -26,7 +26,10 @@ verification:
   - id: test
     argv: [pnpm, test]
     maxDuration: 1m
-policies: {maxTasks: 2, maxParallel: 2}
+policies:
+  maxTasks: 2
+  maxParallel: 2
+  protectedPaths: [acceptance.mjs]
 ---
 Implement two independent changes and verify the integrated result.
 `;
@@ -88,9 +91,9 @@ describe("Feature command preparation", () => {
     });
 
     expect(prepared.repositoryRoot).toBe(repository);
-    expect(prepared.protectedPaths).toEqual(["feature.md"]);
+    expect(prepared.protectedPaths).toEqual(["acceptance.mjs", "feature.md"]);
     expect(prepared.workflow.definedSdlc).toMatchObject({
-      protectedPaths: ["feature.md"],
+      protectedPaths: ["acceptance.mjs", "feature.md"],
       feature: {
         metadata: { id: "test/feature-command", version: "0.1.0" },
         verification: [{ id: "test", command: { argv: ["pnpm", "test"] } }],
@@ -152,7 +155,7 @@ describe("Feature command preparation", () => {
       });
       const retained = await services.store.load("feature-command", "complete-history");
 
-      expect(topology.protectedPaths).toEqual(["feature.md"]);
+      expect(topology.protectedPaths).toEqual(["acceptance.mjs", "feature.md"]);
       expect(topology.integration.branch).toBe("anastom/feature-command--integration");
       expect(state.nodes.analysis?.status).toBe("ready");
       expect(retained?.events.map(({ type }) => type)).toEqual([

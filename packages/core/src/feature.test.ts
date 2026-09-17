@@ -36,6 +36,7 @@ verification:
 policies:
   maxTasks: 4
   maxParallel: 2
+  protectedPaths: [test/acceptance.mjs]
 ${overrides}---
 # Health endpoint
 
@@ -87,6 +88,7 @@ describe("Feature contract", () => {
       policies: {
         maxTasks: 4,
         maxParallel: 2,
+        protectedPaths: ["test/acceptance.mjs"],
         attemptBudget: { maxAttempts: 1, maxDurationMs: 1_200_000 },
       },
       verification: [
@@ -117,6 +119,19 @@ describe("Feature contract", () => {
     );
     expect(() => parseFeatureMarkdown(source)).toThrow("cannot exceed");
   });
+
+  it.each(["../outside", "/absolute", ".git/config", "dir\\file"])(
+    "rejects unsafe protected path %s",
+    (path) => {
+      const source = featureMarkdown().replace(
+        "protectedPaths: [test/acceptance.mjs]",
+        `protectedPaths: [${JSON.stringify(path)}]`,
+      );
+      expect(() => normalizeFeature(parseFeatureMarkdown(source), "/tmp/feature.md")).toThrow(
+        "normalized repository-relative paths",
+      );
+    },
+  );
 
   it("confines Feature selection to the authorized source root", async () => {
     const fixture = await mkdtemp(join(tmpdir(), "anastom-feature-contract-"));
@@ -212,6 +227,7 @@ describe("plan and review contracts", () => {
     expect(() => assertFeatureDefinition(feature)).not.toThrow();
     expect(() => assertWorkflowDefinition(workflow)).not.toThrow();
     expect(workflow.nodeOrder).toEqual(["analysis", "planning"]);
+    expect(workflow.definedSdlc?.protectedPaths).toEqual(["feature.md", "test/acceptance.mjs"]);
     expect(workflow.nodes.planning).toMatchObject({
       role: "planner",
       needs: ["analysis"],

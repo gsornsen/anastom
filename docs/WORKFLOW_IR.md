@@ -2,7 +2,7 @@
 
 ## Feature and methodology inputs
 
-The defined SDLC starts from a strict Markdown `Feature`, not model-authored Workflow YAML. YAML front matter owns identity, acceptance criteria, planning/concurrency limits, attempt policy, and ordered shell-free verifier argv. The Markdown body is the objective. CLI selection confines the Feature to a caller-authorized source root.
+The defined SDLC starts from a strict Markdown `Feature`, not model-authored Workflow YAML. YAML front matter owns identity, acceptance criteria, planning/concurrency limits, attempt policy, explicit repository-relative protected paths, and ordered shell-free verifier argv. The Markdown body is the objective. CLI selection confines the Feature to a caller-authorized source root. Protected paths name operator-owned acceptance programs or policy inputs that implementation patches must not change; command arguments are never reinterpreted as filenames.
 
 The checked-in `sdlc/default` methodology has a fixed manifest and six roles: analyst, planner, implementer, integrator, specification reviewer, and quality reviewer. Every local prompt and JSON Schema is bounded, confined to the methodology root after symlink resolution, compiled before use, and copied into a content-addressed snapshot. Restart uses that persisted snapshot rather than mutable package files.
 

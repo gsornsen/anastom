@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Accept workspace-checkpoint diff artifact references produced by dotted expanded node IDs such as `implement.left`, matching the existing artifact identity grammar.
 - Add the versioned `LiveRunEvent` contract and strict schema validation for bounded public lifecycle, runtime, usage, artifact, workspace, integration, verification, and control observations.
 - Extend the exact context envelope with immutable Feature identity, methodology instructions, normalized plans, task assignments, and mutation scopes for planner-expanded attempts.
 - Keep nested role, tool-policy, failure-category and capability-validation details internal while retaining the documented request, result, adapter and codec contracts.

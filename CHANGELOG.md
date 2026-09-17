@@ -8,6 +8,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
+- Add production-shaped defined-SDLC process acceptance covering both parallel completion orders, pause/cancel fan-in, sibling failure, review rejection, exact verifier failure, later-process inspection, artifact integrity, source-checkout isolation, retained integration branches, and interrupted-integration recovery under stale fencing.
+- Let Feature authors declare explicit repository-relative protected paths for verifier inputs and other policy files, and accept dotted expanded-node artifact identities in workspace checkpoints.
+
 - Compose repository-bound Feature documents and the checked-in `sdlc/default` methodology through the production CLI and durable coordinator. The command retains one run-owned integration branch, protects the Feature and repository-local methodology inputs, reuses explicit Pi/Codex/Claude Code selection, and streams the existing bounded public projection.
 - Add a deterministic evidence ledger and schema-validated public live-event projection over authoritative run history. Public logs have per-message and per-attempt bounds with exact dropped-message accounting; reconnect replay is equivalent, private execution fields remain excluded, and durable Task runs render committed progress as terminal text or JSON Lines.
 - Execute persisted planner expansions through the fenced coordinator with bounded concurrent attempts, per-task workspaces, scoped accepted patches, deterministic wave and integrator commits, independent review semantics, operator verifiers, all-attempt controls, and interrupted-integration recovery. Feature CLI selection and live model evidence remain in the active defined-SDLC stack.

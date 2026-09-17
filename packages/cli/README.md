@@ -27,6 +27,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker Task execution and `sdlc/default` Feature execution are available through Pi, Codex, and Claude Code with durable operator controls, crash recovery, bounded live output, and later-process evidence inspection. Feature runs retain their run-owned integration and implementation branches for review; automatic merge into the operator branch is outside this command. Deterministic YAML workflows use the fake runtime. Process-level Feature acceptance and paired live evidence remain before defined-SDLC completion. Interactive terminal controls, approval gates, and further runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
+Single-worker Task execution and `sdlc/default` Feature execution are available through Pi, Codex, and Claude Code with durable operator controls, crash recovery, bounded live output, and later-process evidence inspection. Feature runs retain their run-owned integration and implementation branches for review; automatic merge into the operator branch is outside this command. Deterministic YAML workflows use the fake runtime. The production-shaped Feature process matrix passes; paired live Pi/Codex evidence remains before defined-SDLC completion. Interactive terminal controls, approval gates, and further runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
 
 License: [AGPL-3.0-only](../../LICENSE).

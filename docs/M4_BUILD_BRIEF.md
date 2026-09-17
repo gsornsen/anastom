@@ -14,6 +14,8 @@ The same feature brief and `sdlc/default` methodology must run through Pi and Co
 
 M4 adds a strict Markdown `Feature` document instead of overloading the single-worker `Task` contract. YAML front matter owns identifiers, acceptance criteria, verification commands, task/concurrency limits, and attempt duration. The Markdown body is the objective. Prose cannot add commands, widen mutation scope, select a runtime, or alter budgets.
 
+Feature policy may name normalized repository-relative protected paths for operator-owned verifier programs or other immutable inputs. The CLI always adds the Feature document and any methodology resources that live in the target repository. Command arguments are never guessed to be paths; methodology resources installed outside the target repository are retained by their content-addressed snapshot and cannot be reached by target-repository patches.
+
 The CLI form is:
 
 ```bash

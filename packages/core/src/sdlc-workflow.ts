@@ -1,25 +1,7 @@
 import type { FeatureDefinition } from "./feature.js";
 import type { SdlcMethodologySnapshot, SdlcRoleName } from "./methodology.js";
+import { normalizeProtectedPaths } from "./protected-paths.js";
 import type { WorkflowDefinition, WorkflowNode } from "./types.js";
-
-function protectedPaths(paths: readonly string[]): string[] {
-  const normalized = paths.map((path) => posix.normalize(path).replace(/^\.\//, ""));
-  if (
-    normalized.some(
-      (path) =>
-        !path ||
-        path === "." ||
-        isAbsolute(path) ||
-        path.includes("\\") ||
-        path.includes("\0") ||
-        path.split("/").includes("..") ||
-        path.split("/")[0] === ".git",
-    )
-  ) {
-    throw new Error("Protected paths must be normalized repository-relative paths");
-  }
-  return [...new Set(normalized)].sort();
-}
 
 function roleNode(options: {
   id: string;
@@ -87,8 +69,10 @@ export function compileSdlcFeature(
       methodology: structuredClone(methodology),
       analysisNodeId: analysis.id,
       planningNodeId: planning.id,
-      protectedPaths: protectedPaths(options.protectedPaths),
+      protectedPaths: normalizeProtectedPaths([
+        ...options.protectedPaths,
+        ...feature.policies.protectedPaths,
+      ]),
     },
   };
 }
-import { isAbsolute, posix } from "node:path";

@@ -31,6 +31,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker task execution and durable recovery are delivered. Run-scoped Feature topology, task worktrees, mutation-scope enforcement, protected inputs, accepted patch capture, and prepared deterministic Git integration now compose with the concurrent durable graph coordinator. Feature CLI composition and live completion evidence remain in the active implementation stack.
+Single-worker task execution and durable recovery are delivered. Run-scoped Feature topology, task worktrees, mutation-scope enforcement, protected inputs, accepted patch capture, and prepared deterministic Git integration compose with the concurrent durable graph coordinator and production Feature CLI. The model-free process matrix passes; paired live Pi/Codex evidence remains before defined-SDLC completion.
 
 License: [AGPL-3.0-only](../../LICENSE).

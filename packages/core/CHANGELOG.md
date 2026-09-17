@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add explicit normalized `policies.protectedPaths` to Feature snapshots and merge those operator-owned verifier/policy inputs into every compiled defined-SDLC workflow without interpreting command arguments as paths.
 - Compile Feature runs into an immutable analysis/planning prefix and persist complete executable expansion nodes with prompt/schema snapshots, patch identities, deterministic integration operations, independent reviews, and exact verifier commands.
 - Add strict source-scoped Feature contracts, bounded content-addressed methodology snapshots, normalized planner output with deterministic dependency waves and disjoint mutation scopes, semantically consistent review reports, and replay-validated graph expansions. Planner data cannot select commands, runtimes, or arbitrary workflow nodes.
 - Remove unused direct exports for implementation-only schema shapes, status constants, and duration normalization while retaining the documented compiler and loader contracts.

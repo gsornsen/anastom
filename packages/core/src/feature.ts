@@ -6,6 +6,7 @@ import { parse } from "yaml";
 import featureDocumentSchema from "../schemas/feature-document.v1alpha1.json" with { type: "json" };
 import { canonicalJson, digestJson } from "./canonical.js";
 import { readBoundedUtf8 } from "./local-file.js";
+import { normalizeProtectedPaths } from "./protected-paths.js";
 import type {
   AttemptBudget,
   AttemptPolicyDocument,
@@ -36,6 +37,7 @@ export interface FeatureDocument {
   policies?: {
     maxTasks?: number;
     maxParallel?: number;
+    protectedPaths?: string[];
     attemptPolicy?: AttemptPolicyDocument;
   };
   objective: string;
@@ -51,6 +53,7 @@ export interface FeatureVerifierDefinition {
 export interface FeaturePolicies {
   maxTasks: number;
   maxParallel: number;
+  protectedPaths: readonly string[];
   attemptBudget: AttemptBudget;
 }
 
@@ -136,6 +139,16 @@ function durationToMilliseconds(duration: string | undefined): number {
   return milliseconds;
 }
 
+function normalizeFeatureProtectedPaths(paths: readonly string[] | undefined): string[] {
+  try {
+    return normalizeProtectedPaths(paths);
+  } catch {
+    throw new SdlcValidationError("Feature", [
+      "policies.protectedPaths must contain normalized repository-relative paths outside .git",
+    ]);
+  }
+}
+
 function normalizeVerifier(verifier: FeatureVerifierDocument): FeatureVerifierDefinition {
   const cwd = verifier.cwd ?? ".";
   if (isAbsolute(cwd) || cwd.includes("\\") || cwd.split("/").includes("..")) {
@@ -199,6 +212,7 @@ export function normalizeFeature(document: FeatureDocument, sourcePath: string):
   const policies: FeaturePolicies = {
     maxTasks: document.policies?.maxTasks ?? 8,
     maxParallel: document.policies?.maxParallel ?? 2,
+    protectedPaths: normalizeFeatureProtectedPaths(document.policies?.protectedPaths),
     attemptBudget: {
       maxAttempts: document.policies?.attemptPolicy?.maxAttempts ?? 1,
       maxDurationMs:
@@ -262,6 +276,7 @@ export function assertFeatureDefinition(value: unknown): asserts value is Featur
         policies: {
           maxTasks: feature.policies.maxTasks,
           maxParallel: feature.policies.maxParallel,
+          protectedPaths: [...feature.policies.protectedPaths],
           attemptPolicy: {
             maxAttempts: feature.policies.attemptBudget.maxAttempts,
             maxDuration: `${feature.policies.attemptBudget.maxDurationMs}ms`,

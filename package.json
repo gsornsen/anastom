@@ -36,6 +36,7 @@
     "probe:m4:graph": "tsx scripts/m4-graph-feasibility.ts",
     "probe:m4:integration": "tsx scripts/m4-git-integration-feasibility.ts",
     "verify:m4:feasibility": "vitest run scripts/probe-m4-graph.test.ts scripts/probe-m4-concurrent-execution.test.ts scripts/probe-m4-git-integration.test.ts",
+    "verify:defined-sdlc": "tsx scripts/verify-defined-sdlc.ts",
     "changeset": "changeset",
     "version:packages": "changeset version",
     "test": "vitest run",
