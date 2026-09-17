@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
+- Add production Feature workspace topology and deterministic Git integration: one owned integration worktree, exact-base task worktrees, protected mutation scopes, immutable patch bytes, fixed commit construction, compare-and-swap ref movement, and refusal of unrelated recovery state.
 - Add the defined-SDLC contract layer: strict source-scoped Feature documents, bounded content-addressed six-role methodology snapshots, normalized planner data with stable dependency waves and disjoint mutation scopes, semantically consistent independent reviews, and replay-validated graph expansion. Verification commands remain operator-authored.
 - Add model-free M4 feasibility for deterministic plan expansion across alternate completion orders, two simultaneously supervised execution identities with all-attempt recovery classification, and prepared Git integration across ref/worktree crash boundaries. Exact binary patch bytes, disjoint ready-task scopes, integration waves, compare-and-swap refs, and all-execution absence become production gates.
 - Begin the defined-SDLC work under issue #37 with a durable post-merge build brief and ADR covering bounded plan expansion, parallel task ownership, scoped worktrees, deterministic Git integration, independent review, evidence projection, and live CLI events. Track the MLP interactive terminal experience separately in issue #38 after the multi-node event projection stabilizes.

@@ -69,22 +69,59 @@ export class GitWorkspaceManager {
     assertRunId(runId);
     const { repoRoot, baseCommit } = await resolveGitRepository(repo);
     const id = runId;
+    if ((await git(repoRoot, ["status", "--porcelain", "--untracked-files=all"])).trim()) {
+      throw new Error("Workspace creation requires a clean source checkout");
+    }
     if (mode === "readonly") {
-      if ((await git(repoRoot, ["status", "--porcelain"])).trim()) {
-        throw new Error("Readonly workspace requires a clean source checkout");
-      }
       const workspace: WorkspaceRef = { id, mode, repoRoot, path: repoRoot, baseCommit };
       await this.writeManifest(workspace);
       return workspace;
     }
-    const branch = "anastom/" + id;
+    return this.createIsolatedAtCommit(repoRoot, id, baseCommit);
+  }
+  /**
+   * Create an owned isolated worktree at one exact full commit.
+   * @internal This is the topology-building seam used by the defined-SDLC workspace operations.
+   */
+  async createIsolatedAtCommit(
+    repo: string,
+    workspaceId: string,
+    baseCommit: string,
+  ): Promise<Extract<WorkspaceRef, { mode: "isolated" }>> {
+    assertRunId(workspaceId);
+    const repoRoot = await realpath(
+      (await git(resolve(repo), ["rev-parse", "--show-toplevel"])).trim(),
+    );
+    const resolvedCommit = (
+      await git(repoRoot, ["rev-parse", "--verify", `${baseCommit}^{commit}`])
+    ).trim();
+    if (baseCommit !== resolvedCommit) {
+      throw new Error("Workspace base must be an exact full commit ID");
+    }
+    const branch = "anastom/" + workspaceId;
     const state = await ensurePrivatePathRoot(this.stateDir);
     const parent = await state.ensureDirectory(["worktrees"]);
-    const path = join(parent, id);
-    await git(repoRoot, ["worktree", "add", "-b", branch, path, baseCommit]);
-    const workspace: WorkspaceRef = { id, mode, repoRoot, path, branch, baseCommit };
+    const path = join(parent, workspaceId);
+    await git(repoRoot, ["worktree", "add", "-b", branch, path, resolvedCommit]);
+    const workspace = {
+      id: workspaceId,
+      mode: "isolated" as const,
+      repoRoot,
+      path,
+      branch,
+      baseCommit: resolvedCommit,
+    };
     await this.writeManifest(workspace, state);
     return workspace;
+  }
+  /**
+   * Revalidate the private manifest, canonical path, branch, and Git registration for an owned worktree.
+   * @internal Control-plane workspace operations call this immediately before mutation.
+   */
+  async assertOwnedWorkspace(
+    workspace: Extract<WorkspaceRef, { mode: "isolated" }>,
+  ): Promise<void> {
+    await this.assertOwned(workspace);
   }
   /**
    * Capture tracked, new, and committed changes against the base using a temporary index; preserve worker staging.
@@ -232,3 +269,17 @@ export class GitWorkspaceManager {
 }
 
 export { captureWorkspaceCheckpoint, compareWorkspaceCheckpoints } from "./checkpoint.js";
+/** Public run-topology, scoped-patch, and recoverable-integration operations. @public */
+export {
+  WorkspaceIntegrationError,
+  assertIntegrationPreparation,
+  captureScopedWorkspacePatch,
+  createFeatureTaskWorkspace,
+  createFeatureWorkspaceTopology,
+  prepareWorkspaceIntegration,
+  reconcileWorkspaceIntegration,
+  type AcceptedWorkspacePatch,
+  type FeatureWorkspaceTopology,
+  type IntegrationPreparation,
+  type IntegrationReconciliation,
+} from "./feature-workspace.js";

@@ -61,6 +61,7 @@ The TypeScript pnpm workspace supports:
 - fenced durable-run storage plus a shared two-phase POSIX execution host and vendor-neutral coordinator with heartbeat, operator controls, exact orphan/workspace reconciliation, bounded retries, parent-death cleanup, and fail-closed supervisor-loss handling;
 - a durable CLI composition root for Pi, Codex, and Claude Code, with exact descriptor reconstruction, `pause` / `cancel` / `resume`, lease and pending-control inspection, snapshot provenance, typed ownership refusal, and fail-closed corrupt-state handling;
 - owned Git worktrees retained for review, with base commit, final head, and diff capture;
+- run-scoped Feature integration/task worktrees with exact dependency-wave bases, protected mutation scopes, immutable patch identity, deterministic controller-owned commits, compare-and-swap branch movement, and narrow interrupted-integration recovery;
 - bounded command execution with separate stdout/stderr artifacts and typed failures;
 - canonical context artifacts, structured reports, public tool summaries, and SHA-256 digests;
 - typed append-only events, SQLite persistence, and inspection from later processes; and
@@ -74,7 +75,7 @@ Pi uses your normal provider authentication and model settings; its Git worktree
 
 See the [M0 retrospective](docs/M0_RETROSPECTIVE.md) and [M1 retrospective](docs/M1_RETROSPECTIVE.md) for the implemented boundaries, evidence, and lessons informing portability.
 
-M4 remains under development. Its [model-free feasibility evidence](docs/M4_FEASIBILITY.md) establishes stable graph expansion, multiple execution identities under one fence, and recoverable deterministic Git integration. The Feature, methodology, plan, review, and expansion contracts are now implemented; production multi-worker scheduling and integration still follow the delivered single-worker path until the remaining stack lands.
+M4 remains under development. Its [model-free feasibility evidence](docs/M4_FEASIBILITY.md) establishes stable graph expansion, multiple execution identities under one fence, and recoverable deterministic Git integration. The Feature/methodology/plan/review/expansion contracts and production workspace/integration operations are now implemented; multi-worker scheduling still follows the delivered single-worker path until the remaining stack lands.
 
 ## Try the current demo
 

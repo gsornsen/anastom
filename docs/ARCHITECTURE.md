@@ -1,5 +1,13 @@
 # Architecture
 
+## Defined-SDLC workspace and integration boundary
+
+A Feature run owns one integration worktree and branch rooted at the clean source commit. Each ready implementation task gets a distinct worktree rooted at the exact integration commit for its dependency wave. The engine records the topology and assignment before execution; runtime adapters receive one ordinary isolated workspace and do not create, merge, or reset branches.
+
+After a task completes, the workspace layer captures the exact binary-capable patch and checks every changed path against the task's normalized mutation scopes and the run's protected Feature, methodology, and verifier inputs. The reported changed-file list is evidence only; Git supplies the authoritative diff.
+
+The controller applies same-wave accepted patches in plan order through a temporary index. It writes the resulting tree and deterministic commit object without moving the branch, then persists the parent, ordered patch digests, tree, expected commit, and preparation digest. Reconciliation accepts only the recorded parent or expected commit. It compare-and-swaps the owned branch, verifies the inactive integration index/worktree matches the recorded parent or result, and synchronizes that worktree. Any unrelated ref, content, ignored file, ownership, or registration state is refused and retained for inspection.
+
 ## Status and objective
 
 This document describes the delivered control plane through M3. The accepted M3 durability design, model-free feasibility evidence, and [production contract](M3_PRODUCTION_CONTRACT.md) govern the implementation merged in [PR #24](https://github.com/gsornsen/anastom/pull/24). The product exposes recovery commands and passes the deterministic [crash/restart matrix](M3_EVIDENCE.md) plus the required Linux/macOS, DCO, dependency-review, and CodeQL checks.

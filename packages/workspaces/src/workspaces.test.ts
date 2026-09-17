@@ -91,4 +91,10 @@ describe("Git worktree ownership", () => {
     expect(workspace.path).toBe(root);
     await expect(manager.cleanup(workspace)).rejects.toThrow("owned");
   });
+  it("refuses to branch from a dirty source checkout", async () => {
+    const { root, manager } = await setup();
+    await writeFile(join(root, "untracked.txt"), "operator work\n");
+    await expect(manager.create(root, "dirty-source")).rejects.toThrow("clean source checkout");
+    expect(await readFile(join(root, "untracked.txt"), "utf8")).toBe("operator work\n");
+  });
 });
