@@ -87,6 +87,8 @@ Anastom has no external users, supported release, or retained user database. The
 
 - migration one creates the complete durable schema and rejects nonempty unjournaled databases;
 - the superseded `SqliteRunPersistence` adapter and fake Markdown Task path are removed;
+- whole-repository and strict production AST analysis reject unused files, exports, types, dependencies, test-only production paths, and stale analyzer exceptions;
+- direct package exports found to have no supported caller are removed or kept only as a documented public contract or explicit internal test seam;
 - current Task creation records its runtime descriptor, ownership, event integrity, and initial snapshot atomically;
 - missing descriptor, lease, or owned-execution records are corrupt durable state and never cause guessed runtime flags;
 - snapshots remain disposable caches, and invalid candidates fall back to authoritative full replay;
@@ -98,21 +100,23 @@ M3 does not adopt provider sessions, promise exactly-once external effects, rese
 
 ## Validation and remaining gates
 
-Local final-code validation completed on the acceptance candidate:
+Local final-code validation completed on acceptance candidate `9666dfd`:
 
-| Check                               | Local result                                                                                         |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `pnpm verify:m3`                    | Passed; exact results above                                                                          |
-| Focused M3 Vitest boundary          | Passed, 1/1 test                                                                                     |
-| `pnpm test`                         | Passed, 48/48 files and 285/285 tests                                                                |
-| `pnpm typecheck`                    | Passed                                                                                               |
-| `pnpm lint`                         | Passed, including the custom no-inline-script rule                                                   |
-| `pnpm format` / `pnpm format:check` | Passed                                                                                               |
-| `pnpm hygiene`                      | Passed                                                                                               |
-| `pnpm docs:api`                     | Passed for all 12 packages; generated output reviewed and left uncommitted                           |
-| Package builds                      | No separate package build scripts exist; repository-wide TypeScript validation is the build boundary |
+| Check                               | Local result                                                                                              |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `pnpm verify:m3`                    | Passed; exact results above                                                                               |
+| Focused M3 Vitest boundary          | Passed, 1/1 test                                                                                          |
+| `pnpm test`                         | Passed, 48/48 files and 285/285 tests                                                                     |
+| `pnpm typecheck`                    | Passed                                                                                                    |
+| `pnpm lint`                         | Passed, including the custom no-inline-script rule                                                        |
+| `pnpm dead-code`                    | Passed in whole-repository and strict production modes with configuration and tag hints treated as errors |
+| `pnpm format` / `pnpm format:check` | Passed                                                                                                    |
+| `pnpm hygiene`                      | Passed                                                                                                    |
+| `pnpm docs:api`                     | Passed for all 12 packages; generated output reviewed and left uncommitted                                |
+| Process-backed conformance repeat   | Passed five consecutive runs, 2/2 files and 20/20 tests per run                                           |
+| Package builds                      | No separate package build scripts exist; repository-wide TypeScript validation is the build boundary      |
 
-On cleanup code candidate `59032bf`, Linux and macOS CI, dependency review, DCO, CodeQL analysis, and the CodeQL policy gate all passed. The CodeQL scan remains clear after the earlier candidate closed 15 findings through code changes: test fixtures now use the shared private-path capability, the SQLite store requires a caller-authorized existing parent, persisted-event dispatch uses fixed method selection, inherited object keys are rejected, and public validation stops at its first error.
+On dead-code cleanup candidate `9666dfd`, Linux and macOS CI, dependency review, DCO, CodeQL analysis, and the CodeQL policy gate all passed. The CodeQL scan remains clear after the earlier candidate closed 15 findings through code changes: test fixtures now use the shared private-path capability, the SQLite store requires a caller-authorized existing parent, persisted-event dispatch uses fixed method selection, inherited object keys are rejected, and public validation stops at its first error.
 
 CodeQL alert 41 (`js/path-injection`) was individually assessed as a false positive at the private-root trust boundary. A local operator explicitly authorizes the state-root path; `ensurePrivatePathRoot()` canonicalizes its existing parent, fixes the leaf, rejects symlinks and non-directories, requires current-user ownership, tightens mode to `0700`, verifies the canonical result, and returns a capability whose child operations accept validated fixed segments and revalidate parents. A future remote caller must authorize the root before invoking this API. The narrow dismissal and rationale are recorded in GitHub; the path-injection query remains enabled.
 
