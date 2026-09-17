@@ -147,7 +147,7 @@ This is the first major differentiator from ordinary coding-agent wrappers.
 
 ## M4 — Defined SDLC: "Ship a real feature"
 
-Status: building under [issue #37](https://github.com/gsornsen/anastom/issues/37). The implementation begins with a durable graph, bounded parallel worktrees, deterministic integration, independent reviews, and a public live-event projection that can support both streaming CLI output and the planned terminal experience.
+Status: complete. The implementation, deterministic process matrix, unchanged owner-authenticated Pi/Codex runs, retained branches, and private-data audits are recorded in [M4_EVIDENCE.md](M4_EVIDENCE.md). [Issue #37](https://github.com/gsornsen/anastom/issues/37) tracks the delivered work.
 
 ### Demo
 
@@ -178,6 +178,8 @@ This is the first workflow that can replace a typical Superpowers-style executio
 ---
 
 ## M4.5 — Terminal experience: "See the work happen"
+
+Status: next MLP workstream. The line-oriented live stream and reconnect-equivalent projection are delivered; interactive rendering, controls, and terminal-level acceptance remain.
 
 ### Demo
 

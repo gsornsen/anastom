@@ -2,7 +2,7 @@
 
 ## Status and mission
 
-This document defines the delivered behavior targeted by [issue #37](https://github.com/gsornsen/anastom/issues/37). Pull-request metadata records implementation progress; this brief describes the durable product boundary that remains accurate after merge. Completion requires the deterministic and live evidence listed below.
+Status: complete on 2026-09-17. This document defines the delivered behavior tracked by [issue #37](https://github.com/gsornsen/anastom/issues/37). The deterministic matrix and unchanged owner-authenticated Pi/Codex demonstrations are recorded in [M4_EVIDENCE.md](M4_EVIDENCE.md). This brief describes the durable product boundary that remains accurate after merge.
 
 Given one strict feature brief and one explicitly selected runtime/model, Anastom must analyze the repository, produce a bounded structured plan, expand that plan into a durable dependency graph, execute independent implementation tasks concurrently in isolated worktrees, integrate accepted changes deterministically, obtain independent specification and code-quality reviews, run operator-authored verification commands, and retain one integration branch ready for human review.
 

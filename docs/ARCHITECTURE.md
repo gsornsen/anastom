@@ -10,7 +10,7 @@ The controller applies same-wave accepted patches in plan order through a tempor
 
 ## Status and objective
 
-This document describes the delivered durable control plane and the implemented defined-SDLC foundation. The accepted durability design, model-free feasibility evidence, and [production contract](M3_PRODUCTION_CONTRACT.md) govern the recovery implementation merged in [PR #24](https://github.com/gsornsen/anastom/pull/24). Expanded-graph execution, deterministic integration, evidence projection, the bounded live stream, and Feature CLI composition extend that same event authority; process-level and live acceptance evidence remain active work.
+This document describes the delivered durable control plane and defined-SDLC implementation. The accepted durability design, model-free feasibility evidence, and [production contract](M3_PRODUCTION_CONTRACT.md) govern the recovery implementation merged in [PR #24](https://github.com/gsornsen/anastom/pull/24). Expanded-graph execution, deterministic integration, evidence projection, the bounded live stream, and Feature CLI composition extend that same event authority. The [defined-SDLC completion record](M4_EVIDENCE.md) covers the deterministic process matrix and unchanged live Pi/Codex runs.
 
 Anastom keeps engineering policy independent from agent runtime implementation. The control plane owns authoritative state and verification; a runtime adapter owns one bounded agent loop.
 

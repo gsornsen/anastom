@@ -8,6 +8,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
+- Complete defined-SDLC acceptance with one checked-in two-task Feature fixture, unchanged owner-authenticated Pi and Codex runs, overlapping implementation and review attempts, retained deterministic integration branches, passing operator verification, later-process replay, and complete bounded private artifact audits.
+- Add a reusable live-run auditor for runtime identity, concurrency intervals, independent approvals, Git scope and branch identity, protected inputs, artifact completeness/integrity/modes/bounds, public-output bounds, and credential/private-field absence.
 - Add production-shaped defined-SDLC process acceptance covering both parallel completion orders, pause/cancel fan-in, sibling failure, review rejection, exact verifier failure, later-process inspection, artifact integrity, source-checkout isolation, retained integration branches, and interrupted-integration recovery under stale fencing.
 - Let Feature authors declare explicit repository-relative protected paths for verifier inputs and other policy files, and accept dotted expanded-node artifact identities in workspace checkpoints.
 
@@ -64,11 +66,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Fixed
 
+- Settle a retryable dirty worker failure as a whole-run pause only after active sibling cancellation, while an exhausted failed attempt now fails the node and run even when its workspace changed.
+- Give Pi one format-only structured-output correction inside the same attempt before reporting a schema violation.
+- Accept and deterministically integrate a valid empty patch when the integrator finds no cross-task correction to make.
+- Project methodology schemas into Codex's supported native strict-output subset while retaining full local result validation, including `uniqueItems`.
 - Give Codex and Claude Code process-group inspection a bounded 500 ms command budget so cleanup does not fail spuriously when the process table is briefly slow under load.
 - Reject inherited object keys during event replay, fail runtime/event schema validation on the first error, route execution-host fixture records through the shared private-path capability, and make the SQLite busy-error test independent of the production five-second contention wait.
 
 ### Changed
 
+- Mark the defined SDLC complete after the model-free matrix and unchanged live Pi/Codex demonstrations, and make the interactive terminal experience the next MLP workstream.
 - Mark M3 durable execution complete after owner acceptance and merge of PR #24, and remove stale review-stack or pending-acceptance claims from current documentation.
 - Add a required implementation definition of done with whole-repository and strict production AST/dependency analysis, exact dynamic executable entries, and manual removal review for superseded tests, fixtures, APIs, and current documentation. Narrow package exports that had no supported caller while preserving explicitly documented public contracts and internal test seams.
 - Make package source, comments, JSDoc, identifiers, fixtures, and test names independent of project milestone labels; enforce the rule in `pnpm hygiene`. Remove the superseded fake Markdown Task path, `SqliteRunPersistence`, historical-resume variants, and compatibility-only tests before the first supported release; consolidate the durable store as the initial migration.

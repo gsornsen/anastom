@@ -1,6 +1,6 @@
 # ADR 0019: Expand one durable graph and integrate scoped work through controller-owned Git operations
 
-- Status: Accepted implementation direction for [issue #37](https://github.com/gsornsen/anastom/issues/37); completion requires the evidence in the [M4 build brief](../M4_BUILD_BRIEF.md)
+- Status: Accepted and implemented; completion evidence is recorded in [M4_EVIDENCE.md](../M4_EVIDENCE.md)
 - Date: 2026-09-17
 
 ## Context
