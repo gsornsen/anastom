@@ -21,6 +21,7 @@ import {
 
 /**
  * The minimal Pi session facade used by the adapter; injectable to test lifecycle without model calls.
+ * @public
  */
 export interface PiSession {
   /** Execute the explicit prompt in this attempt's fresh session. */
@@ -40,6 +41,7 @@ export interface PiSession {
 }
 /**
  * Create a fresh session using explicit context and cancellation, returning public provider/model identity.
+ * @public
  */
 export type PiSessionFactory = (
   request: ExecutionRequest,
@@ -56,6 +58,7 @@ export interface PiAdapterOptions {
 
 /**
  * Present the explicit context and report contract to Pi, keeping independent verification owned by the engine.
+ * @public
  */
 export function renderPiPrompt(request: ExecutionRequest): string {
   return [
@@ -519,7 +522,6 @@ export class PiRuntimeAdapter implements DurableRuntimeAdapter {
   }
 }
 
-export { parsePiRuntimeDescriptor } from "./descriptor.js";
 export type { PiRuntimeDescriptor } from "./descriptor.js";
 
 /** Exact codec used to reconstruct Pi without relying on unrecorded ambient defaults. */

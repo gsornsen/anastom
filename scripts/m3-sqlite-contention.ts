@@ -15,7 +15,7 @@ export interface M3ContentionToken {
 }
 
 /** Process-liveness conclusion supplied before an expired-lease takeover is attempted. */
-export type M3ContentionLiveness = "alive" | "absent" | "unknown";
+type M3ContentionLiveness = "alive" | "absent" | "unknown";
 
 /** One validated operation executed by an isolated contention worker. */
 export type M3ContentionRequest =

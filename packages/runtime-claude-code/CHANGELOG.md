@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Narrow the package entry point to the adapter, descriptor codec and documented public types; native/profile/parser helpers remain implementation details.
+- Give each bounded process-table inspection 500 ms while preserving the one-second group reap window, preventing spurious cleanup uncertainty under concurrent load.
 - Add an exact versioned descriptor codec for Anthropic model and subscription/API-key source while excluding credentials, environment, executable paths, and test transport settings.
 - Add an exact-attested, end-user-installed Claude Code `2.1.268` native CLI adapter with explicit Anthropic model and subscription/API-key selection, model-free preflight, and one fresh owned POSIX process group per attempt.
 - Gate endpoint-managed files, macOS managed preferences, provider-routing environment, and mismatched authentication sources before starting a model session.

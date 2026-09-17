@@ -28,12 +28,10 @@ import {
   renderDurableRunInspection,
 } from "./durable.js";
 
-export type { DurableRunInspection } from "./durable.js";
-
 /**
  * Injectable CLI output streams, allowing hosts and tests to capture diagnostics.
  */
-export interface CliIo {
+interface CliIo {
   /** Emit normal command output and retained run evidence. */
   stdout(message: string): void;
   /** Emit usage or operator-readable command diagnostics. */

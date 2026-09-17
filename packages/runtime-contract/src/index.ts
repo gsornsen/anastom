@@ -28,7 +28,7 @@ export interface RuntimeCapabilities {
 /**
  * A logical worker role independent of model selection.
  */
-export interface ResolvedRole {
+interface ResolvedRole {
   id: string;
 }
 
@@ -130,7 +130,7 @@ export interface ContextEnvelope {
 /**
  * Mutations authorized by the control plane for this attempt.
  */
-export interface ToolPolicy {
+interface ToolPolicy {
   allowMutations: boolean;
 }
 
@@ -241,7 +241,7 @@ export const FAILURE_CATEGORIES = [
 /**
  * Stable failure classification used by runtime adapters and deterministic orchestration policy.
  */
-export type FailureCategory = (typeof FAILURE_CATEGORIES)[number];
+type FailureCategory = (typeof FAILURE_CATEGORIES)[number];
 
 /**
  * A classified failure and operator-readable diagnostic.
@@ -281,7 +281,6 @@ export {
   RuntimePreflightError,
   probeRuntime,
   assertRuntimeNegotiation,
-  assertRuntimeCapabilities,
   assertRuntimeDescriptor,
   assertRuntimeEvent,
   assertExecutionRequest,

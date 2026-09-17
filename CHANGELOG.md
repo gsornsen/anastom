@@ -54,10 +54,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Fixed
 
+- Give Codex and Claude Code process-group inspection a bounded 500 ms command budget so cleanup does not fail spuriously when the process table is briefly slow under load.
 - Reject inherited object keys during event replay, fail runtime/event schema validation on the first error, route execution-host fixture records through the shared private-path capability, and make the SQLite busy-error test independent of the production five-second contention wait.
 
 ### Changed
 
+- Add a required implementation definition of done with whole-repository and strict production AST/dependency analysis, exact dynamic executable entries, and manual removal review for superseded tests, fixtures, APIs, and current documentation. Narrow package exports that had no supported caller while preserving explicitly documented public contracts and internal test seams.
 - Make package source, comments, JSDoc, identifiers, fixtures, and test names independent of project milestone labels; enforce the rule in `pnpm hygiene`. Remove the superseded fake Markdown Task path, `SqliteRunPersistence`, historical-resume variants, and compatibility-only tests before the first supported release; consolidate the durable store as the initial migration.
 - Accepted the M2 Codex CLI design; tracked blocked SDK reconsideration and added M2.5 Claude Code support after M2, with subscription authentication to be investigated during design.
 - Replaced milestone-based executable fixture and CI names with capability names, and removed duplicated durable demo coverage from CI.

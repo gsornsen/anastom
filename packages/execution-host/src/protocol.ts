@@ -343,7 +343,7 @@ function assertFailure(value: unknown): asserts value is ExecutionFailure {
 }
 
 /** Validate a serialized command execution without accepting extra fields. */
-export function assertSerializedCommandExecution(
+function assertSerializedCommandExecution(
   value: unknown,
 ): asserts value is SerializedCommandExecution {
   if (

@@ -7,10 +7,8 @@ import {
   conformanceReport,
   drainEvents,
 } from "../packages/runtime-contract/src/testing/conformance.js";
-import {
-  ClaudeCodeRuntimeAdapter,
-  resolveClaudeCodeExecutable,
-} from "@anastom/runtime-claude-code";
+import { ClaudeCodeRuntimeAdapter } from "@anastom/runtime-claude-code";
+import { resolveClaudeCodeExecutable } from "../packages/runtime-claude-code/src/executable.js";
 
 const fileCases = [
   "inside-read",

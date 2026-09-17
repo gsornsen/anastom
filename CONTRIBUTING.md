@@ -17,6 +17,7 @@ pnpm install --frozen-lockfile
 pnpm test
 pnpm typecheck
 pnpm lint
+pnpm dead-code
 pnpm anastom validate examples/workflows/demo-feature.yaml
 pnpm anastom run examples/workflows/demo-feature.yaml --fake-scenario examples/fake/success.yaml
 ```
@@ -47,9 +48,11 @@ Record notable user-facing or project changes in `CHANGELOG.md`. Keep the README
 
 ## Tests and evidence
 
-Follow the [engineering standards](docs/ENGINEERING.md) for readability, JSDoc, test fixtures, package documentation, SemVer, migrations, and CI ownership. Run `pnpm format` to apply the formatter. Before requesting review, run `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, and `pnpm hygiene`. Add a Changeset with `pnpm changeset` for changed package code or contracts; update the affected package README and changelog. Generate optional package API documentation with `pnpm docs:api <package>` when reviewing an API change.
+Follow the [engineering standards](docs/ENGINEERING.md) for readability, JSDoc, test fixtures, package documentation, SemVer, migrations, and CI ownership. Run `pnpm format` to apply the formatter. Before requesting review, run `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm dead-code`, `pnpm format:check`, and `pnpm hygiene`. Add a Changeset with `pnpm changeset` for changed package code or contracts; update the affected package README and changelog. Generate optional package API documentation with `pnpm docs:api <package>` when reviewing an API change.
 
 Tests should prove observable behavior and failure handling. Avoid tests that merely repeat an implementation. A pull request should state which checks ran and include relevant output or fixtures for behavior that cannot be covered by the standard commands.
+
+For every implementation or refactor, audit the changed capability and its callers for code, exports, dependencies, wrappers, tests, fixtures, configuration, and current documentation that the new path supersedes. Delete obsolete material in the same pull request. `pnpm dead-code` performs AST and dependency-graph checks in both whole-repository and production-only modes; reviewers still decide whether a reachable test protects supported behavior and whether prose remains accurate. Historical evidence and decision records remain when they explain project history, with superseded conclusions labeled clearly.
 
 ## Commits
 

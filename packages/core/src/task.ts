@@ -10,10 +10,13 @@ import { normalizeWorkflow, parseWorkflowYaml, WorkflowValidationError } from ".
 import workerReport from "../schemas/worker-report.v1alpha1.json" with { type: "json" };
 import commandResult from "../schemas/command-result.v1alpha1.json" with { type: "json" };
 
-/** Built-in report schema: descriptive summary, declared changed files, and notes. */
+/**
+ * Built-in report schema: descriptive summary, declared changed files, and notes.
+ * @public
+ */
 export const workerReportSchema = workerReport;
 /** Built-in verifier output schema with exit status and output accounting. */
-export const commandResultSchema = commandResult;
+const commandResultSchema = commandResult;
 const workerSchemaPath = fileURLToPath(
   new URL("../schemas/worker-report.v1alpha1.json", import.meta.url),
 );
@@ -23,6 +26,7 @@ const commandSchemaPath = fileURLToPath(
 
 /**
  * Validated Task front matter and its nonempty Markdown objective.
+ * @public
  */
 export interface TaskDocument {
   apiVersion: "anastom.dev/v1alpha1";
@@ -42,6 +46,7 @@ const validate = new Ajv({ allErrors: true }).compile<Omit<TaskDocument, "object
  * Parse strict YAML front matter and preserve the remaining Markdown as the objective.
  * @remarks Delimiters are scanned linearly; BOM and CRLF input are supported.
  * @throws If front matter, field ownership, or the objective is invalid.
+ * @public
  */
 export function parseTaskMarkdown(source: string): TaskDocument {
   const text = source.startsWith("\uFEFF") ? source.slice(1) : source;
@@ -89,6 +94,7 @@ export function parseTaskMarkdown(source: string): TaskDocument {
 /**
  * Compile one Task into an implement agent followed by an independent command verifier.
  * @remarks Built-in schemas are cloned locally; the default worker budget is one attempt and ten minutes.
+ * @public
  */
 export async function compileTask(
   task: TaskDocument,
@@ -155,7 +161,10 @@ async function readTaskSource(absolutePath: string): Promise<string> {
   return source;
 }
 
-/** Load a trusted operator-selected local Task file. */
+/**
+ * Load a trusted operator-selected local Task file.
+ * @public
+ */
 export async function loadTask(file: string): Promise<WorkflowDefinition> {
   const absolutePath = resolve(file);
   return compileTask(parseTaskMarkdown(await readTaskSource(absolutePath)), absolutePath);

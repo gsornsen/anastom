@@ -3,8 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import { workerReportSchema, canonicalJson } from "@anastom/core";
-import { probeRuntime, assertRuntimeCapabilities, assertRuntimeEvent } from "../index.js";
+import { probeRuntime, assertRuntimeEvent } from "../index.js";
 import type { ExecutionRequest, RuntimeAdapter, RuntimeEvent } from "../index.js";
+import { assertRuntimeCapabilities } from "../validation.js";
 
 export const conformanceReport = {
   summary: "Implemented the requested endpoint while preserving the existing behavior.",
@@ -14,7 +15,7 @@ export const conformanceReport = {
 
 export type ConformanceCase =
   "success" | "invalid" | "missing" | "failure" | "pressure" | "cancellable";
-export interface ConformanceHarness {
+interface ConformanceHarness {
   adapter: RuntimeAdapter;
   requests?: ExecutionRequest[];
   /** Count actual process/session creation, including for a rejected capability probe. */

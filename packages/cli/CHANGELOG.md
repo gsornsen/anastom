@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep CLI inspection and injected-output helper types internal to their actual source modules instead of advertising unused entry-point exports.
 - Compose the fenced store, shared execution host, exact runtime registry, workspace checkpoints, and artifact store for recoverable Pi, Codex, and Claude Code Task runs. Add `pause`, `cancel`, and `resume`, operation IDs, operational status/inspection, snapshot provenance, typed ownership diagnostics, and exit-code `2` for invalid usage or missing runs. Remove the superseded fake Task path while retaining deterministic fake YAML workflows.
 - Scope authored Task/Workflow/schema reads to the CLI's current source directory, rejecting absolute, traversal, and symlink escapes; run from the containing source tree when using an external Task file.
 - Add explicit Claude Code provider/model/subscription-or-API-key selection with source/native preflight before run state, and reject incompatible or incomplete selections.

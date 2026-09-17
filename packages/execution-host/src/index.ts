@@ -54,10 +54,10 @@ import {
 } from "./process.js";
 
 export { localProcessIdentity, observeLocalProcess } from "./process.js";
-export { runExecutionRuntimeHost, type RuntimeResolver } from "./runtime-host.js";
+export { runExecutionRuntimeHost } from "./runtime-host.js";
 
 /** Checked-in hidden runtime-host executable selected by the trusted CLI composition root. */
-export interface RuntimeHostCommand {
+interface RuntimeHostCommand {
   executable: string;
   args: readonly string[];
 }

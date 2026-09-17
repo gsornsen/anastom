@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { loadTaskWithinRoot } from "@anastom/core";
 import { localProcessIdentity } from "@anastom/execution-host";
-import { parsePiRuntimeDescriptor } from "@anastom/runtime-pi";
+import { piRuntimeDescriptorCodec } from "@anastom/runtime-pi";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -12,14 +12,14 @@ import {
   healthEndpointTaskPath,
   removeEndpointRepository,
 } from "../../engine/src/testing/fixture.js";
-import { openDurableCliServices } from "./durable.js";
-import { runCli, type DurableRunInspection } from "./index.js";
+import { openDurableCliServices, type DurableRunInspection } from "./durable.js";
+import { runCli } from "./index.js";
 import { durableRuntimeRegistry } from "./runtime-registry.js";
 
 const pauseOperation = "11111111-1111-4111-8111-111111111111";
 const cancelOperation = "22222222-2222-4222-8222-222222222222";
 const repeatedCancelOperation = "33333333-3333-4333-8333-333333333333";
-const descriptor = parsePiRuntimeDescriptor({
+const descriptor = piRuntimeDescriptorCodec.parse({
   version: "anastom.dev/runtime-descriptor/v1alpha1",
   runtimeId: "pi",
   configurationVersion: "anastom.dev/runtime-pi-config/v1alpha1",

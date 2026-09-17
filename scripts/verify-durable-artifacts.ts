@@ -3,7 +3,8 @@ import { execFile } from "node:child_process";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { FileArtifactStore } from "../packages/persistence/src/index.js";
-import { runCli, type DurableRunInspection } from "../packages/cli/src/index.js";
+import { runCli } from "../packages/cli/src/index.js";
+import type { DurableRunInspection } from "../packages/cli/src/durable.js";
 import { canonicalExistingRoot, resolveExistingChild } from "../packages/path-policy/src/index.js";
 
 const [runId, directory] = process.argv.slice(2);

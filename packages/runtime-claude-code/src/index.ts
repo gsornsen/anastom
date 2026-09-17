@@ -340,10 +340,7 @@ export class ClaudeCodeRuntimeAdapter implements DurableRuntimeAdapter {
   }
 }
 
-export { validateClaudeSelection, createClaudeCodeProfile } from "./profile.js";
-export { CLAUDE_CODE_VERSION, resolveClaudeCodeExecutable } from "./executable.js";
 export type { ClaudeAuthSource } from "./auth.js";
-export { parseClaudeCodeRuntimeDescriptor } from "./descriptor.js";
 export type { ClaudeCodeRuntimeDescriptor } from "./descriptor.js";
 
 /** Exact codec used to reconstruct Claude Code without persisting credentials or private settings. */

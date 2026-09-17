@@ -7,7 +7,10 @@ const PRIVATE_DIRECTORY_MODE = 0o700;
 const PRIVATE_FILE_MODE = 0o600;
 const READ_CHUNK_BYTES = 64 * 1024;
 
-/** A failure to preserve the private-state path ownership or bounded-I/O contract. */
+/**
+ * A failure to preserve the private-state path ownership or bounded-I/O contract.
+ * @public
+ */
 export class PrivatePathError extends Error {
   /** Classify invalid input separately from filesystem ownership and race failures. */
   constructor(

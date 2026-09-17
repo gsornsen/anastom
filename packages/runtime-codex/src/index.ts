@@ -348,8 +348,6 @@ export class CodexRuntimeAdapter implements DurableRuntimeAdapter {
   }
 }
 
-export { renderCodexPrompt, validateSelection, CODEX_VERSION } from "./profile.js";
-export { parseCodexRuntimeDescriptor } from "./descriptor.js";
 export type { CodexRuntimeDescriptor } from "./descriptor.js";
 
 /** Exact codec used to reconstruct Codex without persisting credentials or private settings. */

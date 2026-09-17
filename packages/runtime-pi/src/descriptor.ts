@@ -12,7 +12,9 @@ export type PiRuntimeDescriptor = RuntimeDescriptor & {
 
 const validate = new Ajv({ allErrors: true, strict: false }).compile(schema);
 
-/** Parse the exact Pi descriptor schema, rejecting private or unknown configuration. */
+/**
+ * Parse the exact Pi descriptor schema, rejecting private or unknown configuration.
+ */
 export function parsePiRuntimeDescriptor(value: unknown): PiRuntimeDescriptor {
   assertRuntimeDescriptor(value);
   if (!validate(value)) {

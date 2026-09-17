@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep checkpoint capture and comparison result shapes reachable through their functions without redundant direct type re-exports.
 - Add exact double-captured workspace checkpoints with bounded binary diffs, streamed ignored-content identity, canonical Git ownership evidence, staging preservation, and field-classified comparison.
 - Store and validate isolated and readonly workspace ownership manifests through the fixed-segment private-state root.
 - Create run-owned Git worktrees and explicit readonly source references.

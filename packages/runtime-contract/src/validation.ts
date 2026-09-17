@@ -220,7 +220,10 @@ export class RuntimePreflightError extends Error {
   }
 }
 
-/** Validate a complete capability snapshot; unknown extra fields fail closed. */
+/**
+ * Validate a complete capability snapshot; unknown extra fields fail closed.
+ * @internal
+ */
 export function assertRuntimeCapabilities(value: unknown): asserts value is RuntimeCapabilities {
   if (!capabilitiesValidator(value)) {
     throw new RuntimePreflightError(

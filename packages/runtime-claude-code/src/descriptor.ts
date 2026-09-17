@@ -17,7 +17,9 @@ export type ClaudeCodeRuntimeDescriptor = RuntimeDescriptor & {
 
 const validate = new Ajv({ allErrors: true, strict: false }).compile(schema);
 
-/** Parse the exact Claude Code descriptor without accepting credentials or process settings. */
+/**
+ * Parse the exact Claude Code descriptor without accepting credentials or process settings.
+ */
 export function parseClaudeCodeRuntimeDescriptor(value: unknown): ClaudeCodeRuntimeDescriptor {
   assertRuntimeDescriptor(value);
   if (!validate(value)) {

@@ -42,7 +42,7 @@ export interface M3WorkspaceCheckpointCapture {
 }
 
 /** Classified exact-checkpoint fields that differ during recovery reconciliation. */
-export type M3WorkspaceDifference =
+type M3WorkspaceDifference =
   | "version"
   | "workspace-id"
   | "base-commit"

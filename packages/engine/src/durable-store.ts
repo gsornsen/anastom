@@ -444,7 +444,10 @@ function assertAbsentObservation(value: TakeoverExpiredRun["ownerAbsence"]): voi
   assertTimestamp(value.observedAtMs, "owner observation time");
 }
 
-/** Process-local reference implementation of the durable lease and fencing contract. */
+/**
+ * Process-local reference implementation of the durable lease and fencing contract.
+ * @public
+ */
 export class InMemoryDurableRunStore implements DurableRunStore {
   private readonly runs = new Map<string, MemoryRun>();
   private readonly clock: () => number;

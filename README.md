@@ -67,7 +67,7 @@ The TypeScript pnpm workspace supports:
 
 Markdown Task runs persist under the target repository's ignored `.anastom/` directory. The YAML fake demo uses process-local persistence. A worker report describes the change; the control plane accepts it only after the declared command exits successfully.
 
-Packages have documented APIs and their own READMEs/changelogs. Prettier, ESLint/JSDoc, contributor hygiene checks, and reviewed SemVer release plans establish the development baseline. SQLite uses versioned, validated migrations with transactional failure rollback. Fake scenarios can reference separate source files for readable diffs and IDE support. See the [engineering standards](docs/ENGINEERING.md) for development, migration, and CI practices.
+Packages have documented APIs and their own READMEs/changelogs. Prettier, ESLint/JSDoc, AST-based dead-code and dependency checks, contributor hygiene checks, and reviewed SemVer release plans establish the development baseline. Each implementation includes a semantic audit for superseded tests and current documentation because reachability alone cannot establish their value or accuracy. SQLite uses versioned, validated migrations with transactional failure rollback. Fake scenarios can reference separate source files for readable diffs and IDE support. See the [engineering standards](docs/ENGINEERING.md) for the implementation definition of done, development, migration, and CI practices.
 
 Pi uses your normal provider authentication and model settings; its Git worktree is checkout isolation, not an operating-system sandbox. Codex uses its normal file-backed CLI authentication, requires an explicit OpenAI model, and runs its worker commands in read-only or workspace-write sandboxing. Claude Code uses an end-user-installed, signed native release with an explicit first-party subscription or API-key source. Codex and Claude Code reject managed policy that their bounded profiles cannot certify. The independent verifier runs with local command permissions. Run trusted tasks and verification commands on repositories you are comfortable exposing to the selected provider. M3's local crash/restart acceptance passes without a provider call, and the cleanup code candidate passes Linux, macOS, and repository-required checks; owner acceptance remains before completion. Human approval, multiple workers, routing, and further adapters remain future milestones.
 
@@ -94,6 +94,7 @@ To check the development baseline:
 pnpm test
 pnpm typecheck
 pnpm lint
+pnpm dead-code
 pnpm format:check
 pnpm hygiene
 ```

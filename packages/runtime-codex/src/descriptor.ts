@@ -18,7 +18,9 @@ export type CodexRuntimeDescriptor = RuntimeDescriptor & {
 
 const validate = new Ajv({ allErrors: true, strict: false }).compile(schema);
 
-/** Parse the exact Codex descriptor schema, rejecting auth paths and transport overrides. */
+/**
+ * Parse the exact Codex descriptor schema, rejecting auth paths and transport overrides.
+ */
 export function parseCodexRuntimeDescriptor(value: unknown): CodexRuntimeDescriptor {
   assertRuntimeDescriptor(value);
   if (!validate(value)) {

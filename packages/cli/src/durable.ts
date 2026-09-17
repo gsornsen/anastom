@@ -29,7 +29,9 @@ import { durableRuntimeRegistry } from "./runtime-registry.js";
 
 type OwnerState = "live" | "expired" | "released" | "unknown";
 
-/** Read-only run state plus mutable local coordination evidence. */
+/**
+ * Read-only run state plus mutable local coordination evidence.
+ */
 export interface DurableRunInspection {
   /** Digest of the immutable workflow definition. */
   definitionDigest: string;

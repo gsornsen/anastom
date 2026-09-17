@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DurableRuntimeAdapter } from "@anastom/runtime-contract";
 
-import {
-  ClaudeCodeRuntimeAdapter,
-  claudeCodeRuntimeDescriptorCodec,
-  parseClaudeCodeRuntimeDescriptor,
-} from "./index.js";
+import { ClaudeCodeRuntimeAdapter, claudeCodeRuntimeDescriptorCodec } from "./index.js";
 
 describe("Claude Code durable descriptor", () => {
   it("round-trips only the selected first-party auth mode", async () => {
@@ -43,7 +39,7 @@ describe("Claude Code durable descriptor", () => {
         apiKey: "secret",
       },
     };
-    expect(() => parseClaudeCodeRuntimeDescriptor(privateDescriptor)).toThrow(
+    expect(() => claudeCodeRuntimeDescriptorCodec.parse(privateDescriptor)).toThrow(
       "Invalid Claude Code runtime descriptor",
     );
     await expect(

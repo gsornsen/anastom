@@ -30,7 +30,7 @@ export interface PersistedExecutionRef extends ExecutionPlanRef {
 }
 
 /** Confirmed public terminal evidence retained after private execution cleanup. */
-export interface ExecutionTerminalEvidence {
+interface ExecutionTerminalEvidence {
   outcome: "succeeded" | "failed" | "blocked" | "cancelled";
   cleanup: "confirmed";
   terminalDigest: string;

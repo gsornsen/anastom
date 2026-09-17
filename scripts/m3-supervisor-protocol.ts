@@ -193,7 +193,7 @@ export function assertM3AttemptPlan(value: unknown): asserts value is M3AttemptP
 }
 
 /** Validate the exact private control record before using its capability. */
-export function assertM3ExecutionControl(value: unknown): asserts value is M3ExecutionControl {
+function assertM3ExecutionControl(value: unknown): asserts value is M3ExecutionControl {
   if (
     !isRecord(value) ||
     !exactKeys(value, ["capability", "executionId", "version"]) ||
@@ -207,7 +207,7 @@ export function assertM3ExecutionControl(value: unknown): asserts value is M3Exe
 }
 
 /** Validate the exact sanitized manifest schema before process inspection. */
-export function assertM3ExecutionManifest(value: unknown): asserts value is M3ExecutionManifest {
+function assertM3ExecutionManifest(value: unknown): asserts value is M3ExecutionManifest {
   if (
     !isRecord(value) ||
     !exactKeys(value, [
@@ -308,7 +308,7 @@ function assertExecutionResult(value: unknown): asserts value is ExecutionResult
 }
 
 /** Validate bounded public terminal evidence loaded after supervisor exit. */
-export function assertM3ExecutionTerminal(value: unknown): asserts value is M3ExecutionTerminal {
+function assertM3ExecutionTerminal(value: unknown): asserts value is M3ExecutionTerminal {
   if (
     !isRecord(value) ||
     !exactKeys(value, [

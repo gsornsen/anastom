@@ -20,7 +20,9 @@ const NATIVE_SHA256: Readonly<Record<string, readonly string[]>> = {
   ],
 };
 
-/** Resolve only the operator's official native-installer release path, then attest bytes. */
+/**
+ * Resolve only the operator's official native-installer release path, then attest bytes.
+ */
 export async function resolveClaudeCodeExecutable(): Promise<string> {
   const hashes = NATIVE_SHA256[`${process.platform}-${process.arch}`];
   if (!hashes) {

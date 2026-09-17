@@ -17,12 +17,12 @@ import { assertRunEvent } from "./event-validation.js";
 /**
  * The lifecycle state of the complete run, reconstructed from ordered events.
  */
-export type RunStatus =
+type RunStatus =
   "running" | "blocked" | "succeeded" | "failed" | "paused" | "cancelled" | "recovery-blocked";
 /**
  * The lifecycle state of one scheduled node execution.
  */
-export type AttemptStatus =
+type AttemptStatus =
   | "scheduled"
   | "prepared"
   | "running"
@@ -92,7 +92,7 @@ export interface AttemptState {
 /**
  * A node's event-derived status, ordered attempts, validated output, and verification evidence.
  */
-export interface NodeRunState {
+interface NodeRunState {
   id: string;
   status: NodeStatus;
   attempts: AttemptState[];
@@ -235,6 +235,7 @@ export type RunEvent = RunEventPayload & { runId: string; sequence: number };
 
 /**
  * Signals a transition that would contradict the current run or node state.
+ * @public
  */
 export class InvalidTransitionError extends Error {
   /**

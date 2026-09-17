@@ -20,6 +20,16 @@ The hygiene gate is structural. It does not decide whether prose or JSDoc is acc
 
 Executable process doubles live in checked-in files. The `anastom/no-inline-scripts` ESLint rule rejects script shebangs embedded in strings and source passed through interpreter evaluation flags. Its file-backed positive and negative AST fixtures run as part of `pnpm lint`; ordinary paths and messages remain allowed.
 
+## Definition of done for implementation
+
+An implementation or refactor is complete only after its replacement boundary has been audited, not merely after the new path works. Inspect the changed capability and its callers, then delete source files, exports, types, dependencies, commands, options, wrappers, fixtures, and configuration that no current supported path needs. Delete or rewrite tests whose subject or expected behavior was superseded. Review the README, package documents, current architecture and contract documents, examples, and local links for claims that the change made stale. Retain historical evidence, build briefs, retrospectives, and decision records when they explain the project history; label superseded conclusions instead of rewriting history.
+
+Run `pnpm dead-code` as part of that audit. Knip parses TypeScript and JavaScript imports and exports and checks workspace dependencies twice: the complete repository pass finds unused files, exports, types, dependencies, and test support; strict production mode also finds implementation reachable only from tests and verifies direct workspace dependency ownership. Dynamically launched file-backed executables are listed as exact entry points in `knip.json`. Do not replace those entries with broad directory allowances, because a broad entry would make an abandoned fixture appear live.
+
+An exported symbol with no in-repository production caller needs an explicit reason. Use `@public` only for a deliberate package contract described in that package's README. Use `@internal` only when a production module boundary or focused test requires an export that is not part of the package entry point. Review these tags when the contract or test seam changes; do not use them to silence uncertain findings. Static reachability cannot determine whether a reachable test still protects supported behavior or whether prose is still true, so the pull-request review must record that semantic audit.
+
+During MLP development, remove superseded paths in the same change that replaces them. Compatibility code remains justified only by a current supported caller, an already released contract, or retained user data. A future possibility is not a current use case.
+
 ## Contributor-friendly tests
 
 Name tests for observable behavior and the failure being protected against. Explain non-obvious fixture starting conditions, then keep setup, execution, and assertions easy to distinguish. Use typed transport shapes and named helpers such as `createdRunId`, `inspectInNewProcess`, and `evidence`, rather than dense casts, nested regular expressions, or unexplained non-null assertions.
@@ -58,6 +68,7 @@ Run and Pi execution IDs use [`node:crypto.randomUUID()`](https://nodejs.org/doc
 | TypeScript          | Type and package-boundary compatibility                                            | Required Linux job |
 | ESLint + JSDoc      | Readability and typed correctness                                                  | Required Linux job |
 | Prettier            | Consistent formatting across TS, JS, JSON, YAML, and Markdown                      | Required Linux job |
+| Dead-code gate      | AST reachability, export surface, dependency ownership, and production-only use    | Required Linux job |
 | Hygiene gate        | Package source terminology, docs, metadata, and reviewed SemVer plans              | Required Linux job |
 | YAML CLI demo       | Source CLI launcher smoke check and original workflow compatibility                | Required Linux job |
 | macOS focused tests | Platform-dependent Git, SQLite, path, and process termination behavior             | Separate macOS job |

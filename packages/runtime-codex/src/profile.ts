@@ -20,7 +20,10 @@ import type { ExecutionRequest } from "@anastom/runtime-contract";
 
 /** Exact Codex CLI package and native executable release accepted for this adapter profile. */
 export const CODEX_VERSION = "0.154.0";
-/** Fixed worker role instructions supplied separately from the task-specific prompt. */
+/**
+ * Fixed worker role instructions supplied separately from the task-specific prompt.
+ * @internal
+ */
 export const WORKER_INSTRUCTIONS =
   "You are a bounded software implementer. Follow only the explicit context envelope, operate in its assigned workspace, respect its mutation policy, and return the required JSON report. The control plane owns authoritative verification.";
 const require = createRequire(import.meta.url);
@@ -227,7 +230,10 @@ async function scanRoot(options: {
   }
 }
 
-/** Inventory canonical skill selectors without reading bodies; incomplete or oversized scans fail closed. */
+/**
+ * Inventory canonical skill selectors without reading bodies; incomplete or oversized scans fail closed.
+ * @internal
+ */
 export async function disabledSkillPaths(workspace: string): Promise<string[]> {
   const paths = new Set<string>();
   const visited = new Set<string>();
@@ -265,7 +271,7 @@ export async function disabledSkillPaths(workspace: string): Promise<string[]> {
 }
 
 /** Render only canonical explicit context and the independent-verification boundary on stdin. */
-export function renderCodexPrompt(request: ExecutionRequest): string {
+function renderCodexPrompt(request: ExecutionRequest): string {
   return (
     "Perform the bounded task in this immutable context envelope. Return ONLY the required JSON report.\n\n" +
     canonicalJson(request.context)

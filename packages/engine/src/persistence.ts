@@ -24,6 +24,7 @@ export interface RunPersistence {
 
 /**
  * Signals duplicate creation or a stale expected event sequence; callers must reload state.
+ * @public
  */
 export class PersistenceConflictError extends Error {
   /**

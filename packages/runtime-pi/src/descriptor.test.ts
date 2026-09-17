@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DurableRuntimeAdapter } from "@anastom/runtime-contract";
 
-import { PiRuntimeAdapter, parsePiRuntimeDescriptor, piRuntimeDescriptorCodec } from "./index.js";
+import { PiRuntimeAdapter, piRuntimeDescriptorCodec } from "./index.js";
 
 describe("Pi durable descriptor", () => {
   it("round-trips only explicit public selection", async () => {
@@ -26,7 +26,7 @@ describe("Pi durable descriptor", () => {
       configurationVersion: "anastom.dev/runtime-pi-config/v1alpha1",
       configuration: { provider: "anthropic", model: "fixture", apiKey: "secret" },
     };
-    expect(() => parsePiRuntimeDescriptor(privateDescriptor)).toThrow(
+    expect(() => piRuntimeDescriptorCodec.parse(privateDescriptor)).toThrow(
       "Invalid Pi runtime descriptor",
     );
     await expect(

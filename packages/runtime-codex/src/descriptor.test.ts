@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DurableRuntimeAdapter } from "@anastom/runtime-contract";
 
-import {
-  CodexRuntimeAdapter,
-  codexRuntimeDescriptorCodec,
-  parseCodexRuntimeDescriptor,
-} from "./index.js";
+import { CodexRuntimeAdapter, codexRuntimeDescriptorCodec } from "./index.js";
 
 describe("Codex durable descriptor", () => {
   it("round-trips selection without executable or auth-store paths", async () => {
@@ -45,7 +41,7 @@ describe("Codex durable descriptor", () => {
         authDirectory: "/private/auth",
       },
     };
-    expect(() => parseCodexRuntimeDescriptor(privateDescriptor)).toThrow(
+    expect(() => codexRuntimeDescriptorCodec.parse(privateDescriptor)).toThrow(
       "Invalid Codex runtime descriptor",
     );
     await expect(

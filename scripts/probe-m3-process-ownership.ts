@@ -34,7 +34,7 @@ interface WorkerRecord {
   descendantPid: number;
 }
 
-export interface CurrentOwnerObservation {
+interface CurrentOwnerObservation {
   owner: Owner;
   coordinatorAbsentAfterCrash: boolean;
   executionLeaderAliveAfterCrash: boolean;

@@ -231,9 +231,4 @@ export class GitWorkspaceManager {
   }
 }
 
-export {
-  captureWorkspaceCheckpoint,
-  compareWorkspaceCheckpoints,
-  type WorkspaceCheckpointCapture,
-  type WorkspaceComparison,
-} from "./checkpoint.js";
+export { captureWorkspaceCheckpoint, compareWorkspaceCheckpoints } from "./checkpoint.js";

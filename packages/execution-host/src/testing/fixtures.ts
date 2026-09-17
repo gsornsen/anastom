@@ -9,7 +9,9 @@ import {
 } from "@anastom/engine";
 import type { ExecutionRequest, RuntimeDescriptor, WorkspaceRef } from "@anastom/runtime-contract";
 
-import type { RuntimeHostCommand } from "../index.js";
+import type { LocalExecutionHostOptions } from "../index.js";
+
+type RuntimeHostCommand = LocalExecutionHostOptions["runtimeHost"];
 
 export type FixtureOwner = "pi" | "codex" | "claude-code" | "command";
 export type FixtureScenario = "success" | "hold" | "pressure";

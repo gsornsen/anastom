@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { isDeepStrictEqual, promisify } from "node:util";
 
-import type { DurableRunInspection } from "../packages/cli/src/index.js";
+import type { DurableRunInspection } from "../packages/cli/src/durable.js";
 import type { RunEvent, RunLease, RunState } from "../packages/engine/src/index.js";
 import { observeLocalProcess } from "../packages/execution-host/src/index.js";
 import { ensurePrivatePathRoot, type PrivatePathRoot } from "../packages/path-policy/src/index.js";
