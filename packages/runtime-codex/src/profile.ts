@@ -306,6 +306,60 @@ function boundedCatalog(model: string): object {
   };
 }
 
+const nestedSchemaKeys = new Set([
+  "additionalProperties",
+  "contains",
+  "contentSchema",
+  "else",
+  "if",
+  "items",
+  "not",
+  "propertyNames",
+  "then",
+  "unevaluatedItems",
+  "unevaluatedProperties",
+]);
+const schemaArrayKeys = new Set(["allOf", "anyOf", "oneOf", "prefixItems"]);
+const schemaMapKeys = new Set([
+  "$defs",
+  "definitions",
+  "dependentSchemas",
+  "patternProperties",
+  "properties",
+]);
+
+function projectSchemaMap(value: unknown): unknown {
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([name, schema]) => [name, nativeOutputSchema(schema)]),
+  );
+}
+
+/** Remove uniqueness enforcement that the native CLI does not support while preserving schema data and property names. */
+function nativeOutputSchema(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return structuredClone(value);
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => key !== "uniqueItems")
+      .map(([key, nested]) => {
+        if (schemaMapKeys.has(key)) {
+          return [key, projectSchemaMap(nested)];
+        }
+        if (schemaArrayKeys.has(key) && Array.isArray(nested)) {
+          return [key, nested.map(nativeOutputSchema)];
+        }
+        return [
+          key,
+          nestedSchemaKeys.has(key) ? nativeOutputSchema(nested) : structuredClone(nested),
+        ];
+      }),
+  );
+}
+
 /** Create fresh discovery roots and bounded CLI settings; caller owns disposal after confirmed process cleanup. */
 export async function createCodexProfile(options: {
   request: ExecutionRequest;
@@ -328,7 +382,9 @@ export async function createCodexProfile(options: {
     const schemaFile = join(root, "output-schema.json"),
       instructionsFile = join(root, "instructions.md"),
       catalogFile = join(root, "model-catalog.json");
-    await writeFile(schemaFile, canonicalJson(request.requiredOutputSchema), { mode: 0o600 });
+    await writeFile(schemaFile, canonicalJson(nativeOutputSchema(request.requiredOutputSchema)), {
+      mode: 0o600,
+    });
     await writeFile(instructionsFile, WORKER_INSTRUCTIONS, { mode: 0o600 });
     await writeFile(catalogFile, JSON.stringify(boundedCatalog(model)), { mode: 0o600 });
     const config: Record<string, unknown> = {

@@ -10,7 +10,7 @@ The documented entry point is [src/index.ts](src/index.ts). Generate optional HT
 
 ## Boundaries and invariants
 
-The exact SDK version is pinned in package.json. Sessions use no inherited project extensions, skills, prompt templates, conversations, automatic retries, or compaction. Descriptor resolution starts no model request and persists no authentication or test factory. An injected session factory therefore requires an explicit provider/model before it can describe a durable runtime. Public event normalization excludes private reasoning and raw tool bodies. Positive provider usage is counted once per completed assistant call; missing or synthetic-zero counters remain unavailable. Bounded queues preserve lifecycle and final usage under log pressure. Mutation tools follow the request policy. Execution IDs use Node's cryptographic UUIDv4; they are not credentials.
+The exact SDK version is pinned in package.json. Sessions use no inherited project extensions, skills, prompt templates, conversations, automatic retries, or compaction. Descriptor resolution starts no model request and persists no authentication or test factory. An injected session factory therefore requires an explicit provider/model before it can describe a durable runtime. Public event normalization excludes private reasoning and raw tool bodies. Positive provider usage is counted once per completed assistant call; missing or synthetic-zero counters remain unavailable. Bounded queues preserve lifecycle and final usage under log pressure. If a final response is schema-invalid, the adapter may issue one format-only correction in the same session and attempt; it forbids more repository work and a second invalid response fails normally. Mutation tools follow the request policy. Execution IDs use Node's cryptographic UUIDv4; they are not credentials.
 
 ## Development
 
@@ -27,6 +27,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker task execution and durable recovery are delivered. Parallel production graphs, approvals, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
+Single-worker Task and concurrent `sdlc/default` Feature execution are delivered through the same one-attempt adapter boundary. The unchanged Pi live Feature passed analysis, planning, overlapping implementation, integration, independent review, and verification with durable evidence. Interactive approval gates and further runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
 
 License: [AGPL-3.0-only](../../LICENSE).

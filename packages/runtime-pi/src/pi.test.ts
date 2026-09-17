@@ -105,7 +105,7 @@ describe("Pi SDK boundary without model calls", () => {
     expect(factory).toHaveBeenCalledTimes(2);
   });
   it.each(["not JSON", "```json\n{}\n```", '{"summary":"missing required fields"}'])(
-    "rejects malformed final output: %s",
+    "rejects malformed final output after one bounded correction: %s",
     async (text) => {
       const sdk = session({ content: [{ type: "text", text }], stopReason: "stop" });
       const adapter = new PiRuntimeAdapter({ factory: async () => sdk.value });
@@ -115,9 +115,38 @@ describe("Pi SDK boundary without model calls", () => {
         status: "failed",
         failure: { category: "schema-violation" },
       });
+      expect(sdk.value.prompt).toHaveBeenCalledTimes(2);
       expect(sdk.value.dispose).toHaveBeenCalledOnce();
     },
   );
+  it("accepts one corrected structured response without repeating repository work", async () => {
+    const invalid = { content: [{ type: "text", text: "done" }], stopReason: "stop" };
+    const corrected = {
+      content: [{ type: "text", text: JSON.stringify(report) }],
+      stopReason: "stop",
+    };
+    const sdk = session(invalid);
+    let current: unknown = invalid;
+    sdk.value.finalMessage = () => current;
+    sdk.value.prompt = vi.fn(async (prompt: string) => {
+      if (prompt !== renderPiPrompt(request())) {
+        current = corrected;
+      }
+    });
+    const adapter = new PiRuntimeAdapter({ factory: async () => sdk.value });
+    const handle = await adapter.start(request());
+    const observed = await events(adapter, handle);
+
+    expect(await adapter.collect(handle)).toEqual({ status: "succeeded", output: report });
+    expect(sdk.value.prompt).toHaveBeenCalledTimes(2);
+    expect(sdk.value.prompt).toHaveBeenLastCalledWith(
+      expect.stringContaining("Do not perform more repository work and do not invoke tools."),
+    );
+    expect(observed).toContainEqual({
+      type: "log",
+      message: "Pi requested one structured-output correction",
+    });
+  });
   it("sanitizes provider failures and never maps private reasoning or tool bodies", async () => {
     const sdk = session({ content: [], stopReason: "error", errorMessage: "secret credential" });
     const adapter = new PiRuntimeAdapter({ factory: async () => sdk.value });

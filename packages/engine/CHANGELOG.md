@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Settle retryable dirty failures by cancelling active siblings before pausing the whole run, and preserve exhausted failures as node/run failure even when the failed worker changed its workspace.
 - Derive an immutable evidence ledger and bounded reconnect-equivalent live-event stream from authoritative workflow history, including runtime identity, usage, artifacts, workspace patches, integration, review, verification, and exact dropped-log accounting. Notify presentation observers only after durable commit without granting them workflow authority.
 - Fold validated planner expansions into the durable graph, run independent attempts concurrently under one serialized event owner, fan controls and recovery across every active execution, assign task workspaces, accept scoped patch artifacts, and prepare/reconcile controller-owned integrations before review and verification.
 - Keep event projection and execution terminal detail types internal while retaining the documented run, store, transition-error, and coordination contracts.

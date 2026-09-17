@@ -1396,10 +1396,16 @@ Implement two independent changes, integrate them, review the result, and verify
       status: "failed",
       failure: { category: "tool", message: "right failed" },
     });
-    const running = coordinator(store, host, new FixtureWorkspace(["clean"]), () => now).start(
-      concurrentWorkflow,
-      { runId: "concurrent-failure", workspace, descriptor },
-    );
+    const running = coordinator(
+      store,
+      host,
+      new FixtureWorkspace(["clean", "clean", "dirty"]),
+      () => now,
+    ).start(concurrentWorkflow, {
+      runId: "concurrent-failure",
+      workspace,
+      descriptor,
+    });
 
     await vi.waitFor(() => expect(host.authorized).toEqual(["left", "right"]));
     host.release("right");
@@ -1409,6 +1415,46 @@ Implement two independent changes, integrate them, review the result, and verify
     expect(state.nodes.right?.status).toBe("failed");
     expect(state.nodes.left?.status).toBe("cancelled");
     expect(state.nodes.join?.status).toBe("blocked");
+    expect(host.cancelled).toEqual(["left"]);
+  });
+
+  it("cancels active siblings before pausing a changed workspace that can retry", async () => {
+    const now = 1_000;
+    const store = new InMemoryDurableRunStore(() => now);
+    const host = new ConcurrentExecutionHost();
+    host.setResult("right", {
+      status: "failed",
+      failure: { category: "schema-violation", message: "right returned invalid output" },
+    });
+    const running = coordinator(
+      store,
+      host,
+      new FixtureWorkspace(["clean", "clean", "dirty"]),
+      () => now,
+    ).start(concurrentRecoveryWorkflow, {
+      runId: "concurrent-workspace-pause",
+      workspace,
+      descriptor,
+    });
+
+    await vi.waitFor(() => expect(host.authorized).toEqual(["left", "right"]));
+    host.release("right");
+    const state = await running;
+
+    expect(state.status).toBe("paused");
+    expect(state.pauseReason).toEqual({
+      kind: "workspace-conflict",
+      differences: ["head-commit"],
+    });
+    expect(state.nodes.right).toMatchObject({
+      status: "paused",
+      attempts: [{ status: "failed" }],
+    });
+    expect(state.nodes.left).toMatchObject({
+      status: "paused",
+      attempts: [{ status: "cancelled" }],
+    });
+    expect(state.nodes.join?.status).toBe("pending");
     expect(host.cancelled).toEqual(["left"]);
   });
 

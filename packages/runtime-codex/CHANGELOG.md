@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Remove `uniqueItems` only from the temporary native strict-output schema while continuing to validate every final report against the complete original Anastom schema.
 - Narrow the package entry point to the adapter, descriptor codec and documented public types; prompt, selection, version and parser helpers remain implementation details.
 - Give each bounded process-table inspection 500 ms while preserving the one-second group reap window, preventing spurious cleanup uncertainty under concurrent load.
 - Add an exact versioned descriptor codec for OpenAI model, optional reasoning effort, and file-store auth ownership while excluding executable and auth-directory overrides.

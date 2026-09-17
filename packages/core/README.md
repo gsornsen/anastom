@@ -31,6 +31,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker task execution and durable recovery are delivered. The defined-SDLC Feature, methodology, plan, review, and deterministic expansion contracts compose through concurrent production execution and integration. The model-free production process matrix passes; paired live Pi/Codex evidence remains before defined-SDLC completion. See [milestones](../../docs/MILESTONES.md).
+Single-worker Task execution and durable recovery are delivered. The defined-SDLC Feature, methodology, plan, review, and deterministic expansion contracts compose through concurrent production execution and integration. The model-free process matrix and unchanged live Pi/Codex Feature runs pass. See [milestones](../../docs/MILESTONES.md).
 
 License: [AGPL-3.0-only](../../LICENSE).

@@ -1101,12 +1101,12 @@ function applyNodeEvent(state: RunState, event: NodeEvent): void {
         requireNodeStatus(node, event.type, ["pending", "ready", "running"]);
         if (
           node.status === "running" &&
-          !(["cancelled", "orphaned"] as AttemptStatus[]).includes(
+          !(["failed", "cancelled", "orphaned"] as AttemptStatus[]).includes(
             node.attempts.at(-1)?.status ?? "scheduled",
           )
         ) {
           throw new InvalidTransitionError(
-            "A running node can pause only after cancellation or orphaning",
+            "A running node can pause only after failure, cancellation, or orphaning",
           );
         }
         node.pauseReason = structuredClone(event.reason);

@@ -667,6 +667,7 @@ export class DurableRunCoordinator {
             reason: preflight.reason,
             cause: "pause",
             operationId: this.createOperationId(),
+            runTransition: "paused",
           });
         } else {
           await this.pauseForPreflight(session, preflight.reason);
@@ -890,7 +891,11 @@ export class DurableRunCoordinator {
     const cancelled = Object.values(session.state.nodes).find(
       (node) => node.status === "cancelled",
     );
+    const paused = Object.values(session.state.nodes).find((node) => node.status === "paused");
     if (!failed && !blocked && !cancelled) {
+      if (paused) {
+        await this.settleConcurrentPause(session, active, paused);
+      }
       return;
     }
     if (active.size > 0) {
@@ -935,6 +940,29 @@ export class DurableRunCoordinator {
         { snapshot: true },
       );
     }
+  }
+
+  private async settleConcurrentPause(
+    session: OwnedRunSession,
+    active: Map<string, ActiveAttempt>,
+    paused: { id: string; pauseReason?: PauseReason },
+  ): Promise<void> {
+    if (!paused.pauseReason) {
+      throw new Error(`Paused node ${paused.id} has no durable pause reason`);
+    }
+    if (active.size > 0) {
+      await this.cancelConcurrentAttempts(session, active, {
+        cause: "pause",
+        operationId: this.createOperationId(),
+        nodeTransition: "paused",
+        reason: paused.pauseReason,
+        runTransition: "paused",
+      });
+      return;
+    }
+    await session.commit([{ type: "RunPaused", reason: paused.pauseReason }], {
+      snapshot: true,
+    });
   }
 
   private async prepareAttempt(
@@ -1277,19 +1305,16 @@ export class DurableRunCoordinator {
           failure,
         },
       ];
-      if (!comparison.matches) {
+      if (prepared.attempt >= prepared.node.attemptBudget.maxAttempts) {
+        terminal.push({ type: "NodeFailed", nodeId: prepared.nodeId, failure });
+      } else if (!comparison.matches) {
         const reason: PauseReason = {
           kind: "workspace-conflict",
           differences: comparison.differences,
         };
-        terminal.push(
-          { type: "NodePaused", nodeId: prepared.nodeId, reason },
-          { type: "RunPaused", reason },
-        );
-      } else if (prepared.attempt < prepared.node.attemptBudget.maxAttempts) {
-        terminal.push({ type: "NodeReady", nodeId: prepared.nodeId, reason: "retry" });
+        terminal.push({ type: "NodePaused", nodeId: prepared.nodeId, reason });
       } else {
-        terminal.push({ type: "NodeFailed", nodeId: prepared.nodeId, failure });
+        terminal.push({ type: "NodeReady", nodeId: prepared.nodeId, reason: "retry" });
       }
       await session.commit(terminal, { snapshot: true });
       return;

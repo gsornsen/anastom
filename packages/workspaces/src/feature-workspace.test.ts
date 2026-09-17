@@ -98,6 +98,23 @@ describe("Feature workspace topology", () => {
     expect(accepted.patch.byteLength).toBeGreaterThan(0);
     expect(accepted.patchDigest).toMatch(/^sha256:[0-9a-f]{64}$/);
 
+    const noChangeFixture = await setup("scope-no-change");
+    const noChangeWorkspace = await createFeatureTaskWorkspace(
+      noChangeFixture.manager,
+      noChangeFixture.topology,
+      "no-change",
+      noChangeFixture.topology.sourceBaseCommit,
+    );
+    const noChange = await captureScopedWorkspacePatch(noChangeFixture.manager, noChangeWorkspace, {
+      mutationScopes: ["server.mjs"],
+      protectedPaths: ["tasks/add-endpoint.md"],
+    });
+    expect(noChange.changedFiles).toEqual([]);
+    expect(noChange.patch).toHaveLength(0);
+    expect(noChange.patchDigest).toBe(
+      "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    );
+
     const protectedFixture = await setup("scope-protected");
     await expect(
       patchTask({
@@ -165,6 +182,25 @@ describe("prepared Git integration", () => {
       movedReference: false,
       synchronizedWorktree: false,
     });
+
+    const noChangeWorkspace = await createFeatureTaskWorkspace(
+      manager,
+      topology,
+      "integration-corrections",
+      prepared.expectedCommit,
+    );
+    const noChange = await captureScopedWorkspacePatch(manager, noChangeWorkspace, {
+      mutationScopes: ["server.mjs"],
+      protectedPaths: ["tasks/add-endpoint.md"],
+    });
+    const noChangePreparation = await prepareWorkspaceIntegration(manager, topology.integration, [
+      { taskId: "integration-corrections", accepted: noChange },
+    ]);
+    expect(noChangePreparation.tree).toBe(prepared.tree);
+    expect(noChangePreparation.expectedCommit).not.toBe(prepared.expectedCommit);
+    await expect(
+      reconcileWorkspaceIntegration(manager, topology.integration, noChangePreparation),
+    ).resolves.toMatchObject({ outcome: "committed", movedReference: true });
   });
 
   it("recovers after the branch moves and refuses unrelated branch or worktree state", async () => {

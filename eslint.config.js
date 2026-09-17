@@ -87,6 +87,9 @@ export default tseslint.config(
   {
     files: ["examples/**/*.mjs"],
     extends: [tseslint.configs.disableTypeChecked],
-    languageOptions: { parserOptions: { projectService: false }, globals: { fetch: "readonly" } },
+    languageOptions: {
+      parserOptions: { projectService: false },
+      globals: { fetch: "readonly", process: "readonly" },
+    },
   },
 );

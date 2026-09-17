@@ -164,7 +164,6 @@ function assertAcceptedPatch(accepted: AcceptedWorkspacePatch): void {
     !/^[0-9a-f]{40,64}$/.test(accepted.baseCommit) ||
     !/^[0-9a-f]{40,64}$/.test(accepted.headCommit) ||
     !(accepted.patch instanceof Uint8Array) ||
-    accepted.patch.byteLength === 0 ||
     accepted.patch.byteLength > PATCH_MAX_BYTES ||
     digestBytes(accepted.patch) !== accepted.patchDigest
   ) {
@@ -345,9 +344,6 @@ export async function captureScopedWorkspacePatch(
     options.protectedPaths,
   );
   const patch = Buffer.from(capture.diff, "utf8");
-  if (patch.byteLength === 0) {
-    throw new WorkspaceIntegrationError("invalid", "Accepted task patch must not be empty");
-  }
   if (patch.byteLength > PATCH_MAX_BYTES) {
     throw new WorkspaceIntegrationError("invalid", "Accepted task patch exceeds 16 MiB");
   }
@@ -494,6 +490,9 @@ export async function prepareWorkspaceIntegration(
   try {
     await git(integration.repoRoot, ["read-tree", parentCommit], { env });
     for (const [index, { accepted }] of patches.entries()) {
+      if (accepted.patch.byteLength === 0) {
+        continue;
+      }
       const patchPath = join(temporary, `patch-${index}.diff`);
       await writeFile(patchPath, accepted.patch, { mode: 0o600 });
       try {

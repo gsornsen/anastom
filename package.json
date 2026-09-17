@@ -20,6 +20,8 @@
   },
   "scripts": {
     "anastom": "tsx packages/cli/src/bin.ts",
+    "audit:defined-sdlc-live": "tsx scripts/audit-defined-sdlc-live.ts",
+    "fixture:defined-sdlc": "tsx scripts/create-defined-sdlc-fixture.ts",
     "lint": "node scripts/eslint-rules/no-inline-scripts.test.mjs && eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

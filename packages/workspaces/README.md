@@ -14,7 +14,7 @@ The documented entry point is [src/index.ts](src/index.ts). Generate optional HT
 
 The source repository must be clean. Isolated and readonly selections receive ownership manifests under a fixed-segment private-state root. Feature topology gets its own immutable ownership record; workspace IDs, paths, branches, and bases are derived from validated run/task identities. Isolated run branches and all selected Git registrations must match. A readonly checkpoint requires the state root outside the repository so control-plane files cannot enter its ignored-content identity or worker input. Capture uses a temporary index so worker staging remains intact. Checkpoints reject unstable double captures, invalid UTF-8 names, binary diffs over 16 MiB, ignored trees over 4,096 entries or 64 MiB, unsupported ignored entry types, and changed Git ownership. Ignored ordinary files are streamed without following symlinks.
 
-Task acceptance compares segment-aware repository paths and protects selected Feature, methodology, and verifier inputs. Integration accepts at most 64 MiB of exact patches, rejects overlapping same-wave scopes and patch conflicts, fixes commit identity/time/message, and persists the expected parent/tree/commit/digests before ref mutation. Recovery never resets worker worktrees or unrelated integration content. Cleanup refuses unowned paths, dirty files, and worker commits; workspaces are retained by default. Git isolation is not an operating-system security sandbox.
+Task acceptance compares segment-aware repository paths and protects selected Feature, methodology, and verifier inputs. A schema-valid successful mutating role may produce an empty accepted patch; it retains the SHA-256 identity of zero bytes and can create a deterministic no-op integration commit. Integration accepts at most 64 MiB of exact patches, rejects overlapping same-wave scopes and patch conflicts, fixes commit identity/time/message, and persists the expected parent/tree/commit/digests before ref mutation. Recovery never resets worker worktrees or unrelated integration content. Cleanup refuses unowned paths, dirty files, and worker commits; workspaces are retained by default. Git isolation is not an operating-system security sandbox.
 
 ## Development
 
@@ -31,6 +31,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker task execution and durable recovery are delivered. Run-scoped Feature topology, task worktrees, mutation-scope enforcement, protected inputs, accepted patch capture, and prepared deterministic Git integration compose with the concurrent durable graph coordinator and production Feature CLI. The model-free process matrix passes; paired live Pi/Codex evidence remains before defined-SDLC completion.
+Single-worker Task execution and durable recovery are delivered. Run-scoped Feature topology, task worktrees, mutation-scope enforcement, protected inputs, accepted patch capture, and prepared deterministic Git integration compose with the concurrent durable graph coordinator and production Feature CLI. The deterministic matrix and unchanged Pi/Codex live Feature runs pass.
 
 License: [AGPL-3.0-only](../../LICENSE).
