@@ -4,7 +4,7 @@ Persist immutable workflow definitions, ordered events, and filesystem evidence 
 
 ## Public API
 
-`SqliteDurableRunStore` provides atomic owned creation, 15-second leases, exact expired-owner takeover, monotonic fencing, idempotent event batches, deduplicated pause/cancel requests, rolling event integrity, and rebuildable snapshots. It expects the database parent to exist; production callers authorize and create that private state root through `@anastom/path-policy` before opening the store. `FileArtifactStore` creates artifact parents through the fixed-segment private-state root, atomically publishes synced immutable evidence without replacement, and verifies content digests on read, rejecting symlinked run-owned artifact parents and nonordinary artifact files.
+`SqliteDurableRunStore` provides atomic owned creation, 15-second leases, exact expired-owner takeover, monotonic fencing, idempotent event batches, deduplicated pause/cancel requests, rolling event integrity, and rebuildable snapshots. It expects the database parent to exist; production callers authorize and create that private state root through `@anastom/path-policy` before opening the store. `FileArtifactStore` creates artifact parents through the fixed-segment private-state root, atomically publishes synced immutable evidence without replacement, and verifies content digests on bounded reads. Reads reject symlinked run-owned parents, nonordinary files, identity changes during access, and artifacts larger than 16 MiB.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api persistence`; output is in `.generated/api/persistence/` and is not committed.
 

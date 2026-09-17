@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Route later artifact reads through the bounded private-path capability, including fixed-segment validation, parent checks, file identity checks, and a 16 MiB ceiling.
 - Accept expanded node identities in confined artifact filenames while preserving exact path and digest verification on reads.
 - Add the SQLite durable store and initial schema with transaction-time leases, exact absent-owner takeover, fenced idempotent mutations, deduplicated controls, rolling event integrity, and snapshot fallback.
 - Create artifact parent directories through the shared private-state root and atomically publish synced immutable artifact files without replacement.

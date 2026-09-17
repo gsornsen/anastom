@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
+- Harden defined-SDLC validation, Linux lease identity, protected-input auditing, and artifact reads after consolidated Linux and CodeQL review.
 - Complete defined-SDLC acceptance with one checked-in two-task Feature fixture, unchanged owner-authenticated Pi and Codex runs, overlapping implementation and review attempts, retained deterministic integration branches, passing operator verification, later-process replay, and complete bounded private artifact audits.
 - Add a reusable live-run auditor for runtime identity, concurrency intervals, independent approvals, Git scope and branch identity, protected inputs, artifact completeness/integrity/modes/bounds, public-output bounds, and credential/private-field absence.
 - Add production-shaped defined-SDLC process acceptance covering both parallel completion orders, pause/cancel fan-in, sibling failure, review rejection, exact verifier failure, later-process inspection, artifact integrity, source-checkout isolation, retained integration branches, and interrupted-integration recovery under stale fencing.

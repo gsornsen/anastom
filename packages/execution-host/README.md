@@ -14,6 +14,8 @@ The documented entry point is [src/index.ts](src/index.ts). Generate optional HT
 
 The implementation supports local Linux and macOS. It imports the engine and runtime contracts without importing Pi, Codex, Claude Code, or a provider SDK. A trusted CLI composition root supplies a checked-in runtime-host command; runtime descriptors select model-facing behavior, while the shared supervisor owns OS lifecycle.
 
+Public lease identity binds the host, boot, PID, and process start token without depending on process-group evidence. Any operation that can signal descendants separately requires a positive authenticated process-group identifier and otherwise fails closed.
+
 Private run records use fixed segments under `PrivatePathRoot`, modes `0700`/`0600`, byte limits before parsing, canonical exact schemas, and a control-record digest bound into stable manifest identity. The random 256-bit capability and Unix-socket endpoint remain private. Socket paths use the fixed current-user root below `/tmp/anastom-<uid>` and stay below 100 UTF-8 bytes. Launch input travels through an inherited pipe and is never persisted by this package.
 
 The supervisor keeps one request active and queues at most eight, accepts one exact length-prefixed frame per connection, compares capabilities in constant time after length validation, retains at most 256 public observations with log-drop accounting, and caps terminal records at 4 MiB. Coordinator-pipe loss triggers cleanup without waiting for lease expiry. An absent supervisor in `starting` or `active`, an invalid record, or unconfirmed cleanup produces `unknown`; fencing or a PID alone never proves absence.

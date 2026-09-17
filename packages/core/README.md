@@ -10,6 +10,8 @@ Parse authored workflows, Markdown tasks, and bounded Feature contracts into str
 
 `compileSdlcFeature` creates the immutable analysis/planning prefix and binds exact Feature, methodology, prompt, schema, and protected-path snapshots. A successful normalized plan expands into executable `WorkflowNode` definitions: mutating agents carry patch identities and scopes, controller nodes carry ordered integration authority, and verifier nodes retain only operator-authored commands.
 
+Persisted graph expansions fail on the first schema violation. This keeps validation work bounded while semantic and digest checks still fail closed before replay.
+
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api core`; output is in `.generated/api/core/` and is not committed.
 
 ## Boundaries and invariants

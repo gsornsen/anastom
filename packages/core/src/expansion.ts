@@ -65,7 +65,9 @@ export interface SdlcGraphExpansion {
   expansionDigest: string;
 }
 
-const ajv = new Ajv({ allErrors: true, strict: false, addUsedSchema: false });
+// Persisted expansions fail on the first schema error so nested hostile input cannot multiply
+// validation work merely to produce diagnostics.
+const ajv = new Ajv({ allErrors: false, strict: false, addUsedSchema: false });
 const validateExpansion = ajv.compile<SdlcGraphExpansion>(expansionJsonSchema);
 
 function agentNode(options: {

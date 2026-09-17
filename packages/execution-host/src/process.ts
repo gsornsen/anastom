@@ -8,6 +8,7 @@ import {
   type LocalProcessIdentity,
   type ProcessObservation,
 } from "@anastom/engine";
+import { parseLinuxProcessStat } from "./linux-process-stat.js";
 
 const executeFile = promisify(execFile);
 const inspectionEnvironment = {
@@ -19,6 +20,11 @@ const inspectionEnvironment = {
 /** Private process-group evidence retained only in execution-host records. */
 export interface PrivateProcessIdentity extends LocalProcessIdentity {
   processGroupId: number;
+  state: string;
+}
+
+interface ObservedProcessIdentity extends LocalProcessIdentity {
+  processGroupId?: number;
   state: string;
 }
 
@@ -42,26 +48,10 @@ function liveState(state: string): boolean {
 
 async function linuxProcess(
   pid: number,
-): Promise<
-  (Omit<PrivateProcessIdentity, keyof LocalProcessIdentity> & { startToken: string }) | null
-> {
+): Promise<Pick<ObservedProcessIdentity, "processGroupId" | "startToken" | "state"> | null> {
   try {
     const stat = await readFile(`/proc/${pid}/stat`, "utf8");
-    const end = stat.lastIndexOf(")");
-    if (end < 2) {
-      throw new Error("Linux process stat is malformed");
-    }
-    const fields = stat
-      .slice(end + 2)
-      .trim()
-      .split(/\s+/);
-    const state = fields[0];
-    const processGroupId = Number(fields[2]);
-    const startToken = fields[19];
-    if (!state || !startToken || !Number.isSafeInteger(processGroupId) || processGroupId < 1) {
-      throw new Error("Linux process identity is malformed");
-    }
-    return { processGroupId, state, startToken };
+    return parseLinuxProcessStat(stat);
   } catch (error) {
     if (isMissingProcess(error)) {
       return null;
@@ -72,9 +62,7 @@ async function linuxProcess(
 
 async function darwinProcess(
   pid: number,
-): Promise<
-  (Omit<PrivateProcessIdentity, keyof LocalProcessIdentity> & { startToken: string }) | null
-> {
+): Promise<Pick<ObservedProcessIdentity, "processGroupId" | "startToken" | "state"> | null> {
   try {
     const { stdout } = await executeFile(
       "/bin/ps",
@@ -165,14 +153,12 @@ async function identityDigests(): Promise<{
   return identityDigestCache;
 }
 
-/** Capture the strongest supported same-host process and process-group identity. */
-export async function inspectPrivateProcess(
-  pid = process.pid,
-): Promise<PrivateProcessIdentity | null> {
+async function inspectObservedProcess(pid: number): Promise<ObservedProcessIdentity | null> {
   assertPid(pid, "PID");
-  let processIdentity:
-    (Omit<PrivateProcessIdentity, keyof LocalProcessIdentity> & { startToken: string }) | null =
-    null;
+  let processIdentity: Pick<
+    ObservedProcessIdentity,
+    "processGroupId" | "startToken" | "state"
+  > | null = null;
   if (process.platform === "linux") {
     processIdentity = await linuxProcess(pid);
   } else if (process.platform === "darwin") {
@@ -187,14 +173,30 @@ export async function inspectPrivateProcess(
     ...digests,
     pid,
     startToken: processIdentity.startToken,
-    processGroupId: processIdentity.processGroupId,
     state: processIdentity.state,
+    ...(processIdentity.processGroupId === undefined
+      ? {}
+      : { processGroupId: processIdentity.processGroupId }),
   };
+}
+
+/** Capture the strongest supported same-host process and process-group identity. */
+export async function inspectPrivateProcess(
+  pid = process.pid,
+): Promise<PrivateProcessIdentity | null> {
+  const identity = await inspectObservedProcess(pid);
+  if (!identity) {
+    return null;
+  }
+  if (identity.processGroupId === undefined) {
+    throw new Error("Process group identity is unavailable");
+  }
+  return { ...identity, processGroupId: identity.processGroupId };
 }
 
 /** Capture sanitized identity for a local process without retaining raw host or boot identifiers. */
 export async function localProcessIdentity(pid = process.pid): Promise<LocalProcessIdentity> {
-  const identity = await inspectPrivateProcess(pid);
+  const identity = await inspectObservedProcess(pid);
   if (!identity || !liveState(identity.state)) {
     throw new Error(`Process ${pid} is not live`);
   }
@@ -215,7 +217,7 @@ export async function observeLocalProcess(
     if (digests.bootIdentityDigest !== expected.bootIdentityDigest) {
       return { state: "absent", observedAtMs };
     }
-    const observed = await inspectPrivateProcess(expected.pid);
+    const observed = await inspectObservedProcess(expected.pid);
     if (!observed || !liveState(observed.state) || observed.startToken !== expected.startToken) {
       return { state: "absent", observedAtMs };
     }
@@ -311,7 +313,7 @@ function signalGroup(processGroupId: number, signal: NodeJS.Signals): void {
   }
 }
 
-function publicIdentity(identity: PrivateProcessIdentity): LocalProcessIdentity {
+function publicIdentity(identity: LocalProcessIdentity): LocalProcessIdentity {
   return {
     version: identity.version,
     hostIdentityDigest: identity.hostIdentityDigest,

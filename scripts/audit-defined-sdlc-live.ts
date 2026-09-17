@@ -14,6 +14,7 @@ import {
   type RunState,
 } from "../packages/engine/src/index.js";
 import { FileArtifactStore, SqliteDurableRunStore } from "../packages/persistence/src/index.js";
+import { canonicalExistingRoot, resolveExistingChild } from "../packages/path-policy/src/index.js";
 import {
   GitWorkspaceManager,
   loadFeatureWorkspaceTopology,
@@ -400,15 +401,25 @@ async function verifyProtectedInputs(
   topology: FeatureWorkspaceTopology,
 ): Promise<Record<string, string>> {
   const protectedDigests: Record<string, string> = {};
+  const [fixtureRootPath, sourceRootPath, integrationRootPath] = await Promise.all([
+    canonicalExistingRoot(fixtureRoot),
+    canonicalExistingRoot(options.repository),
+    canonicalExistingRoot(topology.integration.path),
+  ]);
   for (const path of protectedPaths) {
-    const [fixture, source, integrated] = await Promise.all([
-      readFile(join(fixtureRoot, path)),
-      readFile(join(options.repository, path)),
-      readFile(join(topology.integration.path, path)),
+    const [fixturePath, sourcePath, integrationPath] = await Promise.all([
+      resolveExistingChild(fixtureRootPath, path, "file"),
+      resolveExistingChild(sourceRootPath, path, "file"),
+      resolveExistingChild(integrationRootPath, path, "file"),
     ]);
-    assert(source.equals(fixture), `${path} changed in the source checkout`);
-    assert(integrated.equals(fixture), `${path} changed on the integration branch`);
-    protectedDigests[path] = digestBytes(fixture);
+    const [fixtureBytes, sourceBytes, integratedBytes] = await Promise.all([
+      readFile(fixturePath),
+      readFile(sourcePath),
+      readFile(integrationPath),
+    ]);
+    assert(sourceBytes.equals(fixtureBytes), `${path} changed in the source checkout`);
+    assert(integratedBytes.equals(fixtureBytes), `${path} changed on the integration branch`);
+    protectedDigests[path] = digestBytes(fixtureBytes);
   }
   return protectedDigests;
 }

@@ -45,6 +45,9 @@ describe("filesystem artifacts", () => {
     await expect(artifacts.write(input)).rejects.toThrow("differ");
     expect(await readFile(ref.uri, "utf8")).toBe("tampered");
     await expect(artifacts.write({ ...input, runId: "../outside" })).rejects.toThrow("identity");
+    await expect(
+      artifacts.write({ ...input, bytes: Buffer.alloc(16 * 1024 * 1024 + 1) }),
+    ).rejects.toThrow("16 MiB");
   });
 
   it("rejects a run-owned artifact parent redirected outside the state root", async () => {
@@ -63,6 +66,6 @@ describe("filesystem artifacts", () => {
     const runDirectory = dirname(dirname(ref.uri));
     await rename(runDirectory, join(outside, "redirected"));
     await symlink(join(outside, "redirected"), runDirectory, "dir");
-    await expect(artifacts.read(ref)).rejects.toThrow("symlink");
+    await expect(artifacts.read(ref)).rejects.toMatchObject({ reason: "wrong-type" });
   });
 });
