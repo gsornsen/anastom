@@ -51,6 +51,7 @@ The TypeScript pnpm workspace supports:
 - a scriptable fake runtime with per-node, per-attempt outcomes;
 - schema-validated results, verifier pass/fail handling, retries, and failure propagation;
 - strict Markdown tasks compiled into one worker followed by one deterministic verification command;
+- strict Markdown Feature contracts with operator-owned verification, bounded planning policy, content-addressed six-role methodology snapshots, normalized dependency waves, disjoint mutation scopes, and deterministic graph expansion;
 - Pi and exact-pinned Codex CLI adapters with fresh, explicit context per attempt;
 - selected-runtime capability preflight before attempt start, with durable accepted snapshots;
 - configured identity provenance and available attempt-scoped partial token observations;
@@ -73,7 +74,7 @@ Pi uses your normal provider authentication and model settings; its Git worktree
 
 See the [M0 retrospective](docs/M0_RETROSPECTIVE.md) and [M1 retrospective](docs/M1_RETROSPECTIVE.md) for the implemented boundaries, evidence, and lessons informing portability.
 
-M4 remains under development. Its [model-free feasibility evidence](docs/M4_FEASIBILITY.md) establishes stable graph expansion, multiple execution identities under one fence, and recoverable deterministic Git integration; these probes are implementation gates rather than delivered multi-worker behavior.
+M4 remains under development. Its [model-free feasibility evidence](docs/M4_FEASIBILITY.md) establishes stable graph expansion, multiple execution identities under one fence, and recoverable deterministic Git integration. The Feature, methodology, plan, review, and expansion contracts are now implemented; production multi-worker scheduling and integration still follow the delivered single-worker path until the remaining stack lands.
 
 ## Try the current demo
 

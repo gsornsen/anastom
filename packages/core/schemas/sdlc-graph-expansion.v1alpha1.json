@@ -1,0 +1,185 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://anastom.dev/schemas/sdlc-graph-expansion.v1alpha1.json",
+  "title": "Defined-SDLC graph expansion",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "apiVersion",
+    "kind",
+    "source",
+    "maxParallel",
+    "externalNeeds",
+    "nodeOrder",
+    "nodes",
+    "expansionDigest"
+  ],
+  "properties": {
+    "apiVersion": { "const": "anastom.dev/v1alpha1" },
+    "kind": { "const": "WorkflowExpansion" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["featureDigest", "methodologyDigest", "planDigest"],
+      "properties": {
+        "featureDigest": { "$ref": "#/$defs/digest" },
+        "methodologyDigest": { "$ref": "#/$defs/digest" },
+        "planDigest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "maxParallel": { "type": "integer", "minimum": 1, "maximum": 4 },
+    "externalNeeds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "nodeOrder": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "nodes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "oneOf": [
+          { "$ref": "#/$defs/agentNode" },
+          { "$ref": "#/$defs/integrationNode" },
+          { "$ref": "#/$defs/verifierNode" }
+        ]
+      }
+    },
+    "expansionDigest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "nodeBase": {
+      "type": "object",
+      "required": ["id", "kind", "needs"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,95}$" },
+        "kind": { "enum": ["agent", "integration", "verifier"] },
+        "needs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "attemptBudget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxAttempts", "maxDurationMs"],
+      "properties": {
+        "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 3 },
+        "maxDurationMs": { "type": "integer", "minimum": 1, "maximum": 2147483647 }
+      }
+    },
+    "agentNode": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "needs",
+            "role",
+            "mutation",
+            "mutationScopes",
+            "attemptBudget",
+            "outputSchemaDigest"
+          ],
+          "properties": {
+            "id": { "type": "string" },
+            "kind": { "const": "agent" },
+            "needs": { "type": "array" },
+            "role": {
+              "enum": ["implementer", "integrator", "specificationReviewer", "qualityReviewer"]
+            },
+            "taskId": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,47}$" },
+            "mutation": { "enum": ["readonly", "isolated"] },
+            "mutationScopes": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "attemptBudget": { "$ref": "#/$defs/attemptBudget" },
+            "outputSchemaDigest": { "$ref": "#/$defs/digest" }
+          }
+        }
+      ]
+    },
+    "integrationNode": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "kind", "needs", "wave", "taskIds"],
+          "properties": {
+            "id": { "type": "string" },
+            "kind": { "const": "integration" },
+            "needs": { "type": "array" },
+            "wave": { "type": "integer", "minimum": 1, "maximum": 8 },
+            "taskIds": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,47}$" }
+            }
+          }
+        }
+      ]
+    },
+    "verifierNode": {
+      "allOf": [
+        { "$ref": "#/$defs/nodeBase" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "kind", "needs", "verifier"],
+          "properties": {
+            "id": { "type": "string" },
+            "kind": { "const": "verifier" },
+            "needs": { "type": "array" },
+            "verifier": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "command"],
+              "properties": {
+                "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,47}$" },
+                "command": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["argv", "cwd", "maxDurationMs", "maxOutputBytes"],
+                  "properties": {
+                    "argv": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": { "type": "string", "minLength": 1 }
+                    },
+                    "cwd": { "type": "string", "minLength": 1 },
+                    "maxDurationMs": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 2147483647
+                    },
+                    "maxOutputBytes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 16777216
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

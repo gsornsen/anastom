@@ -1,5 +1,15 @@
 # Workflow IR
 
+## Feature and methodology inputs
+
+The defined SDLC starts from a strict Markdown `Feature`, not model-authored Workflow YAML. YAML front matter owns identity, acceptance criteria, planning/concurrency limits, attempt policy, and ordered shell-free verifier argv. The Markdown body is the objective. CLI selection confines the Feature to a caller-authorized source root.
+
+The checked-in `sdlc/default` methodology has a fixed manifest and six roles: analyst, planner, implementer, integrator, specification reviewer, and quality reviewer. Every local prompt and JSON Schema is bounded, confined to the methodology root after symlink resolution, compiled before use, and copied into a content-addressed snapshot. Restart uses that persisted snapshot rather than mutable package files.
+
+Planner output is bounded domain data. It supplies task objectives, acceptance criteria, dependencies, and repository-relative mutation scopes. Trusted normalization rejects unknown dependencies, cycles, task-limit violations, unsafe scopes, and segment-overlap between tasks in the same dependency wave. It derives stable topological waves and a canonical digest.
+
+Trusted expansion creates exact implementation nodes, an integration operation after each wave, one integrator, concurrent independent reviewers, and the operator's ordered verifiers. The expansion records the Feature, methodology, and plan digests plus every node and dependency. Its own digest is checked on replay. Runtime completion order cannot change the expansion or integration order.
+
 ## Status
 
 `anastom.dev/v1alpha1` is an experimental, strictly validated format. This document separates the compatible M0 profile, implemented M1 additions, and later design directions so examples cannot silently become APIs.
