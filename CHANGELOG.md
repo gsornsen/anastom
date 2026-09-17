@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Eve
 
 ### Added
 
+- Add model-free M4 feasibility for deterministic plan expansion across alternate completion orders, two simultaneously supervised execution identities with all-attempt recovery classification, and prepared Git integration across ref/worktree crash boundaries. Exact binary patch bytes, disjoint ready-task scopes, integration waves, compare-and-swap refs, and all-execution absence become production gates.
 - Begin the defined-SDLC work under issue #37 with a durable post-merge build brief and ADR covering bounded plan expansion, parallel task ownership, scoped worktrees, deterministic Git integration, independent review, evidence projection, and live CLI events. Track the MLP interactive terminal experience separately in issue #38 after the multi-node event projection stabilizes.
 - Add the seventh stacked M3 production slice: deterministic separate-process crash/restart acceptance for clean, dirty-workspace, and unknown-execution recovery; pre-expiry ownership refusal; stale-fence and duplicate-operation checks; snapshot-corruption fallback; artifact and source-worktree audits; and `docs/M3_EVIDENCE.md`.
 - Add the sixth stacked M3 production slice: CLI composition for exact Pi, Codex, and Claude Code descriptors; an isolated runtime-host entry point; durable `pause`, `cancel`, and `resume`; operational status/inspection; stable exit behavior; and fail-closed corrupt-state handling.

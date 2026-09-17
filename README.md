@@ -73,6 +73,8 @@ Pi uses your normal provider authentication and model settings; its Git worktree
 
 See the [M0 retrospective](docs/M0_RETROSPECTIVE.md) and [M1 retrospective](docs/M1_RETROSPECTIVE.md) for the implemented boundaries, evidence, and lessons informing portability.
 
+M4 remains under development. Its [model-free feasibility evidence](docs/M4_FEASIBILITY.md) establishes stable graph expansion, multiple execution identities under one fence, and recoverable deterministic Git integration; these probes are implementation gates rather than delivered multi-worker behavior.
+
 ## Try the current demo
 
 Run from the directory containing your authored Task/Workflow source tree with **Node.js 24 or newer** and **pnpm 11.9.0**. CLI-selected source files and schema references must remain inside that directory after symlink resolution; `--repo` can point to a separate target checkout:
