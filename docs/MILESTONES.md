@@ -179,7 +179,7 @@ This is the first workflow that can replace a typical Superpowers-style executio
 
 ## M4.5 — Terminal experience: "See the work happen"
 
-Status: next MLP workstream. The line-oriented live stream and reconnect-equivalent projection are delivered; interactive rendering, controls, and terminal-level acceptance remain.
+Status: complete on 2026-09-17. The line-oriented live stream, reconnect-equivalent projection, detachable interactive view, durable controls, plain snapshots, and terminal-level acceptance are delivered. See [completion evidence](M4_5_EVIDENCE.md).
 
 ### Demo
 

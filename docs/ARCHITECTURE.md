@@ -10,7 +10,7 @@ The controller applies same-wave accepted patches in plan order through a tempor
 
 ## Status and objective
 
-This document describes the delivered durable control plane and defined-SDLC implementation. The accepted durability design, model-free feasibility evidence, and [production contract](M3_PRODUCTION_CONTRACT.md) govern the recovery implementation merged in [PR #24](https://github.com/gsornsen/anastom/pull/24). Expanded-graph execution, deterministic integration, evidence projection, the bounded live stream, and Feature CLI composition extend that same event authority. The [defined-SDLC completion record](M4_EVIDENCE.md) covers the deterministic process matrix and unchanged live Pi/Codex runs.
+This document describes the delivered durable control plane, defined-SDLC implementation, and terminal observation boundary. The accepted durability design, model-free feasibility evidence, and [production contract](M3_PRODUCTION_CONTRACT.md) govern the recovery implementation merged in [PR #24](https://github.com/gsornsen/anastom/pull/24). Expanded-graph execution, deterministic integration, evidence projection, the bounded live stream, Feature CLI composition, and detachable terminal view extend that same event authority. The [defined-SDLC completion record](M4_EVIDENCE.md) covers the deterministic process matrix and unchanged live Pi/Codex runs; the [terminal build brief](M4_5_BUILD_BRIEF.md) defines interactive and noninteractive acceptance.
 
 Anastom keeps engineering policy independent from agent runtime implementation. The control plane owns authoritative state and verification; a runtime adapter owns one bounded agent loop.
 
@@ -19,7 +19,7 @@ Anastom keeps engineering policy independent from agent runtime implementation. 
 ```text
 +-------------------------------------------------------------+
 | User interface                                              |
-| CLI with live public stream now; interactive TUI later     |
+| CLI live stream | attach TUI | plain snapshot and replay   |
 +-------------------------------+-----------------------------+
                                 |
 +-------------------------------v-----------------------------+
@@ -205,6 +205,8 @@ A result observed after the timeout may be retained as diagnostic evidence but c
 The append-only event stream remains the authoritative transition history. Run state is reconstructed by replaying events in sequence; projections and snapshots are derived data.
 
 The evidence ledger derives each phase decision, actor identity, exact context/report references, workspace and patch evidence, usage, integration result, and dependency authorization from that history. The public live projection exposes only bounded lifecycle, runtime identity, usage, artifact-reference, workspace, integration, review, verification, and control observations. Each log message is capped at 2 KiB; each attempt retains at most 128 messages or 64 KiB in the public stream and accounts for omissions. Replay after reconnect runs the same projector. Prompts, output bodies, private reasoning, native tool bodies, credentials, and raw provider errors are absent by construction. CLI observers receive transitions only after commit, and observer failure cannot affect workflow state.
+
+The terminal view combines that public replay with the immutable workflow, event-derived run state, exact graph resolver, lease observation, and pending controls. Its frame is disposable and never persisted. Pause/cancel enter the existing durable control inbox; resume launches the existing coordinator command in a separate process; detach mutates nothing. Non-TTY clients receive the same public JSON Lines, and a one-shot plain snapshot supports logs and diagnostics. Human terminal renderers neutralize control and bidirectional formatting characters after projection.
 
 The current durable store uses SQLite for immutable definitions and event history:
 
