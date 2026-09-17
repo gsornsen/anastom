@@ -17,11 +17,12 @@ pnpm install --frozen-lockfile
 pnpm test
 pnpm typecheck
 pnpm lint
+pnpm dead-code
 pnpm anastom validate examples/workflows/demo-feature.yaml
 pnpm anastom run examples/workflows/demo-feature.yaml --fake-scenario examples/fake/success.yaml
 ```
 
-Automated M1/M2/M2.5 tests use temporary Git repositories, deterministic Pi sessions, and Codex/Claude Code native-process doubles. They must not call real models or require provider credentials. The [M1 demo guide](docs/M1_DEMO.md), [M2 completion evidence](docs/M2_EVIDENCE.md), and [M2.5 evidence](docs/M2_5_EVIDENCE.md) document separate, explicitly invoked live integration checks and durable inspection commands.
+Automated M1/M2/M2.5 tests use temporary Git repositories, deterministic Pi sessions, and Codex/Claude Code native-process doubles. M3 feasibility and acceptance also kill deterministic coordinators, supervisors, and their owned fixture process groups to prove recovery boundaries. `pnpm probe:m3:process` exercises the initial ownership findings; `pnpm probe:m3:supervisor` exercises the production-shaped protocol; `pnpm probe:m3:sqlite` exercises real multi-process database contention with an isolated temporary schema; `pnpm probe:m3:workspace` exercises exact content and Git ownership comparisons in disposable repositories; `pnpm probe:m3:snapshot` exercises snapshot/tail equality and authoritative fallback against a disposable current run store; and `pnpm verify:m3` exercises the final production composition with the real 15-second lease. These tests must not call real models, read authentication stores, or require provider credentials. The [M1 demo guide](docs/M1_DEMO.md), [M2 completion evidence](docs/M2_EVIDENCE.md), [M2.5 evidence](docs/M2_5_EVIDENCE.md), [M3 feasibility evidence](docs/M3_FEASIBILITY.md), and [M3 implementation evidence](docs/M3_EVIDENCE.md) document the separate integration and process-level checks.
 
 ## Engineering expectations
 
@@ -47,9 +48,11 @@ Record notable user-facing or project changes in `CHANGELOG.md`. Keep the README
 
 ## Tests and evidence
 
-Follow the [engineering standards](docs/ENGINEERING.md) for readability, JSDoc, test fixtures, package documentation, SemVer, migrations, and CI ownership. Run `pnpm format` to apply the formatter. Before requesting review, run `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, and `pnpm hygiene`. Add a Changeset with `pnpm changeset` for changed package code or contracts; update the affected package README and changelog. Generate optional package API documentation with `pnpm docs:api <package>` when reviewing an API change.
+Follow the [engineering standards](docs/ENGINEERING.md) for readability, JSDoc, test fixtures, package documentation, SemVer, migrations, and CI ownership. Run `pnpm format` to apply the formatter. Before requesting review, run `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm dead-code`, `pnpm format:check`, and `pnpm hygiene`. Add a Changeset with `pnpm changeset` for changed package code or contracts; update the affected package README and changelog. Generate optional package API documentation with `pnpm docs:api <package>` when reviewing an API change.
 
 Tests should prove observable behavior and failure handling. Avoid tests that merely repeat an implementation. A pull request should state which checks ran and include relevant output or fixtures for behavior that cannot be covered by the standard commands.
+
+For every implementation or refactor, audit the changed capability and its callers for code, exports, dependencies, wrappers, tests, fixtures, configuration, and current documentation that the new path supersedes. Delete obsolete material in the same pull request. `pnpm dead-code` performs AST and dependency-graph checks in both whole-repository and production-only modes; reviewers still decide whether a reachable test protects supported behavior and whether prose remains accurate. Historical evidence and decision records remain when they explain project history, with superseded conclusions labeled clearly.
 
 ## Commits
 

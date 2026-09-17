@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Narrow the package entry point to the adapter, descriptor codec and documented public types; prompt, selection, version and parser helpers remain implementation details.
+- Give each bounded process-table inspection 500 ms while preserving the one-second group reap window, preventing spurious cleanup uncertainty under concurrent load.
+- Add an exact versioned descriptor codec for OpenAI model, optional reasoning effort, and file-store auth ownership while excluding executable and auth-directory overrides.
 - Add the exact-pinned native Codex CLI adapter for one fresh owned filesystem agent attempt, with explicit OpenAI model selection, capability preflight, bounded discovery/context profile, and normal file-backed authentication ownership.
 - Add a model-free native effective-policy inspection before Codex execution; managed requirements/configuration and unavailable policy evidence fail closed without starting the model.
 - Normalize native lifecycle, configured identity, and partial token usage while dropping private transcript, tool, reasoning, and provider-error bodies.

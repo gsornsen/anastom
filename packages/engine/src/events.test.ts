@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
 import { probeRuntime } from "@anastom/runtime-contract";
 import { FakeRuntimeAdapter } from "@anastom/runtime-fake";
 
@@ -29,6 +30,15 @@ describe("event transitions", () => {
     expect(() =>
       applyRunEvent(state, { type: "NodeSucceeded", runId: "run", sequence: 2, nodeId: "work" }),
     ).toThrow(InvalidTransitionError);
+    expect(() =>
+      applyRunEvent(state, {
+        type: "NodeReady",
+        runId: "run",
+        sequence: 2,
+        nodeId: "constructor",
+        reason: "dependencies-satisfied",
+      }),
+    ).toThrow('Unknown node "constructor"');
   });
 
   it("rejects gaps and duplicate events during replay", () => {
@@ -112,53 +122,272 @@ describe("event transitions", () => {
     ).toThrow("only one final usage");
   });
 
-  it("replays old records without negotiation or identity provenance and leaves event bytes intact", () => {
-    const oldEvents: RunEvent[] = [
-      created,
-      {
-        type: "NodeReady",
-        runId: "run",
-        sequence: 2,
-        nodeId: "work",
-        reason: "dependencies-satisfied",
-      },
-      {
-        type: "AttemptScheduled",
-        runId: "run",
-        sequence: 3,
-        nodeId: "work",
-        attempt: 1,
-        runtimeId: "pi",
-      },
-      { type: "AttemptStarted", runId: "run", sequence: 4, nodeId: "work", attempt: 1 },
-      {
-        type: "RuntimeEventObserved",
-        runId: "run",
-        sequence: 5,
-        nodeId: "work",
-        attempt: 1,
-        event: { type: "metadata", provider: "anthropic", model: "legacy" },
-      },
-      {
-        type: "AttemptSucceeded",
-        runId: "run",
-        sequence: 6,
-        nodeId: "work",
-        attempt: 1,
-        output: {},
-      },
-      { type: "NodeSucceeded", runId: "run", sequence: 7, nodeId: "work" },
-      { type: "RunCompleted", runId: "run", sequence: 8, outcome: "succeeded" },
-    ];
-    const bytes = oldEvents.map((event) => JSON.stringify(event));
-    const replayed = replayRun(oldEvents);
+  it("replays the checked-in baseline history without rewriting its records", async () => {
+    const fixture = new URL(
+      "./testing/fixtures/baseline-run-events.v1alpha1.json",
+      import.meta.url,
+    );
+    const baselineEvents = JSON.parse(await readFile(fixture, "utf8")) as RunEvent[];
+    const bytes = baselineEvents.map((event) => JSON.stringify(event));
+    const replayed = replayRun(baselineEvents);
     expect(replayed.status).toBe("succeeded");
     expect(replayed.runtimeNegotiation).toBeUndefined();
     expect(replayed.nodes.work?.attempts[0]?.identity).toEqual([
-      { type: "metadata", provider: "anthropic", model: "legacy" },
+      { type: "metadata", provider: "anthropic", model: "baseline" },
     ]);
     expect(replayed.nodes.work?.attempts[0]?.usage).toBeUndefined();
-    expect(oldEvents.map((event) => JSON.stringify(event))).toEqual(bytes);
+    expect(baselineEvents.map((event) => JSON.stringify(event))).toEqual(bytes);
+  });
+
+  it("replays prepared execution ownership, orphan recovery and exact control evidence", () => {
+    const hash = `sha256:${"a".repeat(64)}`;
+    const checkpoint = {
+      version: "anastom.dev/workspace-checkpoint/v1alpha1" as const,
+      workspaceId: "workspace",
+      baseCommit: "base",
+      headCommit: "head",
+      diffDigest: hash,
+      changedFiles: [],
+      ignoredDigest: hash,
+      ignoredEntryCount: 0,
+      ignoredByteCount: 0,
+      ownership: {
+        repositoryRoot: "/repo",
+        repositoryCommonDirectory: "/repo/.git",
+        workspacePath: "/repo/worktree",
+        workspaceGitDirectory: "/repo/.git/worktrees/worktree",
+        branch: "anastom/run",
+        manifestDigest: hash,
+        registrationDigest: hash,
+      },
+    };
+    const plan = {
+      version: "anastom.dev/owned-execution/v1alpha1" as const,
+      runId: "run",
+      executionId: "execution-1",
+      kind: "runtime" as const,
+      generation: 1,
+      planDigest: hash,
+    };
+    const descriptor = {
+      version: "anastom.dev/runtime-descriptor/v1alpha1" as const,
+      runtimeId: "pi",
+      configurationVersion: "anastom.dev/runtime-pi-config/v1alpha1",
+      configuration: { provider: "anthropic", model: "fixture" },
+    };
+    const scheduled = materializeEvents(applyRunEvent(undefined, created), "run", [
+      { type: "RuntimeConfigured", descriptor },
+      {
+        type: "WorkspaceAssigned",
+        workspace: {
+          id: "workspace",
+          mode: "isolated",
+          repoRoot: "/repo",
+          path: "/repo/worktree",
+          baseCommit: "base",
+          branch: "anastom/run",
+        },
+      },
+      { type: "NodeReady", nodeId: "work", reason: "dependencies-satisfied" },
+      { type: "AttemptScheduled", nodeId: "work", attempt: 1, runtimeId: "pi" },
+    ]).state;
+    expect(() =>
+      applyRunEvent(scheduled, {
+        type: "AttemptPrepared",
+        runId: "run",
+        sequence: scheduled.sequence + 1,
+        nodeId: "work",
+        attempt: 1,
+        execution: plan,
+        workspaceCheckpoint: { ...checkpoint, credential: "secret" },
+      } as unknown as RunEvent),
+    ).toThrow("Corrupt run event AttemptPrepared");
+    const transition = materializeEvents(applyRunEvent(undefined, created), "run", [
+      { type: "RuntimeConfigured", descriptor },
+      {
+        type: "WorkspaceAssigned",
+        workspace: {
+          id: "workspace",
+          mode: "isolated",
+          repoRoot: "/repo",
+          path: "/repo/worktree",
+          baseCommit: "base",
+          branch: "anastom/run",
+        },
+      },
+      { type: "NodeReady", nodeId: "work", reason: "dependencies-satisfied" },
+      { type: "AttemptScheduled", nodeId: "work", attempt: 1, runtimeId: "pi" },
+      {
+        type: "AttemptPrepared",
+        nodeId: "work",
+        attempt: 1,
+        execution: plan,
+        workspaceCheckpoint: checkpoint,
+      },
+      {
+        type: "AttemptStartAuthorized",
+        nodeId: "work",
+        attempt: 1,
+        execution: { ...plan, manifestDigest: hash },
+      },
+      {
+        type: "ControlRequestObserved",
+        operationId: "resume-1",
+        action: "pause",
+        recordedAtMs: 1,
+      },
+      {
+        type: "ExecutionCleanupObserved",
+        nodeId: "work",
+        attempt: 1,
+        executionId: "execution-1",
+        cause: "recovery",
+        outcome: "confirmed",
+      },
+      {
+        type: "AttemptOrphaned",
+        nodeId: "work",
+        attempt: 1,
+        executionId: "execution-1",
+        lostGeneration: 1,
+        reason: "coordinator-lost",
+        workspaceObservation: checkpoint,
+        workspaceDifferences: [],
+      },
+      { type: "NodeReady", nodeId: "work", reason: "recovered" },
+      {
+        type: "RunRecoveryBlocked",
+        operationId: "resume-2",
+        reason: {
+          kind: "execution-unknown",
+          executionId: "execution-1",
+          detail: "supervisor-lost",
+        },
+      },
+      { type: "RunResumed", operationId: "resume-3" },
+    ]);
+    const replayed = replayRun([created, ...transition.events]);
+    expect(replayed.status).toBe("running");
+    expect(replayed.runtimeDescriptor).toEqual(descriptor);
+    expect(replayed.nodes.work?.attempts[0]).toMatchObject({
+      status: "orphaned",
+      executionPlan: plan,
+      execution: { ...plan, manifestDigest: hash },
+      workspaceCheckpoint: checkpoint,
+      orphan: { executionId: "execution-1", workspaceDifferences: [] },
+      cleanup: [{ executionId: "execution-1", cause: "recovery", outcome: "confirmed" }],
+    });
+  });
+
+  it("keeps baseline lifecycle shapes exact while accepting typed pause reasons", () => {
+    const ready = materializeEvents(applyRunEvent(undefined, created), "run", [
+      { type: "NodeReady", nodeId: "work", reason: "dependencies-satisfied" },
+      {
+        type: "NodePaused",
+        nodeId: "work",
+        reason: { kind: "operator", operationId: "pause-1" },
+      },
+      {
+        type: "RunPaused",
+        reason: { kind: "operator", operationId: "pause-1" },
+      },
+    ]);
+    expect(ready.state.pauseReason).toEqual({ kind: "operator", operationId: "pause-1" });
+    expect(ready.state.nodes.work?.pauseReason).toEqual({
+      kind: "operator",
+      operationId: "pause-1",
+    });
+    expect(() =>
+      applyRunEvent(applyRunEvent(undefined, created), {
+        type: "RunPaused",
+        runId: "run",
+        sequence: 2,
+        reason: { kind: "operator", operationId: "pause-1" },
+        extra: true,
+      } as unknown as RunEvent),
+    ).toThrow("Corrupt run event RunPaused");
+  });
+
+  it("uses the same prepared ownership contract for command executions", () => {
+    const hash = `sha256:${"b".repeat(64)}`;
+    const transition = materializeEvents(applyRunEvent(undefined, created), "run", [
+      { type: "NodeReady", nodeId: "work", reason: "dependencies-satisfied" },
+      { type: "AttemptScheduled", nodeId: "work", attempt: 1, runtimeId: "command" },
+      {
+        type: "AttemptPrepared",
+        nodeId: "work",
+        attempt: 1,
+        execution: {
+          version: "anastom.dev/owned-execution/v1alpha1",
+          runId: "run",
+          executionId: "command-1",
+          kind: "command",
+          generation: 1,
+          planDigest: hash,
+        },
+        workspaceCheckpoint: {
+          version: "anastom.dev/workspace-checkpoint/v1alpha1",
+          workspaceId: "workspace",
+          baseCommit: "base",
+          headCommit: "head",
+          diffDigest: hash,
+          changedFiles: [],
+          ignoredDigest: hash,
+          ignoredEntryCount: 0,
+          ignoredByteCount: 0,
+          ownership: {
+            repositoryRoot: "/repo",
+            repositoryCommonDirectory: "/repo/.git",
+            workspacePath: "/repo/worktree",
+            workspaceGitDirectory: "/repo/.git/worktrees/worktree",
+            branch: "anastom/run",
+            manifestDigest: hash,
+            registrationDigest: hash,
+          },
+        },
+      },
+    ]);
+    expect(transition.state.nodes.work?.attempts[0]).toMatchObject({
+      status: "prepared",
+      executionPlan: { kind: "command", executionId: "command-1" },
+    });
+  });
+
+  it("enforces the runtime descriptor byte bound before replay", () => {
+    expect(() =>
+      applyRunEvent(applyRunEvent(undefined, created), {
+        type: "RuntimeConfigured",
+        runId: "run",
+        sequence: 2,
+        descriptor: {
+          version: "anastom.dev/runtime-descriptor/v1alpha1",
+          runtimeId: "pi",
+          configurationVersion: "anastom.dev/runtime-pi-config/v1alpha1",
+          configuration: { model: "x".repeat(17 * 1024) },
+        },
+      }),
+    ).toThrow("invalid runtime descriptor");
+  });
+
+  it("rejects durable pause or cancellation while a node is still active", () => {
+    const active = materializeEvents(applyRunEvent(undefined, created), "run", [
+      { type: "NodeReady", nodeId: "work", reason: "dependencies-satisfied" },
+      { type: "AttemptScheduled", nodeId: "work", attempt: 1, runtimeId: "pi" },
+      { type: "AttemptStarted", nodeId: "work", attempt: 1 },
+    ]).state;
+    expect(() =>
+      materializeEvents(active, "run", [
+        {
+          type: "RunPaused",
+          reason: { kind: "operator", operationId: "pause-1" },
+        },
+      ]),
+    ).toThrow("requires every active node to stop");
+    expect(() =>
+      materializeEvents(active, "run", [
+        { type: "RunCancelled", operationId: "cancel-1", reason: "operator" },
+      ]),
+    ).toThrow("requires every nonterminal node to be cancelled");
   });
 });
 

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "includeEntryExports": true,
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/*.ts",
+        "scripts/eslint-rules/*.mjs",
+        "scripts/probe-claude-hook.mjs",
+        "scripts/testing/m3-attempt-supervisor.ts",
+        "scripts/testing/m3-attempt-worker.mjs",
+        "scripts/testing/m3-protocol-command.mjs",
+        "scripts/testing/m3-protocol-coordinator.ts",
+        "scripts/testing/m3-protocol-supervisor.ts",
+        "scripts/testing/m3-runtime-coordinator.ts",
+        "scripts/testing/m3-sqlite-contention-worker.ts"
+      ],
+      "project": ["scripts/**/*.{ts,mjs}", "*.config.{ts,js,mjs}"]
+    },
+    "packages/*": {
+      "entry": ["src/**/*.test.ts"],
+      "project": ["src/**/*.{ts,mjs}!", "!src/**/*.test.ts!", "!src/testing/**!"]
+    },
+    "packages/cli": {
+      "entry": ["src/bin.ts!", "src/runtime-host.ts!", "src/**/*.test.ts"],
+      "project": ["src/**/*.{ts,mjs}!", "!src/**/*.test.ts!", "!src/testing/**!"]
+    },
+    "packages/engine": {
+      "entry": [
+        "src/testing/commands/arguments.mjs",
+        "src/testing/commands/nonzero.mjs",
+        "src/testing/commands/noop.mjs",
+        "src/testing/commands/pressure.mjs",
+        "src/testing/commands/term-resistant.mjs"
+      ],
+      "project": ["src/**/*.{ts,mjs}!", "!src/**/*.test.ts!", "!src/testing/**!"]
+    },
+    "packages/execution-host": {
+      "entry": [
+        "src/runtime-host.ts!",
+        "src/supervisor.ts!",
+        "src/**/*.test.ts",
+        "src/testing/fixture-coordinator.ts",
+        "src/testing/fixture-descendant.mjs",
+        "src/testing/fixture-runtime-host.ts",
+        "src/testing/fixture-worker.mjs"
+      ],
+      "project": ["src/**/*.{ts,mjs}!", "!src/**/*.test.ts!", "!src/testing/**!"]
+    },
+    "packages/runtime-claude-code": {
+      "entry": ["src/testing/claude-double.mjs", "src/testing/late-write-child.mjs"],
+      "project": ["src/**/*.{ts,mjs}!", "!src/**/*.test.ts!", "!src/testing/**!"]
+    },
+    "packages/runtime-codex": {
+      "entry": ["src/testing/codex-double.mjs"],
+      "project": ["src/**/*.{ts,mjs}!", "!src/**/*.test.ts!", "!src/testing/**!"]
+    }
+  }
+}

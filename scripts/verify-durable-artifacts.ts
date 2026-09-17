@@ -3,7 +3,8 @@ import { execFile } from "node:child_process";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
 import { FileArtifactStore } from "../packages/persistence/src/index.js";
-import { runCli, type DurableRunInspection } from "../packages/cli/src/index.js";
+import { runCli } from "../packages/cli/src/index.js";
+import type { DurableRunInspection } from "../packages/cli/src/durable.js";
 import { canonicalExistingRoot, resolveExistingChild } from "../packages/path-policy/src/index.js";
 
 const [runId, directory] = process.argv.slice(2);
@@ -26,6 +27,10 @@ if (code !== 0 || errors.length !== 0 || output.length !== 1) {
   throw new Error("Later-process durable JSON inspection failed");
 }
 const inspection = JSON.parse(output[0]!) as DurableRunInspection;
+const events = inspection.events;
+if (!events) {
+  throw new Error("Durable JSON inspection omitted authoritative events");
+}
 const workspace = inspection.state.workspace;
 if (
   inspection.state.runId !== runId ||
@@ -35,7 +40,7 @@ if (
 ) {
   throw new Error("Successful isolated run identity or workspace ownership is missing");
 }
-const artifactEvents = inspection.events.filter((event) => event.type === "ArtifactProduced");
+const artifactEvents = events.filter((event) => event.type === "ArtifactProduced");
 if (artifactEvents.length === 0) {
   throw new Error("No durable artifacts were referenced");
 }
@@ -71,7 +76,7 @@ const [source, freshDiff] = await Promise.all([
 if (source.stdout.trim()) {
   throw new Error("Source checkout is no longer clean");
 }
-const observed = inspection.events.filter((event) => event.type === "WorkspaceObserved");
+const observed = events.filter((event) => event.type === "WorkspaceObserved");
 if (
   observed.length === 0 ||
   observed.some(
@@ -115,7 +120,7 @@ process.stdout.write(
   JSON.stringify({
     runId,
     status: inspection.state.status,
-    events: inspection.events.length,
+    events: events.length,
     artifactsVerified: artifactEvents.length,
     verifierExitCode: command.exitCode,
     verifierTests: 2,

@@ -53,7 +53,7 @@ describe("Workflow CLI", () => {
 
   it("returns usage errors without throwing", async () => {
     const output = capture();
-    expect(await runCli(["run", workflowPath], { io: output.io })).toBe(1);
+    expect(await runCli(["run", workflowPath], { io: output.io })).toBe(2);
     expect(output.stderr[0]).toContain("--fake-scenario");
   });
 });

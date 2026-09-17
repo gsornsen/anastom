@@ -3,6 +3,8 @@
 - Status: Accepted and implemented; final revision `1dde54d` approved and PR #9 merged as `af8eb87`
 - Date: 2026-09-13
 
+The unversioned-database adoption decision below was superseded before the first supported release by [ADR 0018](0018-m3-production-contract-and-package-boundaries.md), which consolidates the complete durable schema as migration one and rejects unjournaled databases.
+
 ## Context
 
 Owner review of the single-worker implementation identified compressed code and tests, undocumented APIs, embedded schemas, unversioned initialization SQL, and missing package development conventions. These concerns apply to existing code as well as new packages. The owner explicitly requested implementation before approval and merge.

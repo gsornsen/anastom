@@ -125,6 +125,25 @@ describe("Contributor hygiene gate", () => {
     expect(() => checkHygiene(root, "main")).toThrow("SemVer");
   });
 
+  it("rejects planning labels in package source and test names", async () => {
+    const root = await repositoryFixture();
+    await addPlan(root);
+    await mkdir(join(root, "packages/sample/src"));
+    const testPath = join(root, "packages/sample/src/m3-recovery.test.ts");
+    await writeFile(testPath, 'describe("M3 recovery", () => {});\n');
+    expect(() => checkHygiene(root, "main")).toThrow("durable capability name");
+    await rm(testPath);
+    const sourcePath = join(root, "packages/sample/src/recovery.test.ts");
+    await writeFile(sourcePath, '// M3 recovery behavior\ndescribe("recovery", () => {});\n');
+    expect(() => checkHygiene(root, "main")).toThrow("describe the durable behavior");
+    await writeFile(sourcePath, 'describe("durable crash recovery", () => {});\n');
+    const fixturePath = join(root, "packages/sample/src/recovery.fixture.json");
+    await writeFile(fixturePath, '{"phase":"M3"}\n');
+    expect(() => checkHygiene(root, "main")).toThrow("describe the durable behavior");
+    await writeFile(fixturePath, '{"phase":"durable-recovery"}\n');
+    expect(() => checkHygiene(root, "main")).not.toThrow();
+  });
+
   it("fails clearly when the selected comparison base is unavailable", async () => {
     const root = await repositoryFixture();
     await addPlan(root);

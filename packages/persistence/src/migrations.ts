@@ -128,9 +128,8 @@ function recordMigration(db: DatabaseSync, step: Migration): void {
  * Validate and apply schema changes under one immediate transaction.
  *
  * A failed step or validation rolls back both DDL and the migration journal.
- * The original unversioned run store is adopted only after its complete schema
- * matches migration one. Existing run definitions and events are never rewritten.
- * Newer databases, edited applied migrations, and schema drift fail closed.
+ * A nonempty database without migration history is rejected because its provenance
+ * cannot be established. Newer databases, edited applied migrations, and schema drift fail closed.
  * Back up the SQLite database before upgrading; destructive down migrations are
  * deliberately excluded because undoing schema changes can destroy run evidence.
  */
@@ -148,15 +147,12 @@ export function applyMigrations(db: DatabaseSync, steps: readonly Migration[] = 
       .get();
     const existingObjects = schemaObjects(db);
     if (!hasJournal && existingObjects.size > 0) {
-      assertSchema(db, steps.slice(0, 1));
+      throw new Error("Database schema exists without migration history");
     }
     if (!hasJournal && db.prepare("PRAGMA user_version").get()?.user_version !== 0) {
       throw new Error("Database version exists without a migration history");
     }
     db.exec(journalSql);
-    if (!hasJournal && existingObjects.size > 0) {
-      recordMigration(db, steps[0]!);
-    }
     const applied = validateHistory(db, steps);
     assertSchema(db, steps.slice(0, applied));
     for (const step of steps.slice(applied)) {

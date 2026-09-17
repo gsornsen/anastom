@@ -14,6 +14,7 @@
       "@anastom/cli": ["packages/cli/src/index.ts"],
       "@anastom/core": ["packages/core/src/index.ts"],
       "@anastom/engine": ["packages/engine/src/index.ts"],
+      "@anastom/execution-host": ["packages/execution-host/src/index.ts"],
       "@anastom/persistence": ["packages/persistence/src/index.ts"],
       "@anastom/path-policy": ["packages/path-policy/src/index.ts"],
       "@anastom/workspaces": ["packages/workspaces/src/index.ts"],

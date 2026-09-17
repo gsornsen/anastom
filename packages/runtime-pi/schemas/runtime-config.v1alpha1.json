@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://anastom.dev/schemas/runtime-pi-config.v1alpha1.json",
+  "title": "Anastom Pi runtime descriptor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "runtimeId", "configurationVersion", "configuration"],
+  "properties": {
+    "version": { "const": "anastom.dev/runtime-descriptor/v1alpha1" },
+    "runtimeId": { "const": "pi" },
+    "configurationVersion": { "const": "anastom.dev/runtime-pi-config/v1alpha1" },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "model"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"
+        },
+        "model": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,255}$"
+        }
+      }
+    }
+  }
+}

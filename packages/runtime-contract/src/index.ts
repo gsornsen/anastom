@@ -28,7 +28,7 @@ export interface RuntimeCapabilities {
 /**
  * A logical worker role independent of model selection.
  */
-export interface ResolvedRole {
+interface ResolvedRole {
   id: string;
 }
 
@@ -68,6 +68,44 @@ export interface WorkspaceCapture {
   changedFiles: string[];
 }
 
+/** Complete content and Git ownership evidence captured before execution authorization. */
+export interface WorkspaceCheckpoint {
+  version: "anastom.dev/workspace-checkpoint/v1alpha1";
+  workspaceId: string;
+  baseCommit: string;
+  headCommit: string;
+  diffDigest: string;
+  changedFiles: string[];
+  ignoredDigest: string;
+  ignoredEntryCount: number;
+  ignoredByteCount: number;
+  ownership: {
+    repositoryRoot: string;
+    repositoryCommonDirectory: string;
+    workspacePath: string;
+    workspaceGitDirectory: string;
+    branch: string;
+    manifestDigest: string;
+    registrationDigest: string;
+  };
+  diffArtifactId?: string;
+}
+
+/** Stable dimensions reported when two complete workspace captures do not match. */
+export type WorkspaceDifference =
+  | "version"
+  | "workspace-id"
+  | "base-commit"
+  | "head-commit"
+  | "diff-digest"
+  | "changed-files"
+  | "ignored-content"
+  | "repository"
+  | "workspace-path"
+  | "branch"
+  | "ownership-manifest"
+  | "worktree-registration";
+
 /**
  * Explicit per-attempt context snapshot; previous conversations and failed-attempt outputs are excluded.
  */
@@ -92,7 +130,7 @@ export interface ContextEnvelope {
 /**
  * Mutations authorized by the control plane for this attempt.
  */
-export interface ToolPolicy {
+interface ToolPolicy {
   allowMutations: boolean;
 }
 
@@ -164,6 +202,29 @@ export interface RuntimeNegotiation {
   capabilities: RuntimeCapabilities;
 }
 
+/** A bounded, credential-free runtime selection that can reconstruct an adapter after restart. */
+export interface RuntimeDescriptor {
+  version: "anastom.dev/runtime-descriptor/v1alpha1";
+  runtimeId: string;
+  configurationVersion: string;
+  configuration: Readonly<Record<string, JsonValue>>;
+}
+
+/** A runtime whose complete public selection can be persisted before execution begins. */
+export interface DurableRuntimeAdapter extends RuntimeAdapter {
+  /** Resolve the effective provider/model selection without starting a model request. */
+  descriptor(): Promise<RuntimeDescriptor>;
+}
+
+/** Parse one runtime's exact descriptor and reconstruct only its public adapter configuration. */
+export interface RuntimeDescriptorCodec<T extends RuntimeDescriptor = RuntimeDescriptor> {
+  readonly runtimeId: T["runtimeId"];
+  /** Validate the shared envelope and this runtime's exact public configuration. */
+  parse(value: unknown): T;
+  /** Revalidate and reconstruct an adapter using only the public selection. */
+  create(descriptor: T): Promise<RuntimeAdapter>;
+}
+
 /** Stable failure categories shared by adapters, validation, and retry policy. */
 export const FAILURE_CATEGORIES = [
   "runtime-unavailable",
@@ -180,7 +241,7 @@ export const FAILURE_CATEGORIES = [
 /**
  * Stable failure classification used by runtime adapters and deterministic orchestration policy.
  */
-export type FailureCategory = (typeof FAILURE_CATEGORIES)[number];
+type FailureCategory = (typeof FAILURE_CATEGORIES)[number];
 
 /**
  * A classified failure and operator-readable diagnostic.
@@ -200,21 +261,6 @@ export type ExecutionResult =
   | { status: "cancelled"; reason: string };
 
 /**
- * Optional runtime recovery identity; serializing it must never include credentials.
- */
-export interface PersistedExecutionRef {
-  adapterId: string;
-  handleId: string;
-}
-
-/**
- * An adapter-recovered execution handle and its available status.
- */
-export interface RecoveredExecution {
-  handle: ExecutionHandle;
-}
-
-/**
  * Harness-independent execution boundary; adapters execute requests while the engine owns policy.
  */
 export interface RuntimeAdapter {
@@ -229,14 +275,15 @@ export interface RuntimeAdapter {
   collect(handle: ExecutionHandle): Promise<ExecutionResult>;
   /** Request cancellation and reject if safe termination cannot be confirmed. */
   cancel(handle: ExecutionHandle): Promise<void>;
-  /** Optionally recover a runtime-owned execution; return null when unsupported. */
-  recover?(persisted: PersistedExecutionRef): Promise<RecoveredExecution | null>;
 }
 
 export {
   RuntimePreflightError,
   probeRuntime,
   assertRuntimeNegotiation,
-  assertRuntimeCapabilities,
+  assertRuntimeDescriptor,
   assertRuntimeEvent,
+  assertExecutionRequest,
+  assertExecutionResult,
+  assertWorkspaceCheckpoint,
 } from "./validation.js";

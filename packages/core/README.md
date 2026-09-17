@@ -4,7 +4,7 @@ Parse authored workflows and Markdown tasks into strict, replayable definitions.
 
 ## Public API
 
-`loadWorkflow` and `loadTask` load files selected by a trusted local caller. `loadWorkflowWithinRoot(root, file)` and `loadTaskWithinRoot(root, file)` additionally confine an operator-selected source to an authorized directory; the scoped workflow loader confines referenced schemas to that same source tree. `parseWorkflowYaml` and `parseTaskMarkdown` validate authored text. `normalizeWorkflow` and `compileTask` resolve execution policy. `assertWorkflowDefinition` validates stored snapshots. `canonicalJson`, `digestBytes`, and `digestJson` provide deterministic evidence identity.
+`loadWorkflow` and `loadTask` load files selected by a trusted local caller. `loadWorkflowWithinRoot(root, file)` and `loadTaskWithinRoot(root, file)` additionally confine an operator-selected source to an authorized directory; the scoped workflow loader confines referenced schemas to that same source tree. `parseWorkflowYaml` and `parseTaskMarkdown` validate authored text, with `TaskDocument` describing the latter's result. `normalizeWorkflow` and `compileTask` resolve execution policy. `workerReportSchema` exposes the built-in Task worker report contract, and `assertWorkflowDefinition` validates stored snapshots. `canonicalJson`, `digestBytes`, and `digestJson` provide deterministic evidence identity.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api core`; output is in `.generated/api/core/` and is not committed.
 

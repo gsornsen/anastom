@@ -59,3 +59,11 @@ export async function resolveExistingChild(
   }
   return canonical;
 }
+
+export { ensurePrivatePathRoot, type PrivatePathRoot } from "./private-path-root.js";
+
+/**
+ * Public classified failure for private-state ownership and bounded-I/O violations.
+ * @public
+ */
+export { PrivatePathError } from "./private-path-root.js";

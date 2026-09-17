@@ -2,30 +2,19 @@
 
 Run these commands from the Anastom checkout with Node.js 24 or newer and pnpm 11.9.0. Install dependencies with `pnpm install --frozen-lockfile`.
 
+This guide began as the single-worker milestone demonstration. The current CLI uses the same Task through the durable Pi, Codex, or Claude Code path. The pre-release fake Markdown Task command has been removed; deterministic fake execution remains available for YAML workflows.
+
 ## Deterministic run
 
 The setup helper copies `examples/demo-repos/health-endpoint/` into a temporary Git repository and commits its initial state using a fixture identity. Its two acceptance tests require `GET /health` to return `{ "status": "ok" }` and unmatched routes to return 404. The initial implementation intentionally fails the health test.
 
-```bash
-fixture="$(pnpm exec tsx scripts/create-endpoint-fixture.ts)"
-pnpm anastom validate examples/demo-repos/health-endpoint/tasks/add-endpoint.md
-pnpm anastom graph examples/demo-repos/health-endpoint/tasks/add-endpoint.md
-pnpm anastom run examples/demo-repos/health-endpoint/tasks/add-endpoint.md \
-  --runtime fake --fake-scenario examples/fake/health-endpoint.yaml --repo "$fixture"
-```
-
-Copy the printed run ID into later invocations:
+Run the credential-free crash/restart acceptance, which uses the current durable Task stack and the same endpoint fixture:
 
 ```bash
-pnpm anastom status <run-id> --state-dir "$fixture/.anastom"
-pnpm anastom inspect <run-id> --state-dir "$fixture/.anastom"
-pnpm anastom inspect <run-id> --state-dir "$fixture/.anastom" --json
-git -C "$fixture" status --short
+pnpm verify:m3
 ```
 
-`status` reconstructs node outcomes from SQLite. `inspect` includes the immutable definition digest, exact base commit, retained branch/worktree, final head, attempts, command exit/signal, failures, artifact paths/digests, and sequenced events. JSON inspection also includes the normalized definition. These commands do not initialize Pi or require model credentials.
-
-The fake scenario supplies an explicit file edit and a structured report. The actual verifier still runs `node --test server.test.mjs` outside the worker. The source checkout remains unchanged; only the owned worktree receives the implementation.
+The acceptance starts checked-in fixture workers, kills coordinator processes at controlled boundaries, resumes runs, and invokes the actual `node --test server.test.mjs` verifier. It requires no model credentials. The source checkout remains unchanged; only the owned worktree receives the implementation.
 
 ## Live Pi run
 
@@ -51,6 +40,8 @@ pnpm anastom inspect <run-id> --state-dir "$live_fixture/.anastom"
 
 A successful run requires a schema-valid worker report and verifier exit zero. Authentication/provider failures, invalid reports, command failure, or timeout produce a failed run with inspectable history. The fixture task limits the worker to one five-minute attempt and the verifier to thirty seconds, with a 1 MiB output cap per stream.
 
+`status` reconstructs node outcomes from SQLite. `inspect` includes the immutable definition digest, exact base commit, retained branch/worktree, final head, attempts, command exit/signal, failures, artifact paths/digests, and sequenced events. JSON inspection also includes the normalized definition. These commands do not initialize Pi or make a provider call.
+
 ## Context, evidence, and limits
 
 Every attempt receives newly built, recursively frozen context. Canonical JSON bytes and a SHA-256 digest are persisted before worker start. Dependencies contribute validated structured outputs; previous transcripts, reports, and reasoning are not automatically inherited. Pi uses an in-memory session with inherited context files, prompt templates, skills, extensions, automatic compaction, and automatic retry disabled.
@@ -61,7 +52,7 @@ Verification uses an argument vector with `shell: false`. Task-authored environm
 
 Worktree isolation protects the original checkout from ordinary edits. Neither Pi's tools nor verification are an operating-system sandbox. Tasks, executable code, commands, provider configuration, and the target repository must be trusted. Read-only mode omits mutating Pi tools and requires a clean source checkout for mutation detection; it is not a filesystem access-control boundary. Linux and macOS are the validation targets; Windows process-tree termination is not certified by M1.
 
-At an attempt deadline, the control plane requests cancellation once and records the cancellation outcome. Late success remains diagnostic; the attempt fails with `budget-exhausted`. Retry is refused when termination is unconfirmed. M1 does not recover attempts that were live during a process crash. A later `status` or `inspect` shows the last committed state; it does not restart a worker.
+At an attempt deadline, the control plane requests cancellation once and records the cancellation outcome. Late success remains diagnostic; the attempt fails with `budget-exhausted`. Retry is refused when termination is unconfirmed. `resume` acquires a released run or safely takes over an expired lease after confirming owner absence, then reconciles owned execution and workspace evidence before scheduling more work.
 
 ## Retention and explicit cleanup
 
@@ -69,4 +60,4 @@ Success and failure both retain `.anastom/runs/<run-id>/artifacts/`, the SQLite 
 
 `GitWorkspaceManager.cleanup(workspace)` is the M1 programmatic cleanup operation. It checks the ownership manifest, canonical path, Git registration, and branch namespace. It refuses dirty worktrees, worker commits, read-only/source directories, and unowned paths. Repeating cleanup of an owned clean workspace is safe. There is no broad deletion command in M1; review and preserve changes before removing temporary demo repositories yourself.
 
-The [build brief](M1_BUILD_BRIEF.md) defines the completion checklist. M2 adapters and M3 recovery remain separate milestones.
+The [build brief](M1_BUILD_BRIEF.md) records the original completion checklist. The [durable-execution evidence](M3_EVIDENCE.md) covers the current recovery path.

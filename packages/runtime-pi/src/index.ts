@@ -4,17 +4,24 @@ import type {
   ExecutionHandle,
   ExecutionRequest,
   ExecutionResult,
-  RuntimeAdapter,
+  DurableRuntimeAdapter,
+  RuntimeDescriptorCodec,
   RuntimeCapabilities,
   RuntimeEvent,
   RuntimeUsage,
 } from "@anastom/runtime-contract";
-import { assertRuntimeEvent } from "@anastom/runtime-contract";
+import { assertRuntimeEvent, RuntimePreflightError } from "@anastom/runtime-contract";
 import { observablePiEvent } from "./observable.js";
 import { PiUsageAccumulator } from "./usage.js";
+import {
+  assertPiSelection,
+  parsePiRuntimeDescriptor,
+  type PiRuntimeDescriptor,
+} from "./descriptor.js";
 
 /**
  * The minimal Pi session facade used by the adapter; injectable to test lifecycle without model calls.
+ * @public
  */
 export interface PiSession {
   /** Execute the explicit prompt in this attempt's fresh session. */
@@ -34,6 +41,7 @@ export interface PiSession {
 }
 /**
  * Create a fresh session using explicit context and cancellation, returning public provider/model identity.
+ * @public
  */
 export type PiSessionFactory = (
   request: ExecutionRequest,
@@ -50,6 +58,7 @@ export interface PiAdapterOptions {
 
 /**
  * Present the explicit context and report contract to Pi, keeping independent verification owned by the engine.
+ * @public
  */
 export function renderPiPrompt(request: ExecutionRequest): string {
   return [
@@ -199,6 +208,71 @@ async function createSession(
     dispose: () => session.dispose(),
   };
 }
+
+async function resolvePiSelection(options: PiAdapterOptions): Promise<{
+  provider: string;
+  model: string;
+}> {
+  if (options.provider && options.model) {
+    assertPiSelection(options.provider, options.model);
+    return { provider: options.provider, model: options.model };
+  }
+  if (options.factory) {
+    throw new RuntimePreflightError(
+      "policy-violation",
+      "Injected Pi sessions require an explicit provider and model for durability",
+    );
+  }
+  const sdk = await import("@earendil-works/pi-coding-agent");
+  const cwd = process.cwd();
+  const agentDir = sdk.getAgentDir();
+  const fileSettings = sdk.SettingsManager.create(cwd, agentDir, { projectTrusted: false });
+  const settingsManager = sdk.SettingsManager.inMemory({
+    ...fileSettings.getGlobalSettings(),
+    retry: { enabled: false, maxRetries: 0, provider: { maxRetries: 0 } },
+    compaction: { enabled: false },
+    packages: [],
+    extensions: [],
+    skills: [],
+    prompts: [],
+    themes: [],
+  });
+  const systemPrompt = "Resolve the configured Pi model without executing a request.";
+  const loader = new sdk.DefaultResourceLoader({
+    cwd,
+    agentDir,
+    settingsManager,
+    noExtensions: true,
+    noSkills: true,
+    noPromptTemplates: true,
+    noThemes: true,
+    noContextFiles: true,
+    systemPrompt,
+    appendSystemPrompt: [],
+    systemPromptOverride: () => systemPrompt,
+    appendSystemPromptOverride: () => [],
+  });
+  await loader.reload();
+  const modelRuntime = await sdk.ModelRuntime.create({ allowModelNetwork: false });
+  const { session } = await sdk.createAgentSession({
+    cwd,
+    modelRuntime,
+    settingsManager,
+    resourceLoader: loader,
+    sessionManager: sdk.SessionManager.inMemory(cwd),
+    tools: ["read"],
+  });
+  try {
+    if (!session.model) {
+      throw new RuntimePreflightError("runtime-unavailable", "No configured Pi model is available");
+    }
+    const selection = { provider: session.model.provider, model: session.model.id };
+    assertPiSelection(selection.provider, selection.model);
+    return selection;
+  } finally {
+    session.dispose();
+  }
+}
 interface Pending {
   controller: AbortController;
   session?: PiSession;
@@ -213,13 +287,44 @@ interface Pending {
 /**
  * Run each agent attempt in a fresh ephemeral Pi session and expose only normalized public events.
  */
-export class PiRuntimeAdapter implements RuntimeAdapter {
+export class PiRuntimeAdapter implements DurableRuntimeAdapter {
   readonly id = "pi";
   private readonly executions = new Map<string, Pending>();
   /**
    * Bind explicit model selection and an optional injectable session factory; never accepts credentials.
    */
-  constructor(private readonly options: PiAdapterOptions = {}) {}
+  constructor(private readonly options: PiAdapterOptions = {}) {
+    if (Boolean(options.provider) !== Boolean(options.model)) {
+      throw new RuntimePreflightError(
+        "policy-violation",
+        "Pi provider and model must be selected together",
+      );
+    }
+    if (options.provider && options.model) {
+      assertPiSelection(options.provider, options.model);
+    }
+  }
+  /** Resolve an ambient Pi default once and return a complete durable public selection. */
+  async descriptor(): Promise<PiRuntimeDescriptor> {
+    let selection: { provider: string; model: string };
+    try {
+      selection = await resolvePiSelection(this.options);
+    } catch (error) {
+      if (error instanceof RuntimePreflightError) {
+        throw error;
+      }
+      throw new RuntimePreflightError(
+        "runtime-unavailable",
+        "Pi configured model selection could not be resolved",
+      );
+    }
+    return parsePiRuntimeDescriptor({
+      version: "anastom.dev/runtime-descriptor/v1alpha1",
+      runtimeId: "pi",
+      configurationVersion: "anastom.dev/runtime-pi-config/v1alpha1",
+      configuration: selection,
+    });
+  }
   /**
    * Describe supported Pi features without exposing its private session implementation.
    */
@@ -416,3 +521,18 @@ export class PiRuntimeAdapter implements RuntimeAdapter {
     return pending;
   }
 }
+
+export type { PiRuntimeDescriptor } from "./descriptor.js";
+
+/** Exact codec used to reconstruct Pi without relying on unrecorded ambient defaults. */
+export const piRuntimeDescriptorCodec: RuntimeDescriptorCodec<PiRuntimeDescriptor> = {
+  runtimeId: "pi",
+  parse: parsePiRuntimeDescriptor,
+  create: async (descriptor) => {
+    const parsed = parsePiRuntimeDescriptor(descriptor);
+    return new PiRuntimeAdapter({
+      provider: parsed.configuration.provider,
+      model: parsed.configuration.model,
+    });
+  },
+};

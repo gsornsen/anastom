@@ -1,6 +1,6 @@
 # 0017 — Durable execution ownership and recovery
 
-- Status: Accepted by the owner on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23); exact runtime ownership APIs remain gated on feasibility evidence
+- Status: Accepted by the owner on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23); feasibility passes in stacked PRs #24–#28, and exact APIs are proposed separately in [ADR 0018](0018-m3-production-contract-and-package-boundaries.md)
 - Date: 2026-09-15
 
 ## Context
@@ -19,7 +19,7 @@ M3 needs a local durability contract that is stronger than replay and narrower t
 
 M3 recovery creates a new coordinator and, when safe, a newly numbered attempt with a fresh context. It does not promise to reconnect to an interrupted model conversation or continue under the same attempt identity.
 
-The existing optional `recover()` contract will be removed during M3 unless feasibility evidence establishes a concrete adopter with semantics stronger than session convenience. Runtime-specific session reattachment can return through a later reviewed capability. M3 instead needs an execution-ownership operation that can answer whether a previously recorded execution is active, absent, or unknown and can confirm termination when it is active. Exact method names remain gated on the process-ownership feasibility probe in the [M3 build brief](../M3_BUILD_BRIEF.md).
+The existing optional `recover()` contract will be removed during M3 unless a later concrete adopter establishes semantics stronger than session convenience. Runtime-specific session reattachment can return through a later reviewed capability. M3 instead needs an execution-ownership operation that can answer whether a previously recorded execution is active, absent, or unknown and can confirm termination when it is active. Exact method names remain gated on the separate contract review informed by the completed probes in the [M3 build brief](../M3_BUILD_BRIEF.md).
 
 An engine-generated execution ID is recorded before an adapter may cause model, command, or tool side effects. Adapter-owned process metadata may live in a run-owned operational record keyed by that ID, but credentials, private messages, reasoning, and tool bodies may not enter that record.
 
@@ -58,9 +58,9 @@ Control requests need no run lease because their purpose is to ask the current o
 
 ### Treat snapshots as verified caches
 
-Snapshots contain a reducer/schema version, run ID, event sequence, canonical state bytes, and digest. They are written transactionally at reviewed stable boundaries such as attempt completion, pause/cancel completion, and run completion. High-volume runtime observations do not each require a snapshot.
+Snapshots contain a reducer/schema version, run ID, event sequence, workflow-definition digest, exact event-prefix digest, canonical state bytes, and state digest. They are written transactionally at reviewed stable boundaries such as attempt completion, pause/cancel completion, and run completion. High-volume runtime observations do not each require a snapshot.
 
-Execution may load the newest compatible snapshot and replay its tail. Full-history inspection remains available. A malformed, unknown-version, or digest-mismatched snapshot is ignored and rebuilt from events; it may not hide a corrupt event stream. Tests must compare snapshot-plus-tail state with full replay for every lifecycle shape introduced by M3.
+Execution may load the newest compatible snapshot and replay its tail. Full-history inspection remains available. A malformed, unknown-version, or digest-mismatched snapshot is ignored and rebuilt from events; it may not hide a changed or corrupt event stream. Until production events carry a transactionally maintained rolling history digest, the loader validates the complete event envelope and recomputes the snapshot's prefix digest even when it skips prefix reduction. Tests must compare snapshot-plus-tail state with full replay for every lifecycle shape introduced by M3.
 
 This is an integrity and consistency boundary for Anastom-managed storage, not a defense against an administrator deliberately rewriting the database and disabling its constraints.
 
@@ -138,3 +138,43 @@ Remote ownership, consensus clocks, queues, and cross-host process control would
 ## Review triggers
 
 Revisit this decision if feasibility cannot establish safe local process identity, an adapter cannot expose a durable execution identity before side effects, exact workspace comparison is insufficient on supported Git repositories, or snapshot loading cannot fail back to full replay without changing observable state.
+
+## Feasibility refinement — process ownership
+
+The first [M3 feasibility probe](../M3_FEASIBILITY.md) on 2026-09-16 found that Pi, Codex, Claude Code, and command descendants can all survive coordinator `SIGKILL`; current product handles are not durable. It also disproved direct-leader PID as a complete boundary by retaining a descendant after its verified group leader exited. The former identity could no longer authorize group signalling safely.
+
+A shared parent-death supervisor prototype observed the coordinator identity, terminated a TERM-resistant worker group and descendant, confirmed absence, and exited. The probe passed on Ubuntu 24.04 and macOS 15 CI in PR #24. Its `ps` start time is low-resolution on macOS, so it is not production authority by itself. M3 will evaluate this shared supervisor with a two-phase persisted start handshake, supervisor-issued random execution capability, and same-host/boot binding before defining adapter-specific recovery operations. Pi requires an out-of-process attempt host for equivalent descendant ownership. Durable manifests, fenced start authorization, framed runtime IPC, production-protocol Linux/macOS coverage, and supervisor-failure cases remain gates; this refinement does not yet approve a public API.
+
+## Feasibility refinement — supervisor protocol
+
+The second [M3 feasibility probe](../M3_FEASIBILITY.md) implements the candidate as a temporary production-shaped protocol without exporting it from a package. An engine-shaped execution UUID and fence enter an atomic attempt plan before the supervisor starts. The supervisor authenticates the live coordinator and boot, creates a random 256-bit capability, opens a user-only Unix socket, and publishes an atomic sanitized manifest plus a separate private control record. The coordinator validates that handshake and records start authority before the authenticated `authorize` request may create an execution side effect.
+
+One bounded length-prefixed request and response cross each half-closed socket connection. Exact schemas reject unknown fields; public events are validated and capped. Connection lifetime is bounded, and shutdown destroys every accepted socket so an idle client cannot delay cleanup. The random capability itself remains out of the sanitized manifest and terminal evidence. A later process treats malformed or mismatched persisted control data as `unknown`. A matching terminal record with confirmed cleanup proves absence only after the supervisor is also absent.
+
+Across the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #25, model-free Pi, Codex, Claude Code, and command executions all relayed success, rejected wrong capability/fence/oversized input, confirmed explicit cancellation, and cleaned their observed processes after coordinator death. Deliberately killing the supervisor left its active command group alive; inspection returned `unknown` and replacement remained forbidden. Fixture-only out-of-band cleanup removed that group. A gated start case exposed the launch-publication ambiguity: the supervisor now persists `starting` before the first possible worker side effect, and loss in that state is always unknown even when this particular fixture had not yet launched. Only `awaiting-start` proves that launch was never authorized.
+
+This result supports one shared supervisor/runtime-host lifecycle instead of adapter-specific recovery methods. It does not approve the temporary TypeScript names as public API. Stronger production process identity, final state-directory placement and socket path limits, bounded record loading, SQLite fencing integration, and snapshot evidence remain gates.
+
+## Feasibility refinement — SQLite contention
+
+The third [M3 feasibility probe](../M3_FEASIBILITY.md) uses a checked-in temporary schema and paired worker processes to exercise lease, mutation, and control races against one WAL database. It does not alter the production migration. On the owner macOS host, `BEGIN IMMEDIATE` serialized initial acquisition, renewal, expired absent-owner takeover, release, and reacquisition through monotonically increasing generations one, two, and three.
+
+Every append validated the current unexpired token before looking up its mutation ID. Concurrent same-ID/same-digest appends returned the same sequence range with one physical batch; a changed digest and a wrong expected sequence left no partial rows. Generation one could not append after takeover, and generation two could not append after release and generation-three acquisition. Event sequences remained contiguous. Lease-free control submissions used a unique run/operation key and SQLite-assigned time: the same action replayed the original row, while competing actions produced one accepted row and one conflict.
+
+Process liveness remains outside the database. `alive` and `unknown` refuse takeover before mutation; an externally established `absent` result permits a transaction only if the exact observed owner, generation, expiry, and release state still match. The experiment also establishes that an expired exact owner may release its still-current row, while a takeover that serializes first fences that release. The same matrix passes on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #26. Final table names, migration layout, typed errors, package interfaces, workspace reconciliation, and snapshot loading remain gated.
+
+## Feasibility refinement — workspace checkpoints
+
+The fourth [M3 feasibility probe](../M3_FEASIBILITY.md) retains the existing temporary-index strategy and adds the identity needed to authorize a replacement attempt. Its rich worktree contains a post-base commit, tracked/staged/untracked text, binary content, a symlink, ignored content, and an ignored empty directory. Repeated capture preserves the real staging index. Moving an edit between staged and unstaged state leaves the checkpoint equal because complete content relative to the run base is unchanged.
+
+The candidate binds a version, workspace ID, base and current commits, binary diff digest, ordered changed names, a bounded ignored-tree fingerprint, and canonical repository/worktree ownership. Content and `HEAD` mutations produce classified differences. Changed branch, ownership manifest, symlink boundary, or Git registration rejects capture. An independently cloned repository with the same Git content does not inherit the original workspace identity. Invalid UTF-8 paths fail at the filesystem or checkpoint decoder; unsupported ignored entries, over-limit ignored trees, and unstable double captures also fail closed.
+
+The matrix passes on the owner Darwin arm64 host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #27 without a runtime, model request, or authentication read. This refinement makes staging state explicitly non-authoritative and ignored content explicitly part of retry identity. It does not approve the temporary types or numeric limits as public API. Production capture still needs streaming bounds, durable artifact integration, fenced persistence, and snapshot evidence before package contracts are frozen.
+
+## Feasibility refinement — snapshots
+
+The fifth [M3 feasibility probe](../M3_FEASIBILITY.md) folds reopened M1/M2/M2.5-shaped histories and a pause/resume/cancel lifecycle at valid sequences. Each snapshot-plus-tail result equals complete replay, including an empty tail. Unknown newer candidates can be skipped for an older compatible snapshot, and candidate inputs remain immutable during loading.
+
+The probe exposed one missing integrity field in the original decision: a state digest does not bind that state to the authoritative events it replaces. The refined candidate records the immutable workflow-definition digest and SHA-256 of the exact canonical event prefix alongside its schema/reducer version, sequence, canonical state, and state digest. A changed valid prefix therefore triggers full replay and produces the changed authoritative state. Invalid event shapes and gaps fail before snapshot selection; a semantic event contradiction behind a snapshot triggers prefix mismatch and remains rejected by fallback replay.
+
+Absent, malformed, unknown-version, oversized, digest-mismatched, schema-invalid, identity-mismatched, and tail-contradicting snapshots all fall back on the owner Darwin arm64 host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #28. No production table or package interface changes in this phase. A later contract proposal must settle rolling prefix integrity, bounded SQLite reads, stable write boundaries, fenced cache replacement, state-schema evolution, and exact error names before implementation.

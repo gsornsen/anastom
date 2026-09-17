@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Keep scenario implementation shapes and validation errors internal while retaining the documented scenario parser, loader and adapter API.
 - Resolve scenario `fromFile` references through the shared existing-child policy without changing Fake's stricter relative-input grammar.
 - Preserve M0 fake behavior while adding declared workspace-mode capabilities, defensive scenario/request/result ownership, immutable terminal outcomes, and shared adapter conformance coverage.
 - Support authorized deterministic workspace edits for worker task demonstrations.

@@ -7,6 +7,7 @@
   "exports": "./src/index.ts",
   "dependencies": {
     "@anastom/core": "workspace:*",
-    "@anastom/runtime-contract": "workspace:*"
+    "@anastom/runtime-contract": "workspace:*",
+    "ajv": "^8.17.1"
   }
 }

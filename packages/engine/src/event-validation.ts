@@ -1,47 +1,40 @@
 import Ajv from "ajv";
 import capabilities from "../../runtime-contract/schemas/capabilities.v1alpha1.json" with { type: "json" };
 import observation from "../../runtime-contract/schemas/observation.v1alpha1.json" with { type: "json" };
+import runtimeDescriptor from "../../runtime-contract/schemas/runtime-descriptor.v1alpha1.json" with { type: "json" };
+import { assertRuntimeDescriptor } from "@anastom/runtime-contract";
 import type { RunEvent } from "./events.js";
 
-const str = { type: "string" },
-  positive = { type: "integer", minimum: 1 };
-const failure = {
-  type: "object",
-  additionalProperties: false,
-  required: ["category", "message"],
-  properties: {
-    category: {
-      enum: [
-        "runtime-unavailable",
-        "model-provider",
-        "tool",
-        "schema-violation",
-        "verification",
-        "budget-exhausted",
-        "policy-violation",
-        "workspace-conflict",
-        "human-rejection",
-        "unknown-internal",
-      ],
-    },
-    message: str,
-  },
-};
+const str = { type: "string" };
+const positive = { type: "integer", minimum: 1, maximum: Number.MAX_SAFE_INTEGER };
+const nonnegative = { type: "integer", minimum: 0, maximum: Number.MAX_SAFE_INTEGER };
+const digest = { type: "string", pattern: "^sha256:[a-f0-9]{64}$" };
+const identifier = { type: "string", pattern: "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$" };
 const object = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({
   type: "object",
   additionalProperties: false,
   required,
   properties,
 });
-const producer = object({ runId: str, nodeId: str, attempt: positive });
-const artifact = object({
-  id: str,
-  type: str,
-  mediaType: str,
-  uri: str,
-  digest: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
-  producer,
+const failure = object({
+  category: {
+    enum: [
+      "runtime-unavailable",
+      "model-provider",
+      "tool",
+      "schema-violation",
+      "verification",
+      "budget-exhausted",
+      "policy-violation",
+      "workspace-conflict",
+      "human-rejection",
+      "unknown-internal",
+    ],
+  },
+  message: str,
 });
+const producer = object({ runId: str, nodeId: str, attempt: positive });
+const artifact = object({ id: str, type: str, mediaType: str, uri: str, digest, producer });
 const workspace = {
   oneOf: [
     object({ id: str, mode: { const: "memory" } }),
@@ -56,20 +49,116 @@ const workspace = {
     }),
   ],
 };
-const runtimeEvent = observation;
 const commandOutput = object({
   passed: { type: "boolean" },
   exitCode: { type: ["integer", "null"] },
   signal: { type: ["string", "null"] },
   durationMs: { type: "number", minimum: 0 },
-  stdoutBytes: { type: "integer", minimum: 0 },
-  stderrBytes: { type: "integer", minimum: 0 },
+  stdoutBytes: nonnegative,
+  stderrBytes: nonnegative,
   stdoutTruncated: { type: "boolean" },
   stderrTruncated: { type: "boolean" },
 });
-const node = { nodeId: str },
-  attempt = { ...node, attempt: positive },
-  reason = { reason: str };
+const workspaceDifferences = {
+  type: "array",
+  uniqueItems: true,
+  items: {
+    enum: [
+      "version",
+      "workspace-id",
+      "base-commit",
+      "head-commit",
+      "diff-digest",
+      "changed-files",
+      "ignored-content",
+      "repository",
+      "workspace-path",
+      "branch",
+      "ownership-manifest",
+      "worktree-registration",
+    ],
+  },
+};
+const workspaceCheckpoint = object(
+  {
+    version: { const: "anastom.dev/workspace-checkpoint/v1alpha1" },
+    workspaceId: identifier,
+    baseCommit: str,
+    headCommit: str,
+    diffDigest: digest,
+    changedFiles: { type: "array", uniqueItems: true, items: str },
+    ignoredDigest: digest,
+    ignoredEntryCount: nonnegative,
+    ignoredByteCount: nonnegative,
+    ownership: object({
+      repositoryRoot: str,
+      repositoryCommonDirectory: str,
+      workspacePath: str,
+      workspaceGitDirectory: str,
+      branch: str,
+      manifestDigest: digest,
+      registrationDigest: digest,
+    }),
+    diffArtifactId: identifier,
+  },
+  [
+    "version",
+    "workspaceId",
+    "baseCommit",
+    "headCommit",
+    "diffDigest",
+    "changedFiles",
+    "ignoredDigest",
+    "ignoredEntryCount",
+    "ignoredByteCount",
+    "ownership",
+  ],
+);
+const executionPlanProperties = {
+  version: { const: "anastom.dev/owned-execution/v1alpha1" },
+  runId: identifier,
+  executionId: identifier,
+  kind: { enum: ["runtime", "command"] },
+  generation: positive,
+  planDigest: digest,
+};
+const executionPlan = object(executionPlanProperties);
+const persistedExecution = object({ ...executionPlanProperties, manifestDigest: digest });
+const pauseReason = {
+  oneOf: [
+    object({ kind: { const: "operator" }, operationId: identifier }),
+    object({ kind: { const: "workspace-conflict" }, differences: workspaceDifferences }),
+    object({
+      kind: { const: "attempt-budget-exhausted" },
+      nodeId: identifier,
+      attempts: positive,
+    }),
+    object({ kind: { const: "runtime-unavailable" }, runtimeId: identifier }),
+    object({ kind: { const: "policy-violation" }, runtimeId: identifier }),
+  ],
+};
+const recoveryBlockReason = {
+  oneOf: [
+    object({
+      kind: { const: "execution-unknown" },
+      executionId: identifier,
+      detail: {
+        enum: [
+          "invalid-record",
+          "identity-mismatch",
+          "boot-mismatch",
+          "supervisor-unreachable",
+          "supervisor-lost",
+          "cleanup-unconfirmed",
+        ],
+      },
+    }),
+    object({ kind: { const: "cleanup-unknown" }, executionId: identifier }),
+  ],
+};
+const node = { nodeId: str };
+const attempt = { ...node, attempt: positive };
+const reason = { reason: str };
 const fields: Record<string, Record<string, unknown>> = {
   RuntimeNegotiated: {
     negotiation: object({
@@ -83,6 +172,7 @@ const fields: Record<string, Record<string, unknown>> = {
       capabilities,
     }),
   },
+  RuntimeConfigured: { descriptor: runtimeDescriptor },
   RunCreated: {
     workflowInstanceId: str,
     workflowId: str,
@@ -90,14 +180,39 @@ const fields: Record<string, Record<string, unknown>> = {
     nodeIds: { type: "array", minItems: 1, uniqueItems: true, items: str },
     inputs: { type: "object" },
   },
-  NodeReady: { ...node, reason: { enum: ["dependencies-satisfied", "retry", "resumed"] } },
+  NodeReady: {
+    ...node,
+    reason: { enum: ["dependencies-satisfied", "retry", "resumed", "recovered"] },
+  },
   AttemptScheduled: { ...attempt, runtimeId: str },
+  AttemptPrepared: { ...attempt, execution: executionPlan, workspaceCheckpoint },
+  AttemptStartAuthorized: { ...attempt, execution: persistedExecution },
   AttemptStarted: attempt,
-  RuntimeEventObserved: { ...attempt, event: runtimeEvent },
+  RuntimeEventObserved: { ...attempt, event: observation },
   AttemptSucceeded: { ...attempt, output: true },
   AttemptFailed: { ...attempt, failure },
   AttemptBlocked: { ...attempt, ...reason },
   AttemptCancelled: { ...attempt, ...reason },
+  AttemptOrphaned: {
+    ...attempt,
+    executionId: identifier,
+    lostGeneration: positive,
+    reason: { enum: ["coordinator-lost", "launch-interrupted"] },
+    workspaceObservation: workspaceCheckpoint,
+    workspaceDifferences,
+    terminalArtifactId: identifier,
+  },
+  ControlRequestObserved: {
+    operationId: identifier,
+    action: { enum: ["pause", "cancel"] },
+    recordedAtMs: positive,
+  },
+  ExecutionCleanupObserved: {
+    ...attempt,
+    executionId: identifier,
+    cause: { enum: ["pause", "cancel", "timeout", "recovery"] },
+    outcome: { enum: ["confirmed", "unknown"] },
+  },
   NodeSucceeded: node,
   NodeFailed: { ...node, failure },
   NodeBlocked: { ...node, ...reason },
@@ -105,6 +220,7 @@ const fields: Record<string, Record<string, unknown>> = {
   NodeCancelled: { ...node, ...reason },
   RunPaused: {},
   RunResumed: {},
+  RunRecoveryBlocked: { operationId: identifier, reason: recoveryBlockReason },
   RunBlocked: reason,
   RunCancelled: reason,
   RunCompleted: { outcome: { enum: ["succeeded", "failed"] } },
@@ -127,22 +243,141 @@ const fields: Record<string, Record<string, unknown>> = {
     status: { enum: ["succeeded", "failed", "blocked", "cancelled"] },
   },
 };
-const ajv = new Ajv({ allErrors: true, strict: false });
-const validators = new Map(
-  Object.entries(fields).map(([type, props]) => [
-    type,
-    ajv.compile(object({ type: { const: type }, runId: str, sequence: positive, ...props })),
-  ]),
+const eventSchema = (
+  type: string,
+  properties: Record<string, unknown>,
+  required = Object.keys(properties),
+) =>
+  object({ type: { const: type }, runId: str, sequence: positive, ...properties }, [
+    "type",
+    "runId",
+    "sequence",
+    ...required,
+  ]);
+const schemas = new Map<string, unknown>(
+  Object.entries(fields).map(([type, properties]) => [type, eventSchema(type, properties)]),
 );
-/**
- * Validate an untrusted persisted event's exact discriminated payload before replay.
- */
+schemas.set(
+  "AttemptOrphaned",
+  eventSchema(
+    "AttemptOrphaned",
+    fields.AttemptOrphaned!,
+    Object.keys(fields.AttemptOrphaned!).filter((field) => field !== "terminalArtifactId"),
+  ),
+);
+schemas.set("NodePaused", {
+  oneOf: [
+    eventSchema("NodePaused", node),
+    eventSchema("NodePaused", { ...node, reason: pauseReason }),
+  ],
+});
+schemas.set("RunPaused", {
+  oneOf: [eventSchema("RunPaused", {}), eventSchema("RunPaused", { reason: pauseReason })],
+});
+schemas.set("RunResumed", {
+  oneOf: [eventSchema("RunResumed", {}), eventSchema("RunResumed", { operationId: identifier })],
+});
+schemas.set("RunCancelled", {
+  oneOf: [
+    eventSchema("RunCancelled", reason),
+    eventSchema("RunCancelled", { operationId: identifier, ...reason }),
+  ],
+});
+
+const ajv = new Ajv({ allErrors: false, strict: false });
+const validators = new Map(
+  [...schemas].map(([type, schema]) => [type, ajv.compile(schema as object)]),
+);
+
+function validatorForEventType(type: string) {
+  switch (type) {
+    case "RuntimeNegotiated":
+      return validators.get("RuntimeNegotiated");
+    case "RuntimeConfigured":
+      return validators.get("RuntimeConfigured");
+    case "RunCreated":
+      return validators.get("RunCreated");
+    case "NodeReady":
+      return validators.get("NodeReady");
+    case "AttemptScheduled":
+      return validators.get("AttemptScheduled");
+    case "AttemptPrepared":
+      return validators.get("AttemptPrepared");
+    case "AttemptStartAuthorized":
+      return validators.get("AttemptStartAuthorized");
+    case "AttemptStarted":
+      return validators.get("AttemptStarted");
+    case "RuntimeEventObserved":
+      return validators.get("RuntimeEventObserved");
+    case "AttemptSucceeded":
+      return validators.get("AttemptSucceeded");
+    case "AttemptFailed":
+      return validators.get("AttemptFailed");
+    case "AttemptBlocked":
+      return validators.get("AttemptBlocked");
+    case "AttemptCancelled":
+      return validators.get("AttemptCancelled");
+    case "AttemptOrphaned":
+      return validators.get("AttemptOrphaned");
+    case "ControlRequestObserved":
+      return validators.get("ControlRequestObserved");
+    case "ExecutionCleanupObserved":
+      return validators.get("ExecutionCleanupObserved");
+    case "NodeSucceeded":
+      return validators.get("NodeSucceeded");
+    case "NodeFailed":
+      return validators.get("NodeFailed");
+    case "NodeBlocked":
+      return validators.get("NodeBlocked");
+    case "NodePaused":
+      return validators.get("NodePaused");
+    case "NodeCancelled":
+      return validators.get("NodeCancelled");
+    case "RunPaused":
+      return validators.get("RunPaused");
+    case "RunResumed":
+      return validators.get("RunResumed");
+    case "RunRecoveryBlocked":
+      return validators.get("RunRecoveryBlocked");
+    case "RunBlocked":
+      return validators.get("RunBlocked");
+    case "RunCancelled":
+      return validators.get("RunCancelled");
+    case "RunCompleted":
+      return validators.get("RunCompleted");
+    case "WorkspaceAssigned":
+      return validators.get("WorkspaceAssigned");
+    case "ArtifactProduced":
+      return validators.get("ArtifactProduced");
+    case "WorkspaceObserved":
+      return validators.get("WorkspaceObserved");
+    case "CommandCompleted":
+      return validators.get("CommandCompleted");
+    case "AttemptTimeoutRequested":
+      return validators.get("AttemptTimeoutRequested");
+    case "AttemptCancellationCompleted":
+      return validators.get("AttemptCancellationCompleted");
+    case "LateResultObserved":
+      return validators.get("LateResultObserved");
+    default:
+      return undefined;
+  }
+}
+
+/** Validate an untrusted persisted event's exact discriminated payload before replay. */
 export function assertRunEvent(value: unknown): asserts value is RunEvent {
   if (!value || typeof value !== "object" || !("type" in value) || typeof value.type !== "string") {
     throw new Error("Corrupt run event");
   }
-  const validate = validators.get(value.type);
+  const validate = validatorForEventType(value.type);
   if (!validate || !validate(value)) {
     throw new Error("Corrupt run event " + value.type + ": " + ajv.errorsText(validate?.errors));
+  }
+  if (value.type === "RuntimeConfigured") {
+    try {
+      assertRuntimeDescriptor((value as unknown as { descriptor: unknown }).descriptor);
+    } catch {
+      throw new Error("Corrupt run event RuntimeConfigured: invalid runtime descriptor");
+    }
   }
 }

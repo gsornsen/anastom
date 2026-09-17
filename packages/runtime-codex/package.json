@@ -8,6 +8,7 @@
   "dependencies": {
     "@anastom/core": "workspace:*",
     "@anastom/runtime-contract": "workspace:*",
-    "@openai/codex": "0.154.0"
+    "@openai/codex": "0.154.0",
+    "ajv": "^8.17.1"
   }
 }

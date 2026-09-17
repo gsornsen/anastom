@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Use the descriptor codec as the sole public parsing boundary instead of also exporting its implementation parser.
+- Add an exact versioned descriptor codec that freezes explicit or ambient provider/model selection without persisting Pi authentication, session state, prompts, or test factories.
 - Declare supported filesystem modes and accumulate available assistant-call usage once per attempt, retaining partial coverage and configured/reported identity provenance without persisting private SDK bodies.
 - Make concurrent cancellation and terminal results immutable under bounded event-queue pressure.
 - Add fresh ephemeral Pi sessions with explicit context, model selection, bounded events, and cancellation.

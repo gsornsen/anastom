@@ -1,0 +1,15 @@
+{
+  "name": "@anastom/execution-host",
+  "version": "0.0.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@anastom/core": "workspace:*",
+    "@anastom/engine": "workspace:*",
+    "@anastom/path-policy": "workspace:*",
+    "@anastom/runtime-contract": "workspace:*",
+    "tsx": "^4.20.5"
+  }
+}

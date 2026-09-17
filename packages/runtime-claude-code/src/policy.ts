@@ -15,7 +15,10 @@ function unavailable(): RuntimePreflightError {
   );
 }
 
-/** Reject every endpoint-managed artifact, including hooks and organization-wide CLAUDE.md. */
+/**
+ * Reject every endpoint-managed artifact, including hooks and organization-wide CLAUDE.md.
+ * @internal
+ */
 export async function rejectManagedDirectory(directory: string): Promise<void> {
   try {
     const metadata = await lstat(directory);
@@ -39,7 +42,10 @@ export async function rejectManagedDirectory(directory: string): Promise<void> {
   }
 }
 
-/** Inventory the macOS preference-file source by domain name without reading values. */
+/**
+ * Inventory the macOS preference-file source by domain name without reading values.
+ * @internal
+ */
 export async function rejectManagedPreferenceFiles(directory: string): Promise<void> {
   const pending = [{ path: directory, depth: 0 }];
   let entries = 0;
@@ -141,19 +147,28 @@ export async function inspectClaudeManagedPolicy(): Promise<void> {
   }
 }
 
-/** Recognize only the OS tool's affirmative no-profile result; unknown output fails closed. */
+/**
+ * Recognize only the OS tool's affirmative no-profile result; unknown output fails closed.
+ * @internal
+ */
 export function noMacProfiles(output: string): boolean {
   return output.trim() === "There are no configuration profiles installed on this system";
 }
 
-/** A generic OS inventory count is accepted; Claude-specific preference sources remain gated. */
+/**
+ * A generic OS inventory count is accepted; Claude-specific preference sources remain gated.
+ * @internal
+ */
 export function macProfilesStatusRecognized(output: string): boolean {
   return /^There are (?:no|[0-9]+) configuration profiles installed on this system$/.test(
     output.trim(),
   );
 }
 
-/** Recognize only absence of the Claude Code preference domain. */
+/**
+ * Recognize only absence of the Claude Code preference domain.
+ * @internal
+ */
 export function missingMacManagedDomain(
   code: string | number | undefined,
   stderr?: string,

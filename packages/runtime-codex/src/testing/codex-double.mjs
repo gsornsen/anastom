@@ -1,17 +1,33 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 
 const location = dirname(fileURLToPath(import.meta.url));
+function writeAtomicRecord(name, value) {
+  const temporary = join(location, `.${name}.${process.pid}.tmp`);
+  try {
+    writeFileSync(temporary, value, { flag: "wx", mode: 0o600 });
+    renameSync(temporary, join(location, name));
+  } finally {
+    rmSync(temporary, { force: true });
+  }
+}
+function writeDescendantPid(descendant) {
+  try {
+    writeAtomicRecord("child-pid", String(descendant.pid));
+  } catch (error) {
+    descendant.kill("SIGKILL");
+    throw error;
+  }
+}
 const { scenario, report } = JSON.parse(readFileSync(join(location, "fixture.json"), "utf8"));
 if (process.argv.includes("app-server")) {
-  writeFileSync(
-    join(location, `policy-${process.pid}.json`),
+  writeAtomicRecord(
+    `policy-${process.pid}.json`,
     JSON.stringify({ codexHome: process.env.CODEX_HOME }),
-    { mode: 0o600 },
   );
   if (scenario === "policy-unavailable") {
     process.exit(1);
@@ -65,15 +81,14 @@ const schemaFlag = process.argv.indexOf("--output-schema");
 if (schemaFlag < 0 || !process.argv[schemaFlag + 1]) {
   throw new Error("Synthetic native process did not receive an output schema");
 }
-writeFileSync(
-  join(location, `entry-${process.pid}.json`),
+writeAtomicRecord(
+  `entry-${process.pid}.json`,
   JSON.stringify({
     prompt: Buffer.concat(chunks).toString("utf8"),
     requiredOutputSchema: JSON.parse(readFileSync(process.argv[schemaFlag + 1], "utf8")),
     codexHome: process.env.CODEX_HOME,
     home: process.env.HOME,
   }),
-  { mode: 0o600 },
 );
 const line = (frame) => process.stdout.write(JSON.stringify(frame) + "\n");
 const usage = {
@@ -87,7 +102,7 @@ line({ type: "thread.started", thread_id: "fixture" });
 line({ type: "turn.started" });
 if (scenario === "descendant" || scenario === "term-resistant" || scenario === "cancellable") {
   const descendant = spawn("/bin/sleep", ["10"], { stdio: "ignore" });
-  writeFileSync(join(location, "child-pid"), String(descendant.pid));
+  writeDescendantPid(descendant);
   if (scenario === "term-resistant" || scenario === "cancellable") {
     process.on("SIGTERM", () => {});
     setTimeout(() => {}, 10_000);

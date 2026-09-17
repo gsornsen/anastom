@@ -4,7 +4,8 @@ import type {
   ExecutionHandle,
   ExecutionRequest,
   ExecutionResult,
-  RuntimeAdapter,
+  DurableRuntimeAdapter,
+  RuntimeDescriptorCodec,
   RuntimeCapabilities,
   RuntimeEvent,
 } from "@anastom/runtime-contract";
@@ -22,6 +23,7 @@ import {
   type CodexReasoningEffort,
   CODEX_VERSION,
 } from "./profile.js";
+import { parseCodexRuntimeDescriptor, type CodexRuntimeDescriptor } from "./descriptor.js";
 
 interface Pending {
   queue: RuntimeEvent[];
@@ -70,13 +72,29 @@ function classifyFailure(error: unknown): ExecutionResult {
 }
 
 /** One fresh owned POSIX Codex process group per agent attempt, with sanitized public observations. */
-export class CodexRuntimeAdapter implements RuntimeAdapter {
+export class CodexRuntimeAdapter implements DurableRuntimeAdapter {
   readonly id = "codex";
   private readonly executions = new Map<string, Pending>();
 
   /** Bind explicit OpenAI model selection; normal Codex authentication stays outside the adapter. */
   constructor(private readonly options: CodexAdapterOptions) {
     validateSelection(options.provider, options.model, options.reasoningEffort);
+  }
+
+  /** Return the exact public selection required to rebuild this adapter after restart. */
+  async descriptor(): Promise<CodexRuntimeDescriptor> {
+    const descriptor: CodexRuntimeDescriptor = {
+      version: "anastom.dev/runtime-descriptor/v1alpha1",
+      runtimeId: "codex",
+      configurationVersion: "anastom.dev/runtime-codex-config/v1alpha1",
+      configuration: {
+        provider: "openai",
+        model: this.options.model,
+        ...(this.options.reasoningEffort ? { reasoningEffort: this.options.reasoningEffort } : {}),
+        authSource: "file-store",
+      },
+    };
+    return parseCodexRuntimeDescriptor(descriptor);
   }
 
   /** Probe exact project installation and supported auth-store form without starting a model session. */
@@ -330,4 +348,18 @@ export class CodexRuntimeAdapter implements RuntimeAdapter {
   }
 }
 
-export { renderCodexPrompt, validateSelection, CODEX_VERSION } from "./profile.js";
+export type { CodexRuntimeDescriptor } from "./descriptor.js";
+
+/** Exact codec used to reconstruct Codex without persisting credentials or private settings. */
+export const codexRuntimeDescriptorCodec: RuntimeDescriptorCodec<CodexRuntimeDescriptor> = {
+  runtimeId: "codex",
+  parse: parseCodexRuntimeDescriptor,
+  create: async (descriptor) => {
+    const parsed = parseCodexRuntimeDescriptor(descriptor);
+    return new CodexRuntimeAdapter({
+      provider: parsed.configuration.provider,
+      model: parsed.configuration.model,
+      reasoningEffort: parsed.configuration.reasoningEffort,
+    });
+  },
+};

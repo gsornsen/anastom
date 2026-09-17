@@ -19,7 +19,15 @@ for (const name of requested ? [requested] : packages) {
     excludePrivate: true,
     excludeInternal: true,
     validation: { notDocumented: true, notExported: false },
-    requiredToBeDocumented: ["Class", "Interface", "Function", "TypeAlias", "Method", "Variable"],
+    requiredToBeDocumented: [
+      "Class",
+      "Interface",
+      "Function",
+      "TypeAlias",
+      "Method",
+      "Variable",
+      "Enum",
+    ],
   });
   const project = await app.convert();
   if (!project) {

@@ -19,7 +19,7 @@ import scenarioSchema from "../schemas/scenario.v1alpha1.json" with { type: "jso
 /**
  * A deterministic result script, optionally including logs and isolated workspace file changes.
  */
-export type FakeAttemptDefinition =
+type FakeAttemptDefinition =
   | {
       outcome?: "succeeded";
       output: JsonValue;
@@ -42,7 +42,7 @@ export interface FakeScenario {
 }
 
 /** Source file relative to the scenario directory, materialized before execution. */
-export interface FakeFileReference {
+interface FakeFileReference {
   fromFile: string;
 }
 
@@ -53,7 +53,7 @@ const validateScenario = new Ajv({ allErrors: true, strict: false }).compile<Fak
 /**
  * Actionable diagnostics for malformed scenarios or unsafe file references.
  */
-export class FakeScenarioValidationError extends Error {
+class FakeScenarioValidationError extends Error {
   /**
    * Collect actionable scenario parsing and file-reference diagnostics.
    */
@@ -71,6 +71,7 @@ function formatErrors(errors: ErrorObject[] | null | undefined): string[] {
 
 /**
  * Parse and validate a deterministic scenario; file references remain unresolved until loadFakeScenario.
+ * @public
  */
 export function parseFakeScenario(source: string): FakeScenario {
   let candidate: unknown;

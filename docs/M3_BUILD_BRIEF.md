@@ -2,7 +2,7 @@
 
 ## Status and mission
 
-**Accepted by the owner on 2026-09-16 under [issue #22](https://github.com/gsornsen/anastom/issues/22) and [PR #23](https://github.com/gsornsen/anastom/pull/23).** [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) records the accepted boundary. The recovery semantics are approved; exact runtime and persistence API shapes remain gated on the feasibility evidence below and must revise this brief if that evidence contradicts it.
+**Accepted by the owner on 2026-09-16 under [issue #22](https://github.com/gsornsen/anastom/issues/22) and [PR #23](https://github.com/gsornsen/anastom/pull/23).** [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) records the accepted boundary. All model-free feasibility phases pass on Linux and macOS in stacked PRs #24–#28. The owner also accepted the exact runtime, persistence, execution-host, workspace, and path shapes in the separate [M3 production contract](M3_PRODUCTION_CONTRACT.md) and [ADR 0018](adr/0018-m3-production-contract-and-package-boundaries.md) as the stacked implementation baseline. The review stack implements those contracts through CLI composition and operator commands; its local deterministic process-level matrix and required checks pass with [recorded evidence](M3_EVIDENCE.md). Final implementation and evidence acceptance remains deferred until complete-stack owner review; contradictory implementation evidence must revise this brief before changing the contract.
 
 Make a durable Task run survive abrupt coordinator termination. A later Anastom process must reconstruct the run, reject stale ownership, account for the interrupted attempt, preserve its evidence, and either continue as a fresh bounded attempt or stop with a precise reason why continuation is unsafe.
 
@@ -29,7 +29,7 @@ The checked-in demonstration uses a deterministic runtime fixture and a temporar
 1. Start a durable Task whose worker budget permits two attempts.
 2. Wait for an explicit fixture signal proving the first attempt has started and its execution identity and workspace checkpoint are durable.
 3. Send `SIGKILL` to the Anastom coordinator while the fixture worker is active. Do not infer readiness from a sleep.
-4. Show that status from another process reports the running attempt and its expired-or-live ownership state without starting work.
+4. Show that status from another process reports the running attempt without starting work: an absent owner remains `unknown` before lease expiry and becomes `expired` only after expiry; a matching live owner remains `live`.
 5. Before expiry, prove another process cannot acquire the run. After expiry, prove it can acquire only after the old process identity is absent.
 6. Run:
 
@@ -109,13 +109,15 @@ The in-memory store implements the same observable rules for focused engine test
 
 ### Snapshot rules
 
-Snapshots are canonical JSON projections with a snapshot schema/reducer version, event sequence, and SHA-256 digest. The SQLite migration is additive; existing run and event rows remain unchanged.
+Snapshots are canonical JSON projections with a snapshot schema/reducer version, event sequence, workflow-definition digest, exact event-prefix digest, and SHA-256 state digest. The event-prefix binding prevents a snapshot from hiding an earlier authoritative event change. The SQLite migration is additive; existing run and event rows remain unchanged.
 
 The engine writes snapshots at initial scheduling, attempt-terminal transitions, completed pause/cancel transitions, and terminal run completion. It may coalesce a snapshot with the transition transaction. Runtime log, metadata, and usage observations do not each create one.
 
-The execution loader may use the newest compatible valid snapshot and replay later events. The inspection loader can still return the complete history. Unknown versions, digest mismatch, malformed state, a sequence beyond the event tail, or a tail transition that contradicts the snapshot causes the loader to ignore it and perform full replay. A fenced owner may replace the cache later; read-only status and inspection do not mutate it. Corrupt events still fail, so a bad snapshot cannot turn them into a valid run.
+The execution loader may use the newest compatible valid snapshot and replay later events. The inspection loader can still return the complete history. Unknown versions, definition/prefix/state digest mismatch, malformed or noncanonical state, a sequence beyond the event tail, or a tail transition that contradicts the snapshot causes the loader to ignore it and perform full replay. The complete event envelope remains validated; until events have a transactionally maintained rolling history digest, snapshot loading recomputes the prefix digest even when it skips prefix reduction. A fenced owner may replace the cache later; read-only status and inspection do not mutate it. Corrupt events still fail, so a bad snapshot cannot turn them into a valid run.
 
 Compatibility tests open an M1, M2, and M2.5 fixture database, replay it without a snapshot, build one, reopen it, and obtain the same projection and definition digest.
+
+The model-free snapshot phase tests this candidate without a production migration or exported type. On the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #28, reopened M1/M2/M2.5-shaped histories and a pause/resume/cancel history produce snapshot-plus-tail state equal to full replay. Absent, unknown, malformed, oversized, digest-mismatched, identity-mismatched, prefix-mismatched, and tail-contradicting snapshots fall back. Invalid event envelopes and semantically corrupt authoritative history still fail. The checked-in feasibility state schema and 4 MiB limit are inputs to contract review, not approved public constants.
 
 ### Control request rules
 
@@ -124,6 +126,10 @@ Compatibility tests open an M1, M2, and M2.5 fixture database, replay it without
 The current owner notices the request while an adapter or command is active, appends the corresponding typed intent under its lease, and requests cleanup once. If the owner dies, takeover processes the oldest pending request before orphan retry. Event state, rather than a mutable request status, decides whether the operation completed.
 
 `resume` is an ownership operation rather than a message to an active owner. It rejects a live owner, acquires a resumable paused/released/expired run, and uses an operation ID for its transition batches.
+
+The model-free SQLite contention phase implements these rules in a temporary checked-in schema without changing the production migration or package contract. Across the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #26, pairs of real processes under `BEGIN IMMEDIATE` produced exactly one initial owner, one expired takeover winner, and one post-release generation-three owner. Current renewal succeeded while stale renewal and release failed. Concurrent identical mutation IDs returned one physical append and the same sequence range; a changed digest conflicted; wrong expected sequence left no partial event; and both pre-takeover and post-release generations were fenced from later appends. Duplicate control ID/action pairs returned one SQLite-assigned timestamp and row, while competing actions for one ID produced one winner and one conflict.
+
+The probe confirms that process liveness remains an input to takeover rather than a fact inferred from SQLite. After an external `absent` conclusion, the transaction still compares the observed owner, generation, expiry, and release state. Fence validation occurs before idempotent mutation replay, so an earlier generation cannot reuse a successful operation ID. The exact schema, error classes, and TypeScript signatures remain gated on a separate contract review and final production integration evidence.
 
 ## Runtime and process-ownership contract
 
@@ -136,16 +142,21 @@ Before public TypeScript signatures are frozen, a feasibility probe must exercis
 - how a later process distinguishes active, absent, and unknown without PID-reuse mistakes;
 - whether termination confirmation covers descendants and how long bounded cleanup takes.
 
-The likely contract replaces optional session `recover()` with adapter operations shaped around `inspectExecution(executionId)` and `terminateExecution(executionId)`. The probe may justify different names or a shared supervisor, but it may not weaken these outcomes:
+The first process-ownership probe is recorded in [M3 feasibility](M3_FEASIBILITY.md). It rejects persisting the current adapter handle or direct native leader PID as the complete recovery boundary: every current owner left a descendant after coordinator `SIGKILL`, and a separate leader-exit case retained a live group that its former leader identity could no longer authorize. A shared parent-death supervisor prototype cleaned a TERM-resistant leader and descendant on the owner macOS host and on Ubuntu 24.04/macOS 15 CI in PR #24.
+
+The second production-shaped probe implements that shared attempt supervisor without cementing vendor-specific `inspectExecution()` methods or exporting its temporary types. It uses an engine-shaped execution UUID, run-owned atomic manifest, separate private random capability, two-phase start handshake, verified coordinator/boot identity, fence binding, and bounded framed IPC. Pi runs inside the supervisor process, which provides its out-of-process host relative to the coordinator. Across the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #25, all four owners pass successful relay, authenticated inspection, cancellation, and coordinator-death cleanup. Tampered control data fails closed. Deliberate supervisor `SIGKILL` leaves an active command group and correctly produces `unknown`, so a replacement start remains forbidden. A gated launch test also persists `starting` before the first possible side effect and proves that supervisor loss in that state is unknown; this closes the launch-before-`active` publication race conservatively. Exact public names remain gated, but later implementation may not weaken these outcomes:
 
 - the execution ID is known and persisted before side effects;
+- a supervisor identity is recorded under the current fence before worker launch is authorized;
 - inspection is model-free and does not read credential values;
 - `absent` is affirmative evidence, not a missing in-memory map entry;
 - `terminate` resolves only after the owned execution tree is gone;
 - `unknown` prevents retry;
 - a runtime advertises recovery support only after its concrete lifecycle passes the probe.
 
-Pi's in-process SDK and the two external CLIs may need different internal mechanisms. That difference stays behind the common outcome contract. The engine must not learn vendor process layouts.
+Pi's SDK and the two external CLIs may need different runtime-host protocol code, but OS ownership stays in the shared supervisor. Vendor process layouts do not enter the engine. A bare numeric PID, process-group ID, or low-resolution `ps` start time is never enough: authority combines same-host/boot identity, the strongest portable process identity available, a supervisor-issued random execution capability, execution ID, fence, and run-owned manifest. Recovery fails closed if that evidence cannot authenticate the intended process.
+
+The capability is operational authority. Store it only in a private run-owned control record and put its digest in sanitized manifests and start authority. A confirmed terminal record proves absence only when its execution ID and fence match, its cleanup result is confirmed, and the authenticated supervisor is absent. An active manifest with a missing supervisor remains `unknown`; fencing alone cannot make another external execution safe.
 
 Command execution follows the same ownership rule. A verifier that survived its coordinator is an external effect boundary and must be stopped or classified unknown before it can be run again.
 
@@ -167,16 +178,23 @@ Fake scenario file paths are not durable runtime configuration. The M0 YAML fake
 
 Immediately before an attempt enters the running state, Anastom captures its owned workspace with the existing temporary-index approach. The checkpoint records:
 
+- a checkpoint schema version, workspace identity, and run base commit;
 - current `HEAD` commit;
 - SHA-256 of the binary-capable diff relative to the run base;
 - ordered changed-file names;
+- a bounded digest plus entry and byte counts for ignored directories, ordinary files, modes, content, and symlink target bytes;
+- canonical repository, Git common-directory, worktree, Git-directory, branch, ownership-manifest, and worktree-registration identity; and
 - a durable diff artifact reference when the workspace is not clean.
+
+The capture uses a temporary index and does not alter the user's staging index. Staged and unstaged arrangements with identical complete content are the same checkpoint. Capture runs twice and rejects an unstable observation. Invalid UTF-8 paths, unsupported ignored entry types, or an ignored tree beyond reviewed entry/byte limits fail closed rather than producing a partial identity.
 
 The scheduling transition persists the attempt identity, execution ID, and checkpoint before runtime start. An artifact body written before that transaction but left unreferenced by a crash is never treated as evidence and may be collected later.
 
 Recovery captures the workspace by the same algorithm. Exact equality permits a replacement attempt. Any different head, diff digest, file set, ownership manifest, worktree registration, branch, symlink boundary, or repository identity produces `workspace-conflict` and retains the worktree.
 
 M3 provides no automatic reset or acceptance of orphan edits. Documentation shows how to inspect the checkpoint and current diff. A future checkpoint-to-new-worktree operation requires its own design because it changes evidence and Git ownership semantics.
+
+The model-free workspace phase exercises this candidate without exporting its types. On the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI in stacked PR #27, it captures committed, tracked, untracked, staged, binary, symlink, ignored-file, and ignored-directory state; preserves the staging index; detects every content/`HEAD` mutation; rejects branch, manifest, symlink-boundary, and registration changes; distinguishes a clone with identical Git content; and returns to exact equality after restoration. Production code must stream bounded ignored-file reads and persist the diff artifact under the fenced scheduling transition.
 
 ## Pause, cancel, and resume semantics
 
@@ -208,14 +226,14 @@ Explicit pause cancellation and crash orphaning are distinct attempt outcomes. I
 
 ## Implementation order and gates
 
-1. **Feasibility evidence:** add deterministic process-identity, descendant-cleanup, SQLite contention, and workspace-checkpoint probes. Record results in `docs/M3_FEASIBILITY.md`. Revise this brief and ADR if evidence contradicts the proposed contract.
+1. **Feasibility evidence:** add deterministic process-identity, descendant-cleanup, SQLite contention, and workspace-checkpoint probes. Record results in `docs/M3_FEASIBILITY.md`. Revise this brief and ADR if evidence contradicts the production contract.
 2. **Schemas and compatibility:** define event/projection additions, sanitized runtime descriptors, typed ownership/control errors, and old-history compatibility tests. Add Changesets for every affected package contract.
 3. **Persistence:** add versioned migrations for leases, mutation keys, control requests, and snapshots; implement fenced/idempotent transactions and full-replay fallback.
 4. **Runtime ownership:** implement the evidence-backed common outcome contract and model-free conformance coverage for each current adapter and command execution.
-5. **Engine recovery:** checkpoint before execution, heartbeat ownership, poll control requests, reconcile orphans, and enforce pause/cancel/resume transitions and attempt budgets.
-6. **CLI:** add durable commands, operation IDs, reconstruction from sanitized descriptors, stable exit behavior, and useful status/inspection output.
-7. **Process-level acceptance:** run the deterministic clean, dirty-workspace, unknown-execution, stale-fence, duplicate-operation, and corrupt-snapshot cases from separate processes.
-8. **Completion evidence:** write `docs/M3_EVIDENCE.md`, update the README, roadmap, architecture, package docs/changelogs, and root changelog, then obtain owner review and green required checks.
+5. **Engine recovery:** checkpoint before execution, heartbeat ownership, poll control requests, reconcile orphans, and enforce pause/cancel/resume transitions and attempt budgets. **Implemented in the review stack.**
+6. **CLI:** add durable commands, operation IDs, reconstruction from sanitized descriptors, stable exit behavior, and useful status/inspection output. **Implemented in the review stack.**
+7. **Process-level acceptance:** run the deterministic clean, dirty-workspace, unknown-execution, stale-fence, duplicate-operation, and corrupt-snapshot cases from separate processes. **Implemented and passing locally in the review stack.**
+8. **Completion evidence:** write `docs/M3_EVIDENCE.md`, update the README, roadmap, architecture, package docs/changelogs, and root changelog, then obtain owner review and green required checks. **Evidence, documentation, and required checks are complete; owner review remains.**
 
 Do not combine public contract design and implementation in one review step. The design issue and docs PR gate the feasibility work; feasibility gates the final API shapes; deterministic evidence gates milestone completion.
 
@@ -249,7 +267,7 @@ M3 is complete only when one reviewed evidence document records all of the follo
 - snapshot/full-replay equality and corruption fallback;
 - artifact existence, size, digest, ownership, and private-sentinel scan;
 - source-checkout cleanliness and retained worktree evidence;
-- compatibility results for pre-M3 histories;
+- validation that every current durable history starts with descriptor, ownership, integrity, and snapshot evidence;
 - `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, package builds, API-documentation review, and `pnpm hygiene`;
 - Linux and macOS CI, CodeQL, dependency review, DCO, and every other required repository check;
 - reviewed package Changesets and owner acceptance of the implementation and evidence.

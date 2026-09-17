@@ -3,8 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, afterEach, describe, it, expect, vi } from "vitest";
 import { workerReportSchema, canonicalJson } from "@anastom/core";
-import { probeRuntime, assertRuntimeCapabilities, assertRuntimeEvent } from "../index.js";
+import { probeRuntime, assertRuntimeEvent } from "../index.js";
 import type { ExecutionRequest, RuntimeAdapter, RuntimeEvent } from "../index.js";
+import { assertRuntimeCapabilities } from "../validation.js";
 
 export const conformanceReport = {
   summary: "Implemented the requested endpoint while preserving the existing behavior.",
@@ -14,7 +15,7 @@ export const conformanceReport = {
 
 export type ConformanceCase =
   "success" | "invalid" | "missing" | "failure" | "pressure" | "cancellable";
-export interface ConformanceHarness {
+interface ConformanceHarness {
   adapter: RuntimeAdapter;
   requests?: ExecutionRequest[];
   /** Count actual process/session creation, including for a rejected capability probe. */
@@ -75,7 +76,7 @@ export async function drainEvents(
   return observed;
 }
 
-/** The same behavior suite runs against real session/process doubles and the legacy fake profile. */
+/** The same behavior suite runs against process-backed doubles and the in-memory fake profile. */
 export function runtimeConformance(name: string, driver: ConformanceDriver): void {
   describe(name + " shared agent conformance", () => {
     let root: string;
@@ -177,7 +178,8 @@ export function runtimeConformance(name: string, driver: ConformanceDriver): voi
         const observed = await drainEvents(harness.adapter, handle);
         const result = await harness.adapter.collect(handle);
         if (!driver.real && scenario === "invalid") {
-          expect(result.status).toBe("succeeded"); // M0 fake intentionally lets the engine validate scripts.
+          // The in-memory fake returns scripted output; the engine owns schema validation.
+          expect(result.status).toBe("succeeded");
         } else {
           expect(result.status).toBe("failed");
         }

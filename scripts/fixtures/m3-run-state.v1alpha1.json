@@ -1,0 +1,497 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "anastom.dev/m3-run-state/v1alpha1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "runId",
+    "workflowInstanceId",
+    "workflowId",
+    "workflowVersion",
+    "status",
+    "sequence",
+    "inputs",
+    "nodes"
+  ],
+  "properties": {
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflowInstanceId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflowId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflowVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": ["running", "blocked", "succeeded", "failed", "paused", "cancelled"]
+    },
+    "sequence": {
+      "$ref": "#/$defs/positive"
+    },
+    "inputs": {
+      "type": "object"
+    },
+    "nodes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "workspace": {
+      "$ref": "#/$defs/workspace"
+    },
+    "runtimeNegotiation": {
+      "$ref": "#/$defs/negotiation"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "workspaceObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["headCommit", "changedFiles", "diffArtifactId"],
+      "properties": {
+        "headCommit": {
+          "type": "string"
+        },
+        "changedFiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "diffArtifactId": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "positive": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "counter": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "message"],
+      "properties": {
+        "category": {
+          "enum": [
+            "runtime-unavailable",
+            "model-provider",
+            "tool",
+            "schema-violation",
+            "verification",
+            "budget-exhausted",
+            "policy-violation",
+            "workspace-conflict",
+            "human-rejection",
+            "unknown-internal"
+          ]
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "provider", "model"],
+      "properties": {
+        "type": {
+          "const": "metadata"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "source": {
+          "enum": ["configured", "reported"]
+        },
+        "runtimeVersion": {
+          "type": "string"
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "scope", "coverage"],
+      "properties": {
+        "type": {
+          "const": "usage"
+        },
+        "scope": {
+          "const": "attempt"
+        },
+        "coverage": {
+          "enum": ["complete", "partial"]
+        },
+        "inputTokens": {
+          "$ref": "#/$defs/counter"
+        },
+        "outputTokens": {
+          "$ref": "#/$defs/counter"
+        },
+        "cacheReadTokens": {
+          "$ref": "#/$defs/counter"
+        },
+        "cacheWriteTokens": {
+          "$ref": "#/$defs/counter"
+        },
+        "reasoningTokens": {
+          "$ref": "#/$defs/counter"
+        },
+        "totalTokens": {
+          "$ref": "#/$defs/counter"
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["number", "runtimeId", "status"],
+      "properties": {
+        "number": {
+          "$ref": "#/$defs/positive"
+        },
+        "runtimeId": {
+          "type": "string"
+        },
+        "status": {
+          "enum": ["scheduled", "running", "blocked", "succeeded", "failed", "cancelled"]
+        },
+        "failure": {
+          "$ref": "#/$defs/failure"
+        },
+        "identity": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identity"
+          }
+        },
+        "usage": {
+          "$ref": "#/$defs/usage"
+        },
+        "timeout": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cancellation": {
+              "enum": ["succeeded", "failed", "unavailable"]
+            },
+            "lateStatus": {
+              "enum": ["succeeded", "failed", "blocked", "cancelled"]
+            }
+          }
+        }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "passed",
+        "exitCode",
+        "signal",
+        "durationMs",
+        "stdoutBytes",
+        "stderrBytes",
+        "stdoutTruncated",
+        "stderrTruncated"
+      ],
+      "properties": {
+        "passed": {
+          "type": "boolean"
+        },
+        "exitCode": {
+          "type": ["integer", "null"]
+        },
+        "signal": {
+          "type": ["string", "null"]
+        },
+        "durationMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "stdoutBytes": {
+          "$ref": "#/$defs/counter"
+        },
+        "stderrBytes": {
+          "$ref": "#/$defs/counter"
+        },
+        "stdoutTruncated": {
+          "type": "boolean"
+        },
+        "stderrTruncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "attempts"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "ready",
+            "running",
+            "blocked",
+            "succeeded",
+            "failed",
+            "paused",
+            "cancelled"
+          ]
+        },
+        "attempts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/attempt"
+          }
+        },
+        "output": {},
+        "failure": {
+          "$ref": "#/$defs/failure"
+        },
+        "blockedReason": {
+          "type": "string"
+        },
+        "command": {
+          "$ref": "#/$defs/command"
+        }
+      }
+    },
+    "workspace": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "mode"],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "mode": {
+              "const": "memory"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "mode", "repoRoot", "path", "baseCommit"],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "mode": {
+              "const": "readonly"
+            },
+            "repoRoot": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "baseCommit": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "mode", "repoRoot", "path", "baseCommit", "branch"],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "mode": {
+              "const": "isolated"
+            },
+            "repoRoot": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "baseCommit": {
+              "type": "string"
+            },
+            "branch": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "streaming",
+        "cancellation",
+        "resumableSession",
+        "nativeSubagents",
+        "mcp",
+        "lsp",
+        "debugger",
+        "browser",
+        "structuredOutput",
+        "usageReporting",
+        "sandboxing"
+      ],
+      "properties": {
+        "streaming": {
+          "type": "boolean"
+        },
+        "cancellation": {
+          "type": "boolean"
+        },
+        "resumableSession": {
+          "type": "boolean"
+        },
+        "nativeSubagents": {
+          "type": "boolean"
+        },
+        "mcp": {
+          "type": "boolean"
+        },
+        "lsp": {
+          "type": "boolean"
+        },
+        "debugger": {
+          "type": "boolean"
+        },
+        "browser": {
+          "type": "boolean"
+        },
+        "structuredOutput": {
+          "enum": ["native", "prompted", "none"]
+        },
+        "usageReporting": {
+          "enum": ["tokens", "cost", "partial", "none"]
+        },
+        "sandboxing": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "workspaceModes": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 3,
+          "items": {
+            "enum": ["memory", "readonly", "isolated"]
+          }
+        }
+      }
+    },
+    "negotiation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "runtimeId", "requirements", "capabilities"],
+      "properties": {
+        "version": {
+          "const": "anastom.dev/runtime-negotiation/v1alpha1"
+        },
+        "runtimeId": {
+          "type": "string"
+        },
+        "requirements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["workspaceMode", "cancellation", "structuredOutput"],
+          "properties": {
+            "workspaceMode": {
+              "enum": ["readonly", "isolated"]
+            },
+            "cancellation": {
+              "const": true
+            },
+            "structuredOutput": {
+              "const": "validated"
+            }
+          }
+        },
+        "capabilities": {
+          "$ref": "#/$defs/capabilities"
+        }
+      }
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "nodeId", "attempt"],
+      "properties": {
+        "runId": {
+          "type": "string"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "attempt": {
+          "$ref": "#/$defs/positive"
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "mediaType", "uri", "digest", "producer"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "mediaType": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "producer": {
+          "$ref": "#/$defs/producer"
+        }
+      }
+    }
+  }
+}

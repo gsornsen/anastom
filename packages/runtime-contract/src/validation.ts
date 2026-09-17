@@ -1,16 +1,212 @@
 import Ajv from "ajv";
+import { canonicalJson } from "@anastom/core";
 import capabilitiesSchema from "../schemas/capabilities.v1alpha1.json" with { type: "json" };
 import observationSchema from "../schemas/observation.v1alpha1.json" with { type: "json" };
+import runtimeDescriptorSchema from "../schemas/runtime-descriptor.v1alpha1.json" with { type: "json" };
+import workspaceCheckpointSchema from "../schemas/workspace-checkpoint.v1alpha1.json" with { type: "json" };
 import type {
   RuntimeAdapter,
   RuntimeCapabilities,
+  RuntimeDescriptor,
   RuntimeEvent,
   RuntimeNegotiation,
+  ExecutionRequest,
+  ExecutionResult,
+  WorkspaceRef,
+  WorkspaceCheckpoint,
 } from "./index.js";
 
-const ajv = new Ajv({ allErrors: true, strict: false });
+// Public runtime records fail on the first schema error so adversarially deep input cannot
+// multiply validation work merely to produce diagnostics.
+const ajv = new Ajv({ allErrors: false, strict: false });
 const capabilitiesValidator = ajv.compile(capabilitiesSchema);
 const observationValidator = ajv.compile(observationSchema);
+const runtimeDescriptorValidator = ajv.compile(runtimeDescriptorSchema);
+const workspaceCheckpointValidator = ajv.compile(workspaceCheckpointSchema);
+const MAX_RUNTIME_DESCRIPTOR_BYTES = 16 * 1024;
+const MAX_EXECUTION_REQUEST_BYTES = 4 * 1024 * 1024;
+const MAX_EXECUTION_RESULT_BYTES = 1024 * 1024;
+const failureCategories = [
+  "runtime-unavailable",
+  "model-provider",
+  "tool",
+  "schema-violation",
+  "verification",
+  "budget-exhausted",
+  "policy-violation",
+  "workspace-conflict",
+  "human-rejection",
+  "unknown-internal",
+] as const;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function exactKeys(value: Record<string, unknown>, allowed: readonly string[]): boolean {
+  const observed = Object.keys(value).sort();
+  const expected = [...allowed].sort();
+  return (
+    observed.length === expected.length && observed.every((key, index) => key === expected[index])
+  );
+}
+
+function hasOnlyKeys(
+  value: Record<string, unknown>,
+  required: readonly string[],
+  optional: readonly string[],
+): boolean {
+  const keys = Object.keys(value);
+  const allowed = new Set([...required, ...optional]);
+  return (
+    required.every((key) => Object.hasOwn(value, key)) && keys.every((key) => allowed.has(key))
+  );
+}
+
+function validPositive(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) > 0;
+}
+
+function validString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && !value.includes("\0");
+}
+
+function validWorkspace(value: unknown): value is WorkspaceRef {
+  if (!isRecord(value) || !validString(value.id) || typeof value.mode !== "string") {
+    return false;
+  }
+  if (value.mode === "memory") {
+    return exactKeys(value, ["id", "mode"]);
+  }
+  const common = ["baseCommit", "id", "mode", "path", "repoRoot"];
+  if (
+    !["readonly", "isolated"].includes(value.mode) ||
+    !validString(value.repoRoot) ||
+    !validString(value.path) ||
+    !validString(value.baseCommit)
+  ) {
+    return false;
+  }
+  return value.mode === "readonly"
+    ? exactKeys(value, common)
+    : exactKeys(value, [...common, "branch"]) && validString(value.branch);
+}
+
+function validBudget(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    hasOnlyKeys(value, ["maxAttempts"], ["maxDurationMs"]) &&
+    validPositive(value.maxAttempts) &&
+    (value.maxDurationMs === undefined || validPositive(value.maxDurationMs))
+  );
+}
+
+function validCommand(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    exactKeys(value, ["argv", "cwd", "maxDurationMs", "maxOutputBytes"]) &&
+    Array.isArray(value.argv) &&
+    value.argv.length > 0 &&
+    value.argv.every(validString) &&
+    typeof value.cwd === "string" &&
+    !value.cwd.includes("\0") &&
+    validPositive(value.maxDurationMs) &&
+    validPositive(value.maxOutputBytes)
+  );
+}
+
+function validArtifact(value: unknown): boolean {
+  if (
+    !isRecord(value) ||
+    !exactKeys(value, ["digest", "id", "mediaType", "producer", "type", "uri"]) ||
+    ![value.id, value.type, value.mediaType, value.uri].every(validString) ||
+    typeof value.digest !== "string" ||
+    !/^sha256:[a-f0-9]{64}$/.test(value.digest) ||
+    !isRecord(value.producer) ||
+    !exactKeys(value.producer, ["attempt", "nodeId", "runId"])
+  ) {
+    return false;
+  }
+  return (
+    validString(value.producer.runId) &&
+    validString(value.producer.nodeId) &&
+    validPositive(value.producer.attempt)
+  );
+}
+
+const contextOptionalKeys = [
+  "allowedMutations",
+  "artifacts",
+  "attempt",
+  "budget",
+  "nodeId",
+  "requiredOutputSchema",
+  "role",
+  "runId",
+  "task",
+  "verification",
+  "version",
+  "workflowInstanceId",
+  "workspace",
+] as const;
+
+function validContextScalars(value: Record<string, unknown>): boolean {
+  return !(
+    (value.version !== undefined && value.version !== "anastom.dev/context/v1alpha1") ||
+    (value.runId !== undefined && !validString(value.runId)) ||
+    (value.workflowInstanceId !== undefined && !validString(value.workflowInstanceId)) ||
+    (value.nodeId !== undefined && !validString(value.nodeId)) ||
+    (value.attempt !== undefined && !validPositive(value.attempt)) ||
+    (value.allowedMutations !== undefined &&
+      value.allowedMutations !== "readonly" &&
+      value.allowedMutations !== "isolated")
+  );
+}
+
+function validContextStructures(value: Record<string, unknown>): boolean {
+  return !(
+    (value.workspace !== undefined && !validWorkspace(value.workspace)) ||
+    (value.budget !== undefined && !validBudget(value.budget)) ||
+    (value.verification !== undefined && !validCommand(value.verification)) ||
+    (value.artifacts !== undefined &&
+      (!Array.isArray(value.artifacts) || !value.artifacts.every(validArtifact))) ||
+    (value.role !== undefined &&
+      (!isRecord(value.role) || !exactKeys(value.role, ["id"]) || !validString(value.role.id)))
+  );
+}
+
+function validContextTask(value: Record<string, unknown>): boolean {
+  return !(
+    value.task !== undefined &&
+    (!isRecord(value.task) ||
+      !exactKeys(value.task, ["acceptanceCriteria", "id", "objective", "version"]) ||
+      !validString(value.task.id) ||
+      !validString(value.task.version) ||
+      !validString(value.task.objective) ||
+      !Array.isArray(value.task.acceptanceCriteria) ||
+      !value.task.acceptanceCriteria.every(validString))
+  );
+}
+
+function validContext(value: unknown): boolean {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ["dependencyOutputs", "inputs"], contextOptionalKeys) ||
+    !isRecord(value.inputs) ||
+    !isRecord(value.dependencyOutputs) ||
+    !validContextScalars(value) ||
+    !validContextStructures(value) ||
+    !validContextTask(value)
+  ) {
+    return false;
+  }
+  try {
+    canonicalJson(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** A sanitized pre-state failure to probe or satisfy the explicitly selected runtime. */
 export class RuntimePreflightError extends Error {
@@ -24,7 +220,10 @@ export class RuntimePreflightError extends Error {
   }
 }
 
-/** Validate a complete capability snapshot; unknown extra fields fail closed. */
+/**
+ * Validate a complete capability snapshot; unknown extra fields fail closed.
+ * @internal
+ */
 export function assertRuntimeCapabilities(value: unknown): asserts value is RuntimeCapabilities {
   if (!capabilitiesValidator(value)) {
     throw new RuntimePreflightError(
@@ -38,6 +237,103 @@ export function assertRuntimeCapabilities(value: unknown): asserts value is Runt
 export function assertRuntimeEvent(value: unknown): asserts value is RuntimeEvent {
   if (!observationValidator(value)) {
     throw new Error("Invalid public runtime observation");
+  }
+}
+
+/** Validate an exact persisted execution request before passing it to a reconstructed adapter. */
+export function assertExecutionRequest(value: unknown): asserts value is ExecutionRequest {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(
+      value,
+      [
+        "attempt",
+        "budget",
+        "context",
+        "nodeId",
+        "nodeKind",
+        "requiredOutputSchema",
+        "runId",
+        "toolPolicy",
+        "workflowInstanceId",
+        "workspace",
+      ],
+      ["role"],
+    ) ||
+    ![value.runId, value.workflowInstanceId, value.nodeId].every(validString) ||
+    !["agent", "command", "gate", "verifier"].includes(value.nodeKind as string) ||
+    !validPositive(value.attempt) ||
+    !validWorkspace(value.workspace) ||
+    !validContext(value.context) ||
+    !validBudget(value.budget) ||
+    !isRecord(value.requiredOutputSchema) ||
+    !isRecord(value.toolPolicy) ||
+    !exactKeys(value.toolPolicy, ["allowMutations"]) ||
+    typeof value.toolPolicy.allowMutations !== "boolean" ||
+    (value.role !== undefined &&
+      (!isRecord(value.role) || !exactKeys(value.role, ["id"]) || !validString(value.role.id)))
+  ) {
+    throw new Error("Invalid persisted execution request");
+  }
+  let bytes: number;
+  try {
+    canonicalJson(value.requiredOutputSchema);
+    bytes = Buffer.byteLength(canonicalJson(value));
+  } catch {
+    throw new Error("Invalid persisted execution request");
+  }
+  if (bytes > MAX_EXECUTION_REQUEST_BYTES) {
+    throw new Error("Invalid persisted execution request");
+  }
+}
+
+/** Validate a normalized terminal result and its 1 MiB canonical public-output bound. */
+export function assertExecutionResult(value: unknown): asserts value is ExecutionResult {
+  if (!isRecord(value)) {
+    throw new Error("Invalid execution result");
+  }
+  const valid =
+    (value.status === "succeeded" && exactKeys(value, ["output", "status"])) ||
+    (value.status === "failed" &&
+      exactKeys(value, ["failure", "status"]) &&
+      isRecord(value.failure) &&
+      exactKeys(value.failure, ["category", "message"]) &&
+      failureCategories.includes(value.failure.category as (typeof failureCategories)[number]) &&
+      typeof value.failure.message === "string") ||
+    ((value.status === "blocked" || value.status === "cancelled") &&
+      exactKeys(value, ["reason", "status"]) &&
+      typeof value.reason === "string");
+  let bytes: number;
+  try {
+    bytes = Buffer.byteLength(canonicalJson(value));
+  } catch {
+    throw new Error("Invalid execution result");
+  }
+  if (!valid || bytes > MAX_EXECUTION_RESULT_BYTES) {
+    throw new Error("Invalid execution result");
+  }
+}
+
+/** Validate the shared descriptor envelope and its canonical UTF-8 persistence bound. */
+export function assertRuntimeDescriptor(value: unknown): asserts value is RuntimeDescriptor {
+  if (!runtimeDescriptorValidator(value)) {
+    throw new RuntimePreflightError("policy-violation", "Runtime returned an invalid descriptor");
+  }
+  let bytes: number;
+  try {
+    bytes = Buffer.byteLength(canonicalJson(value));
+  } catch {
+    throw new RuntimePreflightError("policy-violation", "Runtime returned an invalid descriptor");
+  }
+  if (bytes > MAX_RUNTIME_DESCRIPTOR_BYTES) {
+    throw new RuntimePreflightError("policy-violation", "Runtime descriptor exceeds 16 KiB");
+  }
+}
+
+/** Validate exact durable workspace evidence and its feasibility-tested bounds. */
+export function assertWorkspaceCheckpoint(value: unknown): asserts value is WorkspaceCheckpoint {
+  if (!workspaceCheckpointValidator(value)) {
+    throw new Error("Invalid workspace checkpoint");
   }
 }
 

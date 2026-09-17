@@ -1,7 +1,7 @@
 /**
  * A scalar representable in JSON; non-finite numbers are rejected during canonicalization.
  */
-export type JsonPrimitive = boolean | null | number | string;
+type JsonPrimitive = boolean | null | number | string;
 /**
  * A JSON value accepted at workflow boundaries; arbitrary JavaScript objects are excluded.
  */
@@ -11,33 +11,21 @@ export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue
  */
 export type JsonSchema = Record<string, unknown>;
 
-/** Supported authored node execution categories. */
-export const NODE_KINDS = ["agent", "command", "gate", "verifier"] as const;
 /**
  * A workflow node's execution category, independent of its chosen runtime or model.
  */
-export type NodeKind = (typeof NODE_KINDS)[number];
+export type NodeKind = "agent" | "command" | "gate" | "verifier";
 
-/** Supported durable node lifecycle states. */
-export const NODE_STATUSES = [
-  "pending",
-  "ready",
-  "running",
-  "blocked",
-  "succeeded",
-  "failed",
-  "paused",
-  "cancelled",
-] as const;
 /**
  * The durable lifecycle state of one workflow node.
  */
-export type NodeStatus = (typeof NODE_STATUSES)[number];
+export type NodeStatus =
+  "pending" | "ready" | "running" | "blocked" | "succeeded" | "failed" | "paused" | "cancelled";
 
 /**
  * An authored schema filename resolved relative to the workflow file.
  */
-export interface SchemaReferenceDocument {
+interface SchemaReferenceDocument {
   schema: string;
 }
 
@@ -52,7 +40,7 @@ export interface AttemptPolicyDocument {
 /**
  * An authored dependency-graph node before schemas and budgets are resolved.
  */
-export interface WorkflowNodeDocument {
+interface WorkflowNodeDocument {
   kind: NodeKind;
   needs?: string[];
   role?: string;
@@ -110,7 +98,7 @@ export interface AttemptBudget {
 /**
  * The original schema reference and its loaded JSON Schema snapshot.
  */
-export interface ResolvedSchemaReference {
+interface ResolvedSchemaReference {
   ref: string;
   schema: JsonSchema;
 }
@@ -118,7 +106,7 @@ export interface ResolvedSchemaReference {
 /**
  * A named, resolved input schema retained in the immutable workflow definition.
  */
-export interface WorkflowInputDefinition extends ResolvedSchemaReference {
+interface WorkflowInputDefinition extends ResolvedSchemaReference {
   id: string;
 }
 

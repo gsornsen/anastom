@@ -129,7 +129,7 @@ export function parseWorkflowYaml(source: string): WorkflowDocument {
  * Convert a supported ms/s/m/h duration to milliseconds within the platform timer range.
  * @throws WorkflowValidationError for invalid or overflowing durations.
  */
-export function durationToMilliseconds(duration: string | undefined): number | undefined {
+function durationToMilliseconds(duration: string | undefined): number | undefined {
   if (duration === undefined) {
     return undefined;
   }
@@ -281,7 +281,10 @@ async function readWorkflowSource(absolutePath: string): Promise<string> {
   return source;
 }
 
-/** Load a trusted operator-selected workflow and its local schemas. */
+/**
+ * Load a trusted operator-selected workflow and its local schemas.
+ * @public
+ */
 export async function loadWorkflow(filePath: string): Promise<WorkflowDefinition> {
   const absolutePath = resolve(filePath);
   const source = await readWorkflowSource(absolutePath);

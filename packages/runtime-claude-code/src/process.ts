@@ -6,11 +6,11 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-async function groupHasLiveMembers(pid: number, deadline: number): Promise<boolean> {
+async function groupHasLiveMembers(pid: number): Promise<boolean> {
   // A successful group-wide kill(0) may identify only zombies. Inspect live status.
   const executable = process.platform === "darwin" ? "/bin/ps" : "/usr/bin/ps";
   const { stdout } = await execFileAsync(executable, ["-axo", "pgid=,stat="], {
-    timeout: Math.max(1, Math.min(100, deadline - performance.now())),
+    timeout: 500,
     maxBuffer: 1_048_576,
   });
   for (const line of stdout.split("\n")) {
@@ -22,22 +22,17 @@ async function groupHasLiveMembers(pid: number, deadline: number): Promise<boole
   return false;
 }
 
-async function groupExists(pid: number, deadline: number): Promise<boolean> {
+async function groupExists(pid: number): Promise<boolean> {
   try {
     process.kill(-pid, 0);
-    return await groupHasLiveMembers(pid, deadline);
+    return await groupHasLiveMembers(pid);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ESRCH") {
       return false;
     }
     if ((error as NodeJS.ErrnoException).code === "EPERM") {
       try {
-        if (performance.now() >= deadline) {
-          throw new Error("Owned process group inspection exceeded its deadline", {
-            cause: error,
-          });
-        }
-        return await groupHasLiveMembers(pid, deadline);
+        return await groupHasLiveMembers(pid);
       } catch (inspectionError) {
         throw new Error("Owned process group termination cannot be inspected", {
           cause: inspectionError,
@@ -48,12 +43,12 @@ async function groupExists(pid: number, deadline: number): Promise<boolean> {
   }
 }
 
-async function signalGroup(pid: number, signal: NodeJS.Signals, deadline: number): Promise<void> {
+async function signalGroup(pid: number, signal: NodeJS.Signals): Promise<void> {
   try {
     process.kill(-pid, signal);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
-    if (code === "ESRCH" || (code === "EPERM" && !(await groupHasLiveMembers(pid, deadline)))) {
+    if (code === "ESRCH" || (code === "EPERM" && !(await groupHasLiveMembers(pid)))) {
       return;
     }
     throw new Error("Owned process group could not be signalled", { cause: error });
@@ -74,19 +69,19 @@ export async function terminateOwnedGroup(
   }
   const started = performance.now();
   const deadline = started + 1000;
-  if (await groupExists(pid, deadline)) {
-    await signalGroup(pid, "SIGTERM", deadline);
+  if (await groupExists(pid)) {
+    await signalGroup(pid, "SIGTERM");
   }
-  while ((await groupExists(pid, deadline)) && performance.now() - started < 100) {
+  while ((await groupExists(pid)) && performance.now() - started < 100) {
     await delay(5);
   }
-  if (await groupExists(pid, deadline)) {
-    await signalGroup(pid, "SIGKILL", deadline);
+  if (await groupExists(pid)) {
+    await signalGroup(pid, "SIGKILL");
   }
-  while ((await groupExists(pid, deadline)) && performance.now() < deadline) {
+  while ((await groupExists(pid)) && performance.now() < deadline) {
     await delay(5);
   }
-  if (await groupExists(pid, deadline)) {
+  if (await groupExists(pid)) {
     throw new Error("Owned process group termination was not confirmed within 1000 ms");
   }
   if (waitForLeaderExit) {

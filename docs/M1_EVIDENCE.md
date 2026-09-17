@@ -132,7 +132,7 @@ The owner requested repository-wide readability, documentation, versioning, migr
 
 The revised fake run is `9e91b2c5-7590-40c3-9074-f4ff95fb45a0`. Its definition digest is `sha256:fdbc84d509e6b1a70e9c021e778c108b86873d62b696d8a265bbd8b214e6cca2`; base/final head is `0075967cb611ee1f80b7bb67e815a5fbc453710c`. Only `server.mjs` changed. All nine revised artifacts were read with digest verification. Verifier stdout was 204 bytes, stderr zero, neither truncated; duration approximately 156 ms. Its diff digest remains `sha256:2b9feb882a36967385fd84f56da838c8d9fda497cc1f52cbe76a61f5470e31bd`.
 
-Current reproducible fixture names are `examples/demo-repos/health-endpoint/`, `examples/fake/health-endpoint.yaml`, and `scripts/create-endpoint-fixture.ts`. The fake server implementation lives in a separate JavaScript source file. Recorded commands above retain the original baseline names deliberately.
+The accepted evidence used `examples/demo-repos/health-endpoint/`, `examples/fake/health-endpoint.yaml`, and `scripts/create-endpoint-fixture.ts`. The fake server implementation lives in a separate JavaScript source file. Recorded commands above retain the original baseline names deliberately; the current CLI no longer exposes fake Markdown Task execution.
 
 The original fake report's short summary does not satisfy the newer contract; it remains valid under its original embedded schema and is not rewritten. New definitions require thirty non-whitespace summary characters. This rejects blank and padded reports, while independent command verification still decides acceptance. The original live report already satisfies the stronger requirement. Both original normalized-definition digests remain unchanged after migration.
 
