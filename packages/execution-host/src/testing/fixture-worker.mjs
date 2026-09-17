@@ -4,7 +4,11 @@ import { join } from "node:path";
 import { fileURLToPath, URL } from "node:url";
 
 const [scenario, owner] = process.argv.slice(2);
-if (!scenario || !owner || !["success", "hold", "pressure"].includes(scenario)) {
+if (
+  !scenario ||
+  !owner ||
+  !["success", "hold", "pressure", "unresponsive-cancel"].includes(scenario)
+) {
   throw new Error("Fixture worker requires an owner and supported scenario");
 }
 

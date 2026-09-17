@@ -4,7 +4,7 @@
 
 The defined-SDLC implementation and its required deterministic and live acceptance evidence completed on 2026-09-17. One strict Feature and the checked-in `sdlc/default` methodology passed unchanged through owner-authenticated Pi and Codex runs. Both runs used the production CLI, durable coordinator, SQLite store, shared execution host, runtime adapter, artifact store, run-scoped Git topology, controller-owned integration, independent reviews, operator verifier, evidence projection, and later-process inspection.
 
-The controlled fixture is checked in at [`examples/demo-repos/parallel-normalizers`](../examples/demo-repos/parallel-normalizers). It requires exactly two independent source changes and protects its Feature, acceptance program, and repository instructions. `pnpm fixture:defined-sdlc` creates a fresh initialized copy. `pnpm audit:defined-sdlc-live -- <repository> <run-id> <runtime> <provider> <model> [reasoning-effort]` replays and audits a completed live run without contacting a provider.
+The controlled fixture is checked in at [`examples/demo-repos/parallel-normalizers`](../examples/demo-repos/parallel-normalizers). It requires exactly two independent source changes and protects its Feature, acceptance program, and repository instructions. `pnpm fixture:defined-sdlc` creates a fresh initialized copy. `pnpm audit:defined-sdlc-live <repository> <run-id> <runtime> <provider> <model> [reasoning-effort]` replays and audits a completed live run without contacting a provider.
 
 ## Deterministic process matrix
 

@@ -13,6 +13,7 @@ import {
   RUN_SNAPSHOT_MAX_BYTES,
   RunStoreError,
   applyRunEvent,
+  assertControlSubmittable,
   assertControlLimit,
   assertLocalProcessIdentity,
   assertRunEvent,
@@ -454,6 +455,16 @@ export class SqliteDurableRunStore implements DurableRunStore {
         }
         return { ...control, replayed: true };
       }
+      let run: AuthoritativeRun | null;
+      try {
+        run = this.readAuthoritativeRun(input.runId);
+      } catch (error) {
+        throw asStoreError(error, "corrupt-store", "Authoritative run history is corrupt");
+      }
+      if (!run) {
+        throw new RunStoreError("not-found", `Run ${input.runId} was not found`);
+      }
+      assertControlSubmittable(run.state, input.action);
       const recordedAtMs = this.now();
       this.db
         .prepare(

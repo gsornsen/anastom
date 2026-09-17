@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve, extname } from "node:path";
 import { loadTaskWithinRoot, loadWorkflowWithinRoot } from "@anastom/core";
@@ -34,7 +35,11 @@ import {
 } from "./durable.js";
 import { CliUsageError } from "./errors.js";
 import { prepareFeatureCommand } from "./feature-command.js";
-import { LiveRunRenderer } from "./live.js";
+import { LiveRunRenderer, terminalSafeText } from "./live.js";
+import { renderTerminalSnapshot } from "./terminal-frame.js";
+import { ProcessTerminalHost, type TerminalHost } from "./terminal-host.js";
+import { runTerminalSession } from "./terminal-session.js";
+import { projectTerminalRunView } from "./terminal-view.js";
 
 /**
  * Injectable CLI output streams, allowing hosts and tests to capture diagnostics.
@@ -49,11 +54,13 @@ interface CliIo {
 }
 
 /**
- * Optional CLI IO and process-local workflow persistence; Markdown tasks use durable storage.
+ * Optional CLI IO, terminal host, and process-local persistence; Markdown runs use durable storage.
  */
 export interface CliOptions {
   io?: CliIo;
   persistence?: RunPersistence;
+  /** Optional interactive terminal capability; omitted hosts retain plain output behavior. */
+  terminal?: TerminalHost;
 }
 
 const processLocalPersistence = new InMemoryRunPersistence();
@@ -69,6 +76,7 @@ function usage(): string {
     "  anastom run <feature.md> --method sdlc/default --runtime pi|codex|claude-code [--repo <path>] [--provider <id> --model <id>] [--auth-source subscription|api-key] [--reasoning-effort <level>]",
     "  anastom status <run> [--state-dir <path>]",
     "  anastom inspect <run> [--state-dir <path>] [--json]",
+    "  anastom attach <run> [--state-dir <path>] [--snapshot]",
     "  anastom pause <run> [--state-dir <path>] [--operation-id <uuid>]",
     "  anastom cancel <run> [--state-dir <path>] [--operation-id <uuid>]",
     "  anastom resume <run> [--state-dir <path>] [--operation-id <uuid>]",
@@ -82,7 +90,7 @@ function flags(args: readonly string[], allowed: readonly string[]): Record<stri
     if (!allowed.includes(flag) || flag in result) {
       throw new CliUsageError("Unknown or duplicate option: " + flag);
     }
-    if (flag === "--json") {
+    if (flag === "--json" || flag === "--snapshot") {
       result[flag] = true;
       continue;
     }
@@ -245,6 +253,7 @@ async function runTask(target: string, args: readonly string[], io: CliIo): Prom
       throw new Error("Durable task execution requires a filesystem workspace");
     }
     await services.coordinator.createRun(workflow, { runId, workspace, descriptor });
+    announceDurableRun(io, runId, stateDir);
     const state = await services.coordinator.resume(runId);
     return state.status === "succeeded" ? 0 : 1;
   } finally {
@@ -298,11 +307,19 @@ async function runFeature(target: string, args: readonly string[], io: CliIo): P
       workspace: topology.integration,
       descriptor,
     });
+    announceDurableRun(io, runId, stateDir);
     const state = await services.coordinator.resume(runId);
     return state.status === "succeeded" ? 0 : 1;
   } finally {
     services.store.close();
   }
+}
+
+function announceDurableRun(io: CliIo, runId: string, stateDir: string): void {
+  if (!io.isTty) {
+    return;
+  }
+  io.stdout(`Run ID: ${terminalSafeText(runId)}\nState directory: ${terminalSafeText(stateDir)}`);
 }
 
 async function durableInspect(
@@ -483,8 +500,12 @@ export async function runCli(args: readonly string[], options: CliOptions = {}):
     isTty: process.stdout.isTTY === true,
   };
   const persistence = options.persistence ?? processLocalPersistence;
+  const processTerminal = new ProcessTerminalHost();
+  const terminal =
+    options.terminal ??
+    (options.io === undefined && processTerminal.interactive() ? processTerminal : undefined);
   try {
-    return await executeCliCommand(args, io, persistence);
+    return await executeCliCommand(args, io, persistence, terminal);
   } catch (error) {
     return reportCliError(error, io);
   }
@@ -494,6 +515,7 @@ async function executeCliCommand(
   args: readonly string[],
   io: CliIo,
   persistence: RunPersistence,
+  terminal: TerminalHost | undefined,
 ): Promise<number> {
   const [command, target, ...rest] = args;
   if (target === undefined) {
@@ -523,6 +545,9 @@ async function executeCliCommand(
   if (command === "status" || command === "inspect") {
     return durableInspect(command, target, rest, io);
   }
+  if (command === "attach") {
+    return attachDurableRun(target, rest, io, terminal);
+  }
   if (command === "pause" || command === "cancel") {
     return controlDurableRun(command, target, rest, io);
   }
@@ -531,6 +556,124 @@ async function executeCliCommand(
   }
   io.stderr(usage());
   return 2;
+}
+
+async function attachDurableRun(
+  target: string,
+  args: readonly string[],
+  io: CliIo,
+  terminal: TerminalHost | undefined,
+): Promise<number> {
+  try {
+    assertRunId(target);
+  } catch (error) {
+    throw new CliUsageError("Invalid run ID", { cause: error });
+  }
+  const opts = flags(args, ["--state-dir", "--snapshot"]);
+  const supplied = stringFlag(opts, "--state-dir");
+  const stateDir = supplied
+    ? resolve(supplied)
+    : resolve((await resolveGitRepository(process.cwd())).repoRoot, ".anastom");
+  requireDurableDatabase(stateDir);
+  const store = await openDurableRunStore(stateDir);
+  try {
+    const initial = await inspectDurableRun(store, target, true);
+    if (!initial) {
+      throw new CliUsageError(`Run ${target} was not found`);
+    }
+    if (opts["--snapshot"]) {
+      io.stdout(renderTerminalSnapshot(projectTerminalRunView(initial)));
+      return 0;
+    }
+    if (!terminal) {
+      return followDurableRun(store, target, io, initial);
+    }
+    await runTerminalSession({
+      host: terminal,
+      operations: {
+        load: () => inspectDurableRun(store, target, true),
+        async submit(action, operationId) {
+          const receipt = await store.submitControl({
+            runId: target,
+            action,
+            operationId,
+          });
+          try {
+            await launchResumeProcess(target, stateDir, operationId);
+            return receipt;
+          } catch (error) {
+            return {
+              ...receipt,
+              coordinatorLaunchError: error instanceof Error ? error.message : String(error),
+            };
+          }
+        },
+        launchResume: (operationId) => launchResumeProcess(target, stateDir, operationId),
+      },
+      createOperationId: randomUUID,
+    });
+    return 0;
+  } finally {
+    store.close();
+  }
+}
+
+async function followDurableRun(
+  store: Awaited<ReturnType<typeof openDurableRunStore>>,
+  runId: string,
+  io: CliIo,
+  initial: NonNullable<Awaited<ReturnType<typeof inspectDurableRun>>>,
+): Promise<number> {
+  const renderer = new LiveRunRenderer(false);
+  let inspection = initial;
+  while (true) {
+    for (const line of renderer.render(inspection.liveEvents ?? [])) {
+      io.stdout(line);
+    }
+    if (inspection.state.status !== "running") {
+      return 0;
+    }
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 500));
+    const next = await inspectDurableRun(store, runId, true);
+    if (!next) {
+      throw new Error("Attached run disappeared from durable storage");
+    }
+    inspection = next;
+  }
+}
+
+async function launchResumeProcess(
+  runId: string,
+  stateDir: string,
+  operationId: string,
+): Promise<void> {
+  const entry = process.argv[1];
+  if (!entry) {
+    throw new Error("Cannot locate the current Anastom CLI entry point");
+  }
+  const child = spawn(
+    process.execPath,
+    [
+      ...process.execArgv,
+      entry,
+      "resume",
+      runId,
+      "--state-dir",
+      stateDir,
+      "--operation-id",
+      operationId,
+    ],
+    {
+      cwd: process.cwd(),
+      detached: true,
+      stdio: "ignore",
+    },
+  );
+  await new Promise<void>((resolveLaunch, rejectLaunch) => {
+    child.once("spawn", resolveLaunch);
+    child.once("error", rejectLaunch);
+  });
+  child.unref();
 }
 
 async function inspectProcessLocalOrDurable(

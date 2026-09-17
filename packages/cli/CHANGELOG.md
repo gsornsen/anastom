@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add `attach` with a resize-aware full-screen graph/activity view, durable pause/cancel, separately launched resume coordination, detach/reconnect, `NO_COLOR`, plain snapshots, and JSON Lines following. Neutralize terminal control and bidirectional formatting characters in human-rendered public output.
 - Merge explicit authored Feature protected paths with CLI-selected Feature and methodology inputs before creating the run topology.
 - Add `anastom run <feature.md> --method sdlc/default --runtime ...` composition through the production durable coordinator. The Feature and any repository-local methodology resources are protected inputs, while external methodology content is retained in the immutable snapshot; successful work remains on its run-owned integration branch.
 - Stream only post-commit public Task observations through a cursor-aware renderer: concise colored terminal lines for TTYs and one schema-valid JSON value per line for pipes. Include the derived evidence ledger in complete JSON inspection.

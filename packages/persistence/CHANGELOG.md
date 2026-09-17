@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Reject newly submitted pause/cancel controls atomically when they cannot change the folded run state, while preserving idempotent replay of prior receipts.
 - Route later artifact reads through the bounded private-path capability, including fixed-segment validation, parent checks, file identity checks, and a 16 MiB ceiling.
 - Accept expanded node identities in confined artifact filenames while preserving exact path and digest verification on reads.
 - Add the SQLite durable store and initial schema with transaction-time leases, exact absent-owner takeover, fenced idempotent mutations, deduplicated controls, rolling event integrity, and snapshot fallback.

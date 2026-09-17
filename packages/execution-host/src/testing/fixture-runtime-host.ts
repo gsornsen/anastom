@@ -17,7 +17,7 @@ import {
 import { runExecutionRuntimeHost } from "../runtime-host.js";
 
 type FixtureOwner = "pi" | "codex" | "claude-code";
-type FixtureScenario = "success" | "hold" | "pressure";
+type FixtureScenario = "success" | "hold" | "pressure" | "unresponsive-cancel";
 
 interface FixtureExecution {
   child: ChildProcess;
@@ -148,6 +148,9 @@ class FixtureRuntimeAdapter implements RuntimeAdapter {
 
   async cancel(handle: ExecutionHandle): Promise<void> {
     const execution = this.lookup(handle);
+    if (this.scenario === "unresponsive-cancel") {
+      await new Promise<void>(() => {});
+    }
     execution.cancelled = true;
     const deadline = Date.now() + 1_000;
     while (
@@ -182,7 +185,9 @@ function parseFixtureDescriptor(descriptor: RuntimeDescriptor): {
     !["pi", "codex", "claude-code"].includes(owner) ||
     descriptor.configurationVersion !== "fixture-v1" ||
     Object.keys(configuration).sort().join(",") !== "scenario" ||
-    !["success", "hold", "pressure"].includes(configuration.scenario as string)
+    !["success", "hold", "pressure", "unresponsive-cancel"].includes(
+      configuration.scenario as string,
+    )
   ) {
     throw new TypeError("Invalid fixture runtime descriptor");
   }

@@ -26,6 +26,7 @@ import {
   EXECUTION_PROTOCOL_VERSION,
   EXECUTION_SOCKET_FRAME_MAX_BYTES,
   EXECUTION_TERMINAL_MAX_BYTES,
+  EXECUTION_TERMINATION_TIMEOUT_MS,
   assertExecutionControlRecord,
   assertExecutionManifestRecord,
   assertExecutionPlanRecord,
@@ -353,6 +354,10 @@ export class LocalExecutionHost implements ExecutionHost {
       ...(cursor === undefined ? {} : { cursor }),
     };
     const socket = createConnection(control.endpoint);
+    const timeoutMs =
+      operation === "terminate"
+        ? EXECUTION_TERMINATION_TIMEOUT_MS
+        : EXECUTION_CONNECTION_TIMEOUT_MS;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const value = await Promise.race([
@@ -368,7 +373,7 @@ export class LocalExecutionHost implements ExecutionHost {
         new Promise<never>((_resolve, reject) => {
           timer = setTimeout(
             () => reject(new Error("Execution supervisor request timed out")),
-            EXECUTION_CONNECTION_TIMEOUT_MS,
+            timeoutMs,
           );
         }),
       ]);

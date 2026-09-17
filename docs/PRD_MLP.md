@@ -29,7 +29,8 @@ Anastom:
 7. verifies acceptance criteria;
 8. pauses safely if intervention is needed;
 9. resumes after process restart;
-10. renders a concise trace explaining what happened.
+10. renders a concise trace explaining what happened; and
+11. lets the developer detach from and reconnect to a live terminal view without owning the run.
 
 The developer can then rerun the same methodology with:
 
@@ -223,17 +224,20 @@ MLP shall support:
 
 A circuit breaker must produce a durable failure report.
 
-### FR10 — Intervention
+### FR10 — Observation and intervention
 
 At minimum:
 
 ```bash
 anastom status <run>
 anastom inspect <run>
+anastom attach <run>
 anastom pause <run>
 anastom resume <run>
 anastom cancel <run>
 ```
+
+The interactive terminal shall project authoritative durable state and bounded public events. Detach shall not cancel the run or release its owner, and reconnect shall reconstruct the same view from durable history. Noninteractive clients shall receive structured output suitable for pipes and logs.
 
 Optional MLP stretch:
 

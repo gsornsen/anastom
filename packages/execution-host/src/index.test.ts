@@ -233,6 +233,34 @@ describe("local execution host", () => {
     30_000,
   );
 
+  it("confirms process-group cleanup when runtime cancellation does not settle", async () => {
+    const paths = await fixturePaths();
+    const executionHost = host(paths);
+    const input = fixturePrepare(
+      paths.workspace,
+      "pi",
+      "unresponsive-cancel",
+      await localProcessIdentity(),
+    );
+    const persisted = await executionHost.prepare(input);
+    const owned = await executionHost.authorize(persisted);
+    const observed = await waitForJson<FixtureProcesses>(
+      join(paths.workspace, "processes.json"),
+      "unresponsive runtime readiness",
+    );
+
+    const outcome = await owned.cancel();
+    expect(outcome).toMatchObject({
+      state: "absent",
+      terminal: { outcome: "cancelled", cleanup: "confirmed" },
+    });
+    await waitForCondition(
+      "forced runtime descendant cleanup",
+      () => processesAbsent(observed),
+      10_000,
+    );
+  }, 30_000);
+
   it.each(owners)(
     "cancels and confirms descendant cleanup for %s",
     async (owner) => {

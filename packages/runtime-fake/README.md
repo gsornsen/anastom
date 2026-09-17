@@ -27,6 +27,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker task execution and durable recovery are delivered. Parallel production graphs, approvals, and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
+The fake adapter remains the scriptable process-local Workflow runtime used for deterministic behavior tests and the original YAML demo. Production Task and Feature concurrency, recovery, and integration run through the durable coordinator with production-shaped acceptance doubles rather than this adapter. Approval gates and additional runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
 
 License: [AGPL-3.0-only](../../LICENSE).

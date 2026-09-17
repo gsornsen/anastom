@@ -22,6 +22,8 @@ import {
   EXECUTION_READY_FRAME_MAX_BYTES,
   EXECUTION_SOCKET_FRAME_MAX_BYTES,
   EXECUTION_TERMINAL_MAX_BYTES,
+  EXECUTION_TERMINATION_GRACE_MS,
+  EXECUTION_TERMINATION_TIMEOUT_MS,
   FrameDecoder,
   assertExecutionPlanRecord,
   assertExecutionStartAuthority,
@@ -132,6 +134,7 @@ let stopping = false;
 let ordinal = 0;
 let droppedLogs = 0;
 let terminationRequested = false;
+let terminationCleanup: Promise<boolean> | undefined;
 const events: RetainedEvent[] = [];
 const sockets = new Set<Socket>();
 const queuedSockets: Socket[] = [];
@@ -241,6 +244,13 @@ function failureResult(): ExecutionResult {
   };
 }
 
+function cancelledResult(): ExecutionResult {
+  return {
+    status: "cancelled",
+    reason: "Execution cancelled by execution supervisor",
+  };
+}
+
 function emptyCommandFailure(message: string): CommandExecution {
   return {
     output: {
@@ -257,6 +267,28 @@ function emptyCommandFailure(message: string): CommandExecution {
     stderr: Buffer.alloc(0),
     failure: { category: "runtime-unavailable", message },
   };
+}
+
+async function executionGroupIsEmpty(): Promise<boolean> {
+  if (terminationCleanup && (await terminationCleanup)) {
+    return true;
+  }
+  return executionLeader
+    ? (await liveProcessGroup(executionLeader.processGroupId)).length === 0
+    : false;
+}
+
+function settlementFallback(expectedTermination: boolean): ExecutionTerminalRecord["result"] {
+  if (planRecord.plan.kind === "runtime") {
+    return {
+      kind: "runtime",
+      value: expectedTermination ? cancelledResult() : failureResult(),
+    };
+  }
+  const message = expectedTermination
+    ? "Command was terminated by the execution supervisor"
+    : "Command host cleanup is unknown";
+  return { kind: "command", value: commandExecutionToRecord(emptyCommandFailure(message)) };
 }
 
 function boundedTerminal(value: ExecutionTerminalRecord): ExecutionTerminalRecord {
@@ -469,17 +501,13 @@ async function settleExecution(
   if (!streamValid || exitCode !== 0) {
     result = undefined;
   }
-  const groupEmpty = executionLeader
-    ? (await liveProcessGroup(executionLeader.processGroupId)).length === 0
-    : false;
-  const cleanup = streamValid && result && exitCode === 0 && groupEmpty ? "confirmed" : "unknown";
-  const fallback =
-    planRecord.plan.kind === "runtime"
-      ? ({ kind: "runtime", value: failureResult() } as const)
-      : ({
-          kind: "command",
-          value: commandExecutionToRecord(emptyCommandFailure("Command host cleanup is unknown")),
-        } as const);
+  const groupEmpty = await executionGroupIsEmpty();
+  const expectedTermination = terminationRequested && groupEmpty;
+  const cleanup =
+    expectedTermination || (streamValid && result && exitCode === 0 && groupEmpty)
+      ? "confirmed"
+      : "unknown";
+  const fallback = settlementFallback(expectedTermination);
   return publishTerminal(result ?? fallback, cleanup);
 }
 
@@ -513,7 +541,11 @@ async function terminateExecution(): Promise<ExecutionTerminalRecord> {
           } as const);
     return publishTerminal(fallback, "unknown");
   }
-  await terminatePrivateProcessGroup(executionLeader, 5_000);
+  terminationCleanup ??= terminatePrivateProcessGroup(
+    executionLeader,
+    EXECUTION_TERMINATION_GRACE_MS,
+  );
+  await terminationCleanup;
   if (executionSettlement) {
     return executionSettlement;
   }
@@ -599,6 +631,11 @@ async function handle(socket: Socket): Promise<void> {
     const value = await readEndedFrame(socket, EXECUTION_SOCKET_FRAME_MAX_BYTES);
     assertSupervisorRequest(value);
     request = value;
+    socket.setTimeout(
+      request.operation === "terminate"
+        ? EXECUTION_TERMINATION_TIMEOUT_MS
+        : EXECUTION_CONNECTION_TIMEOUT_MS,
+    );
   } catch {
     respond(socket, {
       ok: false,
