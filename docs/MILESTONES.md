@@ -118,7 +118,7 @@ The source adapter invokes an end user's separately installed, unmodified Claude
 
 ## M3 — Durable execution: "Kill it and it comes back"
 
-Status: building in a reviewed stack. The owner accepted the design on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23), approved the completed feasibility evidence, and authorized the exact [M3 production contract](M3_PRODUCTION_CONTRACT.md) and [ADR 0018](adr/0018-m3-production-contract-and-package-boundaries.md) as the implementation baseline. The five stacked [feasibility phases](M3_FEASIBILITY.md) pass on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI. The production stack through CLI composition and `pause`, `cancel`, and `resume` is implemented in the unmerged review stack. Final process-level crash/recovery acceptance remains.
+Status: building in a reviewed stack. The owner accepted the design on 2026-09-16 in [PR #23](https://github.com/gsornsen/anastom/pull/23), approved the completed feasibility evidence, and authorized the exact [M3 production contract](M3_PRODUCTION_CONTRACT.md) and [ADR 0018](adr/0018-m3-production-contract-and-package-boundaries.md) as the implementation baseline. The five stacked [feasibility phases](M3_FEASIBILITY.md) pass on the owner macOS host, Ubuntu 24.04 CI, and clean macOS 15 CI. The unmerged production stack includes CLI `pause`, `cancel`, and `resume`, and its local deterministic [process-level evidence](M3_EVIDENCE.md) passes. Whole-stack owner acceptance and final-code Linux, macOS, and repository-required checks remain.
 
 ### Demo
 

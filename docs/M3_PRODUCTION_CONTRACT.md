@@ -2,7 +2,7 @@
 
 ## Status and review boundary
 
-This is the accepted production contract requested after the five M3 feasibility phases. The owner authorized a stacked implementation against it, with final acceptance and merge deferred until review of the complete stack. The production stack through CLI composition is implemented in the review stack; final process-level acceptance evidence remains. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Implementation must preserve these names, ownership boundaries, state transitions, and compatibility rules unless new evidence first amends this contract and the build brief.
+This is the accepted production contract requested after the five M3 feasibility phases. The owner authorized a stacked implementation against it, with final acceptance and merge deferred until review of the complete stack. The production stack through CLI composition and deterministic local process-level acceptance is implemented in the review stack; [M3 evidence](M3_EVIDENCE.md) records the results. [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) and the [M3 build brief](M3_BUILD_BRIEF.md) remain the accepted safety boundary. Implementation must preserve these names, ownership boundaries, state transitions, and compatibility rules unless new evidence first amends this contract and the build brief.
 
 The proposal covers local Linux and macOS Task runs. It does not add provider-session adoption, remote workers, parallel scheduling, force takeover, automatic worktree repair, or exactly-once external effects.
 
@@ -724,7 +724,7 @@ Each slice is a separately reviewable stacked PR. Later slices remain based on t
 4. `@anastom/execution-host`, hidden fixture host, and model-free conformance for all four execution owners.
 5. Engine start, heartbeat, control, orphan, workspace, and recovery state machines. **Implemented in the review stack.**
 6. CLI commands, runtime registry, inspection output, and old-history refusal behavior. **Implemented in the review stack.**
-7. Process-level M3 acceptance and `docs/M3_EVIDENCE.md`.
+7. Process-level M3 acceptance and `docs/M3_EVIDENCE.md`. **Implemented and passing locally in the review stack.**
 
 Every code/contract slice carries reviewed package Changesets and updates affected package READMEs/changelogs. No slice uses a real model. A contradiction found during implementation stops the affected slice and updates this proposal, ADR 0018, and the build brief before the API changes.
 

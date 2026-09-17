@@ -2,7 +2,7 @@
 
 ## Status and mission
 
-**Accepted by the owner on 2026-09-16 under [issue #22](https://github.com/gsornsen/anastom/issues/22) and [PR #23](https://github.com/gsornsen/anastom/pull/23).** [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) records the accepted boundary. All model-free feasibility phases pass on Linux and macOS in stacked PRs #24–#28. The owner also accepted the exact runtime, persistence, execution-host, workspace, and path shapes in the separate [M3 production contract](M3_PRODUCTION_CONTRACT.md) and [ADR 0018](adr/0018-m3-production-contract-and-package-boundaries.md) as the stacked implementation baseline. The review stack now implements those contracts through CLI composition and operator commands; final process-level acceptance and evidence remain. Final implementation and evidence acceptance remains deferred until complete-stack review; contradictory implementation evidence must revise this brief before changing the contract.
+**Accepted by the owner on 2026-09-16 under [issue #22](https://github.com/gsornsen/anastom/issues/22) and [PR #23](https://github.com/gsornsen/anastom/pull/23).** [ADR 0017](adr/0017-durable-execution-ownership-and-recovery.md) records the accepted boundary. All model-free feasibility phases pass on Linux and macOS in stacked PRs #24–#28. The owner also accepted the exact runtime, persistence, execution-host, workspace, and path shapes in the separate [M3 production contract](M3_PRODUCTION_CONTRACT.md) and [ADR 0018](adr/0018-m3-production-contract-and-package-boundaries.md) as the stacked implementation baseline. The review stack implements those contracts through CLI composition and operator commands, and its local deterministic process-level matrix passes with [recorded evidence](M3_EVIDENCE.md). Final implementation and evidence acceptance remains deferred until complete-stack owner review and final-code remote checks; contradictory implementation evidence must revise this brief before changing the contract.
 
 Make a durable Task run survive abrupt coordinator termination. A later Anastom process must reconstruct the run, reject stale ownership, account for the interrupted attempt, preserve its evidence, and either continue as a fresh bounded attempt or stop with a precise reason why continuation is unsafe.
 
@@ -29,7 +29,7 @@ The checked-in demonstration uses a deterministic runtime fixture and a temporar
 1. Start a durable Task whose worker budget permits two attempts.
 2. Wait for an explicit fixture signal proving the first attempt has started and its execution identity and workspace checkpoint are durable.
 3. Send `SIGKILL` to the Anastom coordinator while the fixture worker is active. Do not infer readiness from a sleep.
-4. Show that status from another process reports the running attempt and its expired-or-live ownership state without starting work.
+4. Show that status from another process reports the running attempt without starting work: an absent owner remains `unknown` before lease expiry and becomes `expired` only after expiry; a matching live owner remains `live`.
 5. Before expiry, prove another process cannot acquire the run. After expiry, prove it can acquire only after the old process identity is absent.
 6. Run:
 
@@ -232,8 +232,8 @@ Explicit pause cancellation and crash orphaning are distinct attempt outcomes. I
 4. **Runtime ownership:** implement the evidence-backed common outcome contract and model-free conformance coverage for each current adapter and command execution.
 5. **Engine recovery:** checkpoint before execution, heartbeat ownership, poll control requests, reconcile orphans, and enforce pause/cancel/resume transitions and attempt budgets. **Implemented in the review stack.**
 6. **CLI:** add durable commands, operation IDs, reconstruction from sanitized descriptors, stable exit behavior, and useful status/inspection output. **Implemented in the review stack.**
-7. **Process-level acceptance:** run the deterministic clean, dirty-workspace, unknown-execution, stale-fence, duplicate-operation, and corrupt-snapshot cases from separate processes.
-8. **Completion evidence:** write `docs/M3_EVIDENCE.md`, update the README, roadmap, architecture, package docs/changelogs, and root changelog, then obtain owner review and green required checks.
+7. **Process-level acceptance:** run the deterministic clean, dirty-workspace, unknown-execution, stale-fence, duplicate-operation, and corrupt-snapshot cases from separate processes. **Implemented and passing locally in the review stack.**
+8. **Completion evidence:** write `docs/M3_EVIDENCE.md`, update the README, roadmap, architecture, package docs/changelogs, and root changelog, then obtain owner review and green required checks. **Evidence and documentation are implemented locally; owner review and remote checks remain.**
 
 Do not combine public contract design and implementation in one review step. The design issue and docs PR gate the feasibility work; feasibility gates the final API shapes; deterministic evidence gates milestone completion.
 
