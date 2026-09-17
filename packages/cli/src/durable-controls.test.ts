@@ -132,6 +132,12 @@ describe("durable CLI controls and inspection", () => {
     expect(view.pendingControls).toEqual([]);
     expect(view.snapshot.source).toBe("snapshot-tail");
     expect(view.events?.length).toBeGreaterThan(0);
+    expect(view.evidence).toMatchObject({
+      version: "anastom.dev/evidence-ledger/v1alpha1",
+      runId,
+      decision: "cancelled",
+    });
+    expect(view.liveEvents?.at(-1)).toMatchObject({ type: "run", status: "cancelled" });
   });
 
   it("reports a live owner without acquiring or releasing its lease", async () => {

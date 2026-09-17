@@ -174,7 +174,7 @@ type ArtifactRef = {
 };
 ```
 
-The digest covers the stored bytes. Artifact metadata belongs in the durable run history; artifact bodies belong in the run artifact directory. M1 does not add an evidence graph, confidence score, named workflow state slots, or multi-output node transitions.
+The digest covers the stored bytes. Artifact metadata belongs in the durable run history; artifact bodies belong in the run artifact directory. The current evidence ledger is a deterministic projection over those records, not a separate mutable graph. Confidence scores, named workflow state slots, and multi-output node transitions remain outside the accepted IR.
 
 ## Deferred directions
 
@@ -184,8 +184,8 @@ The following concepts remain design intent rather than accepted syntax:
 - `fanout` and `fanin`;
 - loops and expressions;
 - nested `workflow` calls and explicit parent/child mappings;
-- shared integration workspaces;
-- human approval gates and resume;
+- cross-run shared integration workspaces;
+- human approval gates;
 - named authoritative outputs and workflow state slots;
 - role-to-model routing and runtime capability requirements;
 - evidence graphs and hypothesis entities.

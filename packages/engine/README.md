@@ -10,6 +10,8 @@ Recoverable Task execution uses the engine-owned `DurableRunStore` and `Executio
 
 The same coordinator folds a validated `WorkflowExpanded` event into its executable graph and supervises up to the persisted parallel limit. Each active attempt retains separate ownership and cleanup evidence while one owned session serializes event commits. Generated implementation work uses assigned task workspaces and accepted patch artifacts. Controller integration records the exact parent/tree/result before compare-and-swap, reconciles interrupted commits, and schedules fresh read-only reviewers plus ordered operator verifiers only after committed integration.
 
+`projectEvidenceLedger` reconstructs phase decisions, runtime/model identity, exact context and report references, workspace/diff evidence, usage, integration commits, and dependency evidence from the immutable workflow plus authoritative events. `LiveRunProjector` derives the presentation-safe stream used by terminal clients. It caps each message at 2 KiB and each attempt at 128 messages or 64 KiB, reports omitted messages, and produces the same observations when durable history is replayed after reconnect. Prompts, structured output bodies, private reasoning, tool bodies, credentials, and raw provider errors have no live-event representation. Commit observers run only after persistence and cannot affect workflow decisions.
+
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api engine`; output is in `.generated/api/engine/` and is not committed.
 
 ## Boundaries and invariants
@@ -31,6 +33,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker Task execution uses the durable coordinator through the CLI, including pause, cancel, resume, crash recovery, and operational inspection. The coordinator and workspace boundary now execute planner-expanded graphs with concurrent attempts and recoverable Git integration; Feature CLI composition, public live projection, and completion evidence remain in the active defined-SDLC work. Deterministic YAML workflows continue through `WorkflowEngine`.
+Single-worker Task execution uses the durable coordinator through the CLI, including pause, cancel, resume, crash recovery, live public observations, evidence-ledger inspection, and operational inspection. The coordinator and workspace boundary execute planner-expanded graphs with concurrent attempts and recoverable Git integration; Feature CLI composition and completion evidence remain in the active defined-SDLC work. Deterministic YAML workflows continue through `WorkflowEngine`.
 
 License: [AGPL-3.0-only](../../LICENSE).

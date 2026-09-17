@@ -8,6 +8,7 @@ import {
   RunOwnershipBlockedError,
   RunStoreError,
   WorkflowEngine,
+  LiveRunProjector,
   renderRunStatus,
   renderWorkflowGraph,
   type RunPersistence,
@@ -27,6 +28,7 @@ import {
   openDurableRunStore,
   renderDurableRunInspection,
 } from "./durable.js";
+import { LiveRunRenderer } from "./live.js";
 
 /**
  * Injectable CLI output streams, allowing hosts and tests to capture diagnostics.
@@ -36,6 +38,8 @@ interface CliIo {
   stdout(message: string): void;
   /** Emit usage or operator-readable command diagnostics. */
   stderr(message: string): void;
+  /** Whether stdout supports terminal styling rather than newline-delimited JSON. */
+  isTty?: boolean;
 }
 
 /**
@@ -225,20 +229,23 @@ async function runTask(target: string, args: readonly string[], io: CliIo): Prom
   if (mutation !== "readonly" && mutation !== "isolated") {
     throw new Error("Task requires a filesystem mutation mode");
   }
-  const services = await openDurableCliServices(stateDir);
+  const renderer = new LiveRunRenderer(io.isTty ?? false);
+  let projector: LiveRunProjector | undefined;
+  const services = await openDurableCliServices(stateDir, {
+    observeCommittedEvents(events, state, committedWorkflow) {
+      projector ??= new LiveRunProjector(committedWorkflow);
+      for (const line of renderer.render(projector.project(state, events))) {
+        io.stdout(line);
+      }
+    },
+  });
   try {
     const workspace = await services.workspaces.create(repoRoot, runId, mutation);
     if (workspace.mode === "memory") {
       throw new Error("Durable task execution requires a filesystem workspace");
     }
     await services.coordinator.createRun(workflow, { runId, workspace, descriptor });
-    io.stdout("Run " + runId + " created\nWorkspace: " + workspace.path);
     const state = await services.coordinator.resume(runId);
-    const inspection = await inspectDurableRun(services.store, runId, true);
-    if (!inspection) {
-      throw new Error("Created durable run could not be inspected");
-    }
-    io.stdout(renderDurableRunInspection(inspection));
     return state.status === "succeeded" ? 0 : 1;
   } finally {
     services.store.close();
@@ -420,6 +427,7 @@ export async function runCli(args: readonly string[], options: CliOptions = {}):
   const io = options.io ?? {
     stdout: (message: string) => console.log(message),
     stderr: (message: string) => console.error(message),
+    isTty: process.stdout.isTTY === true,
   };
   const persistence = options.persistence ?? processLocalPersistence;
   try {

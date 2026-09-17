@@ -150,6 +150,12 @@ export interface DurableRunCoordinatorOptions {
   owner: LocalProcessIdentity;
   /** Observe the process identity recorded by a prior lease without signalling it. */
   observeProcess: (owner: LocalProcessIdentity) => Promise<ProcessObservation>;
+  /** Observe committed transitions for presentation; observer failures never affect authority. */
+  observeCommittedEvents?: (
+    events: readonly RunEvent[],
+    state: RunState,
+    workflow: WorkflowDefinition,
+  ) => void;
   /** Injectable cryptographic UUIDv4 run factory for deterministic tests. */
   createRunId?: () => string;
   /** Injectable cryptographic UUIDv4 lease-owner factory for deterministic tests. */
@@ -284,6 +290,7 @@ export class DurableRunCoordinator {
   private readonly runtimes: CoordinatorRuntimeRegistry;
   private readonly owner: LocalProcessIdentity;
   private readonly observeProcess: (owner: LocalProcessIdentity) => Promise<ProcessObservation>;
+  private readonly observeCommittedEvents?: DurableRunCoordinatorOptions["observeCommittedEvents"];
   private readonly createRunId: () => string;
   private readonly createOwnerId: () => string;
   private readonly createOperationId: () => string;
@@ -299,6 +306,7 @@ export class DurableRunCoordinator {
     this.runtimes = options.runtimes;
     this.owner = structuredClone(options.owner);
     this.observeProcess = options.observeProcess;
+    this.observeCommittedEvents = options.observeCommittedEvents;
     this.createRunId = options.createRunId ?? randomUUID;
     this.createOwnerId = options.createOwnerId ?? randomUUID;
     this.createOperationId = options.createOperationId ?? randomUUID;
@@ -350,6 +358,7 @@ export class DurableRunCoordinator {
       workflow: loaded.workflow,
       loaded,
       createOperationId: this.createOperationId,
+      observeCommittedEvents: this.observeCommittedEvents,
     });
     return this.finishOwnedSession(session, () =>
       this.coordinateRecovered(session, loaded.events, descriptor, operationId),
@@ -407,12 +416,18 @@ export class DurableRunCoordinator {
       operationId: this.createOperationId(),
       snapshot,
     });
+    try {
+      this.observeCommittedEvents?.(events, initialized.state, workflow);
+    } catch {
+      // Presentation observers cannot change an already committed workflow decision.
+    }
     return new OwnedRunSession({
       store: this.store,
       lease: receipt.lease,
       workflow,
       loaded: { state: initialized.state, eventPrefixDigest: snapshot.eventPrefixDigest },
       createOperationId: this.createOperationId,
+      observeCommittedEvents: this.observeCommittedEvents,
     });
   }
 

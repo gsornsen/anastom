@@ -32,9 +32,11 @@ import {
   createPrepareExecution,
   createRunSnapshot,
   materializeEvents,
+  projectEvidenceLedger,
   type ArtifactStore,
   type CommandExecution,
   type DurableWorkspaceBoundary,
+  type DurableRunCoordinatorOptions,
   type ExecutionHost,
   type ExecutionObservation,
   type LocalProcessIdentity,
@@ -633,8 +635,14 @@ function coordinator(
   store: InMemoryDurableRunStore,
   host: ExecutionHost,
   fixtureWorkspace: DurableWorkspaceBoundary,
-  now: () => number,
+  options:
+    | (() => number)
+    | {
+        now: () => number;
+        observeCommittedEvents: DurableRunCoordinatorOptions["observeCommittedEvents"];
+      },
 ): DurableRunCoordinator {
+  const now = typeof options === "function" ? options : options.now;
   return new DurableRunCoordinator({
     store,
     executionHost: host,
@@ -654,6 +662,8 @@ function coordinator(
     },
     owner,
     observeProcess: async () => ({ state: "absent", observedAtMs: now() }),
+    observeCommittedEvents:
+      typeof options === "function" ? undefined : options.observeCommittedEvents,
   });
 }
 
@@ -972,6 +982,29 @@ Implement two independent changes, integrate them, review the result, and verify
       ["left", "right"],
       ["integration-corrections"],
     ]);
+    const retained = await store.load("defined-sdlc", "complete-history");
+    if (!retained) {
+      throw new Error("Completed defined-SDLC run was not retained");
+    }
+    const ledger = projectEvidenceLedger(definedWorkflow, retained.events);
+    expect(ledger.phases.find(({ nodeId }) => nodeId === "implement.left")).toMatchObject({
+      actor: { kind: "runtime", runtimeIds: ["fake"] },
+      attempts: [
+        {
+          workspace: {
+            workspaceId: "defined-sdlc--task--left",
+            patchDigest: digestBytes("patch:left"),
+          },
+        },
+      ],
+    });
+    expect(ledger.phases.find(({ nodeId }) => nodeId === "integrate.wave-1")).toMatchObject({
+      actor: { kind: "controller" },
+      integration: { committedCommit: state.integrations?.["integrate.wave-1"]?.committed?.commit },
+    });
+    expect(ledger.phases.find(({ nodeId }) => nodeId === "verify.test")).toMatchObject({
+      actor: { kind: "command" },
+    });
   });
 
   it("persists preparation and start authority before authorizing the execution host", async () => {
@@ -1001,6 +1034,30 @@ Implement two independent changes, integrate them, review the result, and verify
     );
     expect(await store.inspectLease("start")).toMatchObject({ released: true });
     now += 1;
+  });
+
+  it("notifies presentation observers only after commit and ignores observer failures", async () => {
+    const now = 1_000;
+    const store = new InMemoryDurableRunStore(() => now);
+    const observed: string[] = [];
+    const state = await coordinator(
+      store,
+      new FixtureExecutionHost(),
+      new FixtureWorkspace(["clean"]),
+      {
+        now: () => now,
+        observeCommittedEvents(events) {
+          observed.push(...eventTypes(events));
+          throw new Error("display unavailable");
+        },
+      },
+    ).start(workflow, { runId: "observed", workspace, descriptor });
+    const loaded = await store.load("observed", "complete-history");
+
+    expect(state.status).toBe("succeeded");
+    expect(observed[0]).toBe("RunCreated");
+    expect(observed.at(-1)).toBe("RunCompleted");
+    expect(observed).toEqual(eventTypes(loaded?.events ?? []));
   });
 
   it("routes command attempts through the same prepared and authorized boundary", async () => {

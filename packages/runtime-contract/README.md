@@ -4,13 +4,15 @@ Define the harness-independent interface between Anastom's control plane and exe
 
 ## Public API
 
-`RuntimeAdapter` exposes `capabilities`, `start`, `events`, `collect`, and `cancel`. `DurableRuntimeAdapter` adds a bounded credential-free `descriptor`, and `RuntimeDescriptorCodec` parses exact adapter configuration before reconstructing a runtime. `ExecutionRequest`, `ExecutionResult`, `ContextEnvelope`, `WorkspaceRef`, `WorkspaceCheckpoint`, and `ArtifactRef` describe explicit execution and evidence boundaries. `assertExecutionRequest` and `assertExecutionResult` enforce exact process-boundary shapes plus 4 MiB request and 1 MiB result limits; `assertWorkspaceCheckpoint` validates the exact versioned workspace evidence shape and reviewed ignored-content bounds. `probeRuntime` checks a selected adapter before durable state exists; `RuntimeNegotiation` records the accepted workspace requirement and capability snapshot. Versioned schemas validate descriptor, checkpoint, capability, and public observation shapes.
+`RuntimeAdapter` exposes `capabilities`, `start`, `events`, `collect`, and `cancel`. `DurableRuntimeAdapter` adds a bounded credential-free `descriptor`, and `RuntimeDescriptorCodec` parses exact adapter configuration before reconstructing a runtime. `ExecutionRequest`, `ExecutionResult`, `ContextEnvelope`, `WorkspaceRef`, `WorkspaceCheckpoint`, and `ArtifactRef` describe explicit execution and evidence boundaries. `LiveRunEvent` is the presentation-safe lifecycle contract used by CLI and later terminal clients. `assertExecutionRequest` and `assertExecutionResult` enforce exact process-boundary shapes plus 4 MiB request and 1 MiB result limits; `assertWorkspaceCheckpoint` and `assertLiveRunEvent` validate exact workspace and public-stream shapes. `probeRuntime` checks a selected adapter before durable state exists; `RuntimeNegotiation` records the accepted workspace requirement and capability snapshot. Versioned schemas validate descriptor, checkpoint, capability, runtime observation, and live-run event shapes.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api runtime-contract`; output is in `.generated/api/runtime-contract/` and is not committed.
 
 ## Boundaries and invariants
 
 Capabilities describe observable support, including supported filesystem modes. Runtime descriptors are canonical JSON capped at 16 KiB; the shared envelope and adapter codec reject unknown fields, and descriptors exclude credentials, executable overrides, auth paths, environment, native sessions, and test factories. `RuntimeEvent` can report configured or native-reported provider/model identity and one partial or complete attempt-scoped token observation. Optional counters mean unavailable values stay absent rather than becoming invented zeroes; telemetry does not decide acceptance or price. Adapter handles convey identity, not authorization. Context contains explicit task or Feature identity, exact methodology instructions, normalized plan and assignment data, mutation scopes, dependency outputs, policy, and required output schema; no ambient conversation is assumed. Durable process recovery belongs to the engine-owned execution host rather than runtime adapters.
+
+`LiveRunEvent` contains public run, graph, node, attempt, runtime, usage, artifact-reference, workspace, integration, verification, and control observations. It intentionally has no fields for prompts, structured result bodies, reasoning, native tool payloads, credentials, or raw errors. The engine owns projection and dropped-message policy; this package owns only the exact shared shape and validation boundary.
 
 ## Development
 
@@ -27,6 +29,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker task execution and durable recovery are delivered. The runtime boundary now carries exact planner-expanded attempt context while scheduling, integration, and review acceptance stay in the control plane. Feature CLI composition and live projection remain in the active defined-SDLC work.
+Single-worker task execution and durable recovery are delivered. The runtime boundary carries exact planner-expanded attempt context while scheduling, integration, review acceptance, evidence derivation, and live projection stay in the control plane. Feature CLI composition remains in the active defined-SDLC work.
 
 License: [AGPL-3.0-only](../../LICENSE).

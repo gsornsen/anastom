@@ -4,7 +4,7 @@ Expose local operator commands for validation, graph rendering, execution, statu
 
 ## Public API
 
-`runCli(args, options)` returns an exit code with injectable IO. Run Anastom from a directory containing the authored Task or Workflow source tree: CLI-selected files and workflow schema references must remain inside its current directory after physical resolution. `--repo` can still target a separate Git checkout. Direct core loaders remain available for trusted local callers with their own file authorization. YAML workflows use the deterministic fake runtime and process-local persistence. Pi, Codex, and Claude Code Task runs use the fenced store, shared execution host, exact descriptor registry, workspace checkpoints, and artifact store. Separate processes can inspect event, lease, pending-control, and snapshot evidence or issue `pause`, `cancel`, and `resume` with a printed UUIDv4 operation ID.
+`runCli(args, options)` returns an exit code with injectable IO. Run Anastom from a directory containing the authored Task or Workflow source tree: CLI-selected files and workflow schema references must remain inside its current directory after physical resolution. `--repo` can still target a separate Git checkout. Direct core loaders remain available for trusted local callers with their own file authorization. YAML workflows use the deterministic fake runtime and process-local persistence. Pi, Codex, and Claude Code Task runs use the fenced store, shared execution host, exact descriptor registry, workspace checkpoints, and artifact store. Each committed public observation streams as concise colored text when stdout is a TTY or one schema-valid JSON value per line when stdout is piped. Separate processes can inspect events, the derived evidence ledger, lease, pending-control, and snapshot evidence or issue `pause`, `cancel`, and `resume` with a printed UUIDv4 operation ID.
 
 The documented entry point is [src/index.ts](src/index.ts). Generate optional HTML API documentation with `pnpm docs:api cli`; output is in `.generated/api/cli/` and is not committed.
 
@@ -27,6 +27,6 @@ Follow [engineering standards](../../docs/ENGINEERING.md) and [contribution expe
 
 ## Current scope
 
-Single-worker Task execution is available through Pi, Codex, and Claude Code with durable operator controls and crash recovery. Deterministic YAML workflows use the fake runtime. Parallel graphs, approvals, and further runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
+Single-worker Task execution is available through Pi, Codex, and Claude Code with durable operator controls, crash recovery, bounded live output, and later-process evidence inspection. The underlying coordinator executes concurrent expanded graphs, while the Feature command that composes those contracts remains in the active defined-SDLC stack. Deterministic YAML workflows use the fake runtime. Interactive terminal controls, approval gates, and further runtime integrations remain roadmap work; see [milestones](../../docs/MILESTONES.md).
 
 License: [AGPL-3.0-only](../../LICENSE).

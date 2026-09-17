@@ -64,6 +64,7 @@ The TypeScript pnpm workspace supports:
 - run-scoped Feature integration/task worktrees with exact dependency-wave bases, protected mutation scopes, immutable patch identity, deterministic controller-owned commits, compare-and-swap branch movement, and narrow interrupted-integration recovery;
 - bounded command execution with separate stdout/stderr artifacts and typed failures;
 - canonical context artifacts, structured reports, public tool summaries, and SHA-256 digests;
+- deterministic evidence-ledger projection plus bounded reconnect-equivalent public live events with dropped-message accounting and TTY/JSON Lines rendering;
 - typed append-only events, SQLite persistence, and inspection from later processes; and
 - CLI commands to validate, render a graph, run, inspect, show status, pause, cancel, and resume.
 
@@ -75,7 +76,7 @@ Pi uses your normal provider authentication and model settings; its Git worktree
 
 See the [M0 retrospective](docs/M0_RETROSPECTIVE.md) and [M1 retrospective](docs/M1_RETROSPECTIVE.md) for the implemented boundaries, evidence, and lessons informing portability.
 
-M4 remains under development. Its [model-free feasibility evidence](docs/M4_FEASIBILITY.md) establishes stable graph expansion, multiple execution identities under one fence, and recoverable deterministic Git integration. The Feature/methodology/plan/review contracts, executable expansion events, concurrent durable scheduling and recovery, task-worktree assignment, scoped patch acceptance, deterministic wave/integrator commits, independent-review semantics, and operator-verifier authority are implemented. Feature CLI selection, bounded live projection, process-level acceptance, and live Pi/Codex evidence remain in the active stack.
+M4 remains under development. Its [model-free feasibility evidence](docs/M4_FEASIBILITY.md) establishes stable graph expansion, multiple execution identities under one fence, and recoverable deterministic Git integration. The Feature/methodology/plan/review contracts, executable expansion events, concurrent durable scheduling and recovery, task-worktree assignment, scoped patch acceptance, deterministic wave/integrator commits, independent-review semantics, operator-verifier authority, derived evidence ledger, and bounded reconnect-equivalent public live stream are implemented. Feature CLI selection, process-level acceptance, and live Pi/Codex evidence remain in the active stack.
 
 ## Try the current demo
 
